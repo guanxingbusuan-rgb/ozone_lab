@@ -105,12 +105,6 @@ run: v3 runtime_v3.dat
 
 # 注: make all 不含 mcm_run（它是独立子树），需要时显式 make mcm
 
-# ---------- FACSIMILE ----------
-
-facsimile_impl/gen/oz_mech.f90: mechanism/ozone.fac facsimile_impl/mechc.py
-	cd facsimile_impl && $(PY) mechc.py ../mechanism/ozone.fac gen
-
-
 
 
 # ---------- 测试 ----------

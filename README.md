@@ -202,7 +202,6 @@ mechc.py → gen*/、fac2kpp.py → KPP 三件套、cfgbuild --mech → runtime_
 | # | 脚本 | 实读确认的功能 | 用法 |
 |---|---|---|---|
 | 1 | `src/cfgbuild.py` | 12 类配置 → Fortran 顺序表控 runtime.dat；段结构（与解析端 `runtime_dat_mod.read_runtime` 逐段对上）：`RUN ns nj nser nscen / SPECIES / MODEL days dtout rtol atol / IC / MET×7 / BC / PHOT lat doy + J idx l m n ×nj / EMIS×ns / DRY×ns / WET×ns / DIL / SCEN name fnox fvoc fco fch4 jfac dt / SERIES name n + t行 + v行`；编译期校验全过才写出 | `python src/cfgbuild.py input_v3 runtime_v3.dat` |
-| 2 | `src/mechc_c.py` | .fac → C 速率函数 → gcc -shared → ctypes（第二执行后端）；生成 C 文件头注释可查（15sp/25rx/14 命名速率） | `python src/mechc_c.py <fac> <out.c> [--compile]` |
 | 3 | `scan_suite.py` | ① 9×9 网格（FS=[0.3,0.45,0.67,1.0,1.5,2.0,2.5,2.8,3.0]）× 6 变量逐案例调 fac_batch_omp（曾用已退役的 fac_run） | `python scan_suite.py` → `output/scan/s*.csv` + 根目录 `ozone_lab_response_suite.png` |
 | 3b | `src/sat2surf.py` | **卫星柱 → 地表等效 ppb 转换器**（两法互证/QA 过滤/BLH 序列插值/点数抽稀/量级自检；`--selftest` 内置校验） | `python src/sat2surf.py <raw> <out> [--blh-file ...]` |
 | 4 | `diagnostics/diagnostics.py` | 8 个纯函数（§6 函数级详表） | `import diagnostics as dg` |
@@ -435,8 +434,9 @@ f_CO → CO              f_CH4 → CH4        另: jfac 乘 J 通道, dt 加 TEM
 
 ### E5. 机制→C 跨语言编译
 
-- **命令**：`python src/mechc_c.py mechanism/mechanism_3_full_chain.fac output/mech_rates.c --compile`
-- **解读**：同一 .fac 两条后端（Fortran/C），绕过 f2py 构建链。
+- **状态**：~~已退役~~（2026-10 清理）。`src/mechc_c.py`（.fac → C 速率函数）零消费者、
+  不在构建链、无测试覆盖，已删除。当前唯一机制编译路径是 `facsimile_impl/mechc.py`。
+- **历史**：如需查阅，见 git 历史（commit `1cc2777` 之前）。
 
 ## F 类：数值方法教学实验（10b 坑实录精选 8 个）
 
@@ -779,7 +779,7 @@ OPE 谷 13.35——机制/求解器改动造成的数值漂移被 make test 直�
 | 2 Jacobian 延迟 | **已验证无益**（1.0×，负结果保留） |
 | 3 EBI 自适应子步 | **已实现**（1.4×） |
 | 4 并行扫描 | **已实现**（scan_parallel 2.3× + fac_batch_omp 2.05×） |
-| 5 C 代码生成 | **已实现**（mechc_c.py） |
+| 5 C 代码生成 | ~~已实现~~（mechc_c.py，2026-10 删除：零消费者） |
 | 6 KPP 批量 | 已由 fac_batch_omp 线程级取代（kpp_batch 退役） |
 
 ---

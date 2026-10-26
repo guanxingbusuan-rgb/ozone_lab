@@ -49,7 +49,7 @@
 ├──────── 诊断层 ──── diagnostics/ (indicators.py 引擎 + diagnostics.py 账本库)
 ├──────── 求解器层 ── facsimile_impl/ (fac_v3 + fac_batch_omp)   mcm_city/ (mcm_run)
 ├──────── 运行时层 ── modules/ (runtime_dat_mod + chem_phys_mod)
-├──────── 编译层 ──── src/ (cfgbuild.py + mechc.py + mechc_c.py)
+├──────── 编译层 ──── src/cfgbuild.py  facsimile_impl/mechc.py
 ├──────── 合同层 ──── templates/ (5 类外数据模板)   input_v3/ (12 类生效配置 + constraints/)
 └──────── 事实源 ──── mechanism/ (mechanism_3_full_chain.fac) + audit/ (元素守恒审计)
 ```
@@ -59,7 +59,7 @@
 | 目录 | 角色 | 关键文件 → 功能 |
 |---|---|---|
 | **`mechanism/`** | **机制唯一事实源**（1 个文件） | `mechanism_3_full_chain.fac`：**V2.4 111sp/198rx**，十段链条（①无机核心+HONO 晨爆 ②NO₃/N₂O₅ 夜化学 Troe ③CH₄+PAN 储库 ④ISOP 二代三分支 ⑤DMS 硫链 ⑥卤素闭环）+ V2.3 补链（臭氧化 OH 产率 0.30/0.26、RONO₂/OLENIT 硝酸酯家族、TERP 五物种迷你链、PNA+OH）；自带 FORMULA 段；**规格书见 mechanism/README.md**（逐反应速率/配平方法论/对比定位）|
-| **`src/`** | **两个编译器**（Python，全部输入唯一入口） | `cfgbuild.py`：12 类 config+constraints → runtime_v3.dat，编译期校验（物种存在性/单位指令/单调性/≤128 点/情景表达式）；`mechc.py`：机制编译器（.fac → gen_v3 生成码）；`mechc_c.py`：C 后端（机制→C 速率函数，第二执行路径） |
+| **`src/`** | **两个编译器**（Python，全部输入唯一入口） | `cfgbuild.py`：12 类 config+constraints → runtime_v3.dat，编译期校验（物种存在性/单位指令/单调性/≤128 点/情景表达式）；`mechc.py`：机制编译器（.fac → gen_v3 生成码）；（`mechc_c.py` 已于 2026-10 删除：零消费者） |
 | **`modules/`** | **Fortran 共享模块层**（三路线共用） | `runtime_dat_mod.f90`：runtime.dat 唯一消费端（12 段解析+气象插值+SZA→J+BOX 日型+ser_interp+build_groups 组映射+scen_build）；`chem_phys_mod.f90`：**物理四账唯一实现**（排放①/干+湿沉②/BC 序列观测同化③/BLH 膨胀④）+ `tune_atol_by_name`（ATOL 单源）+ `eval_met_dt`/`eval_J_jf`；`rad_photol.f90`：B2 在线光解 demo |
 | **`facsimile_impl/`** | **工程主线**（两条活路线） | `gen_v3/`：生成码（oz_mech.f90 + oz.reac/prod 计量表，fac_v3/batch 共享）；`oz_fac_v3.f90`→`fac_v3`：单箱深度（情景名/观测同化/六账 IPR 逐时导出）；`fac_batch_omp.f90`+`cvode_c_mod.f90`→`fac_batch_omp`：批量广度（C-ABI 直连+OpenMP、NOy 17 物种权重表+运行期氮守恒不变量、24 列指示因子）；`oz_audit.c`：C 证人（NOx 望远镜闭合+O₃ 收支） |
 | **`mcm_city/`** | **真实机制对照**（刻意冻结，游离 make 主链外，**零代码耦合**） | `mcm_driver.f90`→`mcm_run`：MCM v3.3.1 CH₄ 子集 29sp/71rx 城市模拟（CLI: days/pref/fnox/fvoc，排放/IC/沉降全硬编码）；`gen/` 独立生成码。**详见 [mcm_city/README.md](mcm_city/README.md)** |

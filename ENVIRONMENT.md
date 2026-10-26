@@ -36,7 +36,7 @@
 | 6 | Pillow (PIL) | 11.1.0 | 同上 | 可选 | 图片后处理/验证 |
 | 7 | fontTools | 4.55.3 | 同上 | 可选 | 字体覆盖自检（排版排查用） |
 | 8 | **gfortran** | 13.2.0 | `~/gcc-13.2.0/bin` | **硬** | 无法编译求解核 |
-| 9 | **gcc** | 13.2.0 | `~/gcc-13.2.0/bin` | 半硬 | 仅 C 审计器/`mechc_c.py` 后端需要 |
+| 9 | **gcc** | 13.2.0 | `~/gcc-13.2.0/bin` | 半硬 | 仅 C 审计器 `audit/oz_audit.c` 需要 |
 | 10 | **SUNDIALS CVODE** | 2.7.0（库 2.9.0/2.7.0 版本号见 §4） | `~/soft/atmenv/cvode` | **硬** | 所有 Fortran 路线无法链接 |
 | 11 | libgomp（OpenMP） | 随 gcc 13.2.0 | `~/gcc-13.2.0/lib` | 半硬 | `fac_batch_omp` 无并行（仍可串行） |
 | 12 | KPP | 3.2.0 | `~/soft/src/KPP-3.2.0` | **已退役** | 无影响（KPP 路线已删） |
@@ -291,7 +291,7 @@ libquadmath.0.dylib
 │ C  ——  三类角色                                                  │
 │   libsundials_*  (第三方)       ODE 求解引擎本体（BDF/Newton）   │
 │   audit/oz_audit.c            独立"证人"：NOx 守恒 + O₃ 收支      │
-│   (src/mechc_c.py 按需生成)    机制 → C 速率函数（第二执行后端）  │
+│   (已删除: mechc_c.py)        原 C 速率函数后端（零消费者）      │
 └─────────────────────────────────────────────────────────────────┘
                          ▼
 ┌─────────────────────────────────────────────────────────────────┐
@@ -309,7 +309,7 @@ libquadmath.0.dylib
 | 文件 | 行数 | 角色 | 做什么 |
 |---|---|---|---|
 | **`src/cfgbuild.py`** | 395 | **配置编译器（唯一前端入口）** | 读 12 类人类可读配置 → 校验（物种/单位/单调/点数/槽位）→ 写 `runtime_v3.dat`（Fortran 唯一输入）。**运行时零文本解析的秘密全在这里** |
-| `src/mechc_c.py` | 112 | 机制→C 代码生成 | `.fac` → C 速率函数 → `gcc -shared` → ctypes 直调。绕过 f2py 构建链 |
+| ~~`src/mechc_c.py`~~ | ~~112~~ | ~~机制→C 代码生成~~ | **已删除（2026-10）**：零消费者、不在构建链、无测试 |
 | **`src/sat2surf.py`** | 282 | 卫星数据转换器 | TROPOMI 柱浓度 → 地表等效 ppb 序列（直观法主准则 + QA 过滤 + BLH 插值 + 点数抽稀） |
 
 #### B. 机制编译器（`facsimile_impl/mechc.py`，1 个）
@@ -375,7 +375,7 @@ libquadmath.0.dylib
 |---|---|---|
 | **`libsundials_cvode` 等（第三方）** | **ODE 求解引擎本体** | BDF/Newton/SPGMR 的实现是 C；Fortran 通过 fcmix（`FCVODE`）或 C API（`CVode`）调用。**整个项目的数值能力建立在它之上** |
 | **`audit/oz_audit.c`**（40 行） | **独立"证人"审计器（C 语言旁证）** | `nox_budget`（NOx 家族望远镜闭合，Kahan 求和）+ `o3_budget`（ΔO₃=∫(P−L)dt）。**用与 Fortran 完全无关的实现算同一笔账**——若两边不一致，说明有一边错了。需手动 `gcc -shared` 编译为 dylib 后由 Python 调 |
-| `src/mechc_c.py`（Python，非 C 文件） | **机制→C 代码生成后端** | 按需把 `.fac` 编译成 C 速率函数（`gcc -shared` → ctypes），提供 Fortran 之外的第二条机制执行路径 |
+| ~~`src/mechc_c.py`~~（已删除） | ~~机制→C 代码生成后端~~ | 原为性能实验 #5 的产物；因零消费者已移除。当前唯一机制编译路径 = `facsimile_impl/mechc.py` |
 
 > **C 层的设计意图**：不是"用 C 重写求解器"，而是提供**独立的第二实现**做交叉验证
 > + 借助第三方 C 库获得成熟数值算法。当前唯一的 C 源文件 `oz_audit.c` 是历史

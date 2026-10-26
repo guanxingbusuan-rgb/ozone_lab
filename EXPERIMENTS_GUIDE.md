@@ -236,7 +236,7 @@ fac_v3 / fac_batch_omp                 (两个二进制)
 | `facsimile_impl/` | 工程主线两个可执行体 + 生成码 | 改物理逻辑时 |
 | `mcm_city/` | MCM 对照子树的独立机制与二进制 | 机制扩链后跑一次 |
 | `modules/` | 共享 Fortran 模块（runtime_dat_mod / chem_phys_mod） | 改物理/解析时 |
-| `src/` | Python 编译前端（cfgbuild / mechc / mechc_c / fac2kpp） | 改输入格式时 |
+| `src/` | Python 编译前端（cfgbuild / sat2surf）；机制编译在 `facsimile_impl/mechc.py` | 改输入格式时 |
 | `diagnostics/` | 诊断库（diagnostics.py + indicators.py） | 改指标定义时 |
 | `audit/` | 元素审计与 C 证人 | 加机制时跑 |
 | `tests/` | 冒烟 + 功能测试 | 加哨兵时 |

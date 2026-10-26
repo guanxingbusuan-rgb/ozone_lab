@@ -554,6 +554,30 @@ check("冻结版: V25_PLAN 已删除（避免与评估冲突）",
       not os.path.exists("mechanism/V25_PLAN.md"), "预备方案已移除")
 check("冻结版: teaching/ 已删除（无死代码）",
       not os.path.exists("mechanism/teaching"), "目录已移除")
+# 所有 .fac 必须被 git 跟踪（.fac 是机制事实源，不允许游离或被 ignore）
+import subprocess as _sp2
+_facs = sorted(str(p2) for p2 in __import__("pathlib").Path(".").rglob("*.fac")
+               if ".git" not in p2.parts)
+_tracked = set(_sp2.run(["git", "ls-files", "*.fac"], capture_output=True,
+                        text=True).stdout.split())
+_untracked_fac = [f for f in _facs if f not in _tracked]
+check("所有 .fac 均已入库（机制事实源不可游离）",
+      not _untracked_fac,
+      f"{len(_facs)} 个 .fac 全部跟踪" if not _untracked_fac
+      else f"未跟踪: {_untracked_fac}")
+
+check("modules/ 有职责说明文档（含核心/预留区分）",
+      os.path.exists("modules/README.md")
+      and "核心" in open("modules/README.md").read()
+      and "预留钩子" in open("modules/README.md").read(),
+      "已标注 2 核心 + 1 工具 + 1 预留")
+
+check("mechc_c.py 已删除（零消费者，避免误用）",
+      not os.path.exists("src/mechc_c.py"), "已移除")
+
+check("Makefile 无引用已删除的 mechanism/ozone.fac",
+      "mechanism/ozone.fac" not in open("Makefile").read(), "死规则已清")
+
 check("mcm_city 有定位说明文档（标明与核心零耦合）",
       os.path.exists("mcm_city/README.md")
       and "零代码耦合" in open("mcm_city/README.md").read(),
