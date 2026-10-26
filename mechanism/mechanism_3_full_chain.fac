@@ -257,7 +257,7 @@ KISOPNO3 = 3.03D-12*EXP(-446/TEMP)  ;
 KISOPBO2NO = 4.0D-12  ;
 KMVKOH = 2.6D-12*EXP(610/TEMP)  ;       ! MCM 总速率 (0.3+0.7)
 KMACROH = 8.0D-12*EXP(380/TEMP)  ;      ! MCM 总速率 (0.45+0.47+0.08)
-KMGLYOH = 1.9D-12  ;
+KMGLYOH = 1.9D-12*EXP(575/TEMP)  ;      ! MCM MGLYOX+OH (旧漏 EXP 项, 偏慢 7x)
 KMPANTH = 1.6D+16*EXP(-13500/TEMP)  ;   ! MCM (旧 D-3 写错 → 慢 19 量级)
 * ;
 * ---- 硫链速率 ----  ;
@@ -286,15 +286,15 @@ KOLEO3 = 1.0D-17  ;                    ! 烯烃臭氧化集总  ;
 KOLENO3 = 9.4D-15  ;                   ! 夜交通 NO3 加成 (丙烯)  ;
 KALKOH = 1.1D-12  ;                    ! C3H8 代理  ;
 KARO1OH = 5.6D-12  ;                   ! 甲苯+OH (MCM)  ;
-KARO2OH = 1.3D-11  ;                   ! 二甲苯+OH  ;
-KKETOH = 2.2D-13  ;                    ! 丙酮+OH (MCM)  ;
+KARO2OH = 2.31D-11  ;                   ! MCM MXYL+OH 总速率 (旧 1.3e-11 偏慢 1.8x)                   ! 二甲苯+OH  ;
+KKETOH = 8.8D-12*EXP(-1320/TEMP)+1.7D-14*EXP(423/TEMP)  ; ! MCM CH3COCH3+OH 双通道                    ! 丙酮+OH (MCM)  ;
 KPNAF = 1.4D-12  ;                     ! HO2+NO2+M (低温显著)  ;
 KOHPNA = 4.5D-12  ;                    ! PNA+OH 汇 (JPL ~4.5e-12 @298K)  ;
 KRONO2OH = 1.2D-12  ;                  ! RONO2+OH (集总烷基硝酸酯)  ;
 KOLENITOH = 1.2D-12  ;                 ! OLENIT+OH  ;
-KTERPOH = 1.2D-10  ;                   ! 单萜+OH (扩散控制级, pinene)  ;
-KTERPO3 = 8.0D-17  ;                   ! 单萜+O3 (高 OH 产率 ~0.8)  ;
-KTERPNO3 = 3.8D-12  ;                  ! 单萜+NO3 (夜间主要汇)  ;
+KTERPOH = 1.2D-11*EXP(440/TEMP)  ;      ! MCM APINENE+OH 总速率 (旧 1.2e-10 偏快 2.3x)                   ! 单萜+OH (扩散控制级, pinene)  ;
+KTERPO3 = 8.05D-16*EXP(-640/TEMP)  ;    ! MCM APINENE+O3 (旧 8e-17 近似值, 差 15%)                   ! 单萜+O3 (高 OH 产率 ~0.8)  ;
+KTERPNO3 = 1.2D-12*EXP(490/TEMP)  ;     ! MCM APINENE+NO3 (旧 3.8e-12 偏慢 1.6x)                  ! 单萜+NO3 (夜间主要汇)  ;
 KPNAT = 1.3D+16*EXP(-10400/TEMP)  ;
 * ---- V2.5-pre: MCM 官方 CH3O2 专属速率 + KAPHO2 ----  ;
 KAPHO2 = 5.2D-13*EXP(980/TEMP)  ;        ! 酰基过氧 + HO2 通用
@@ -316,13 +316,13 @@ KLALKOH = 5.2D-12*EXP(405/TEMP)  ;
 KMTBEOH = 2.3D-12  ;
 KESTEROH = 1.7D-12  ;
 KSESQOH = 1.9D-10  ;
-KSESQO3 = 1.2D-16  ;
-KSESQNO3 = 4.0D-11  ;
+KSESQO3 = 1.2D-14  ;                    ! MCM BCARY+O3 (旧 1.2e-16 偏慢 100x — 严重)
+KSESQNO3 = 1.9D-11  ;                   ! MCM BCARY+NO3 (旧 4e-11 偏快 2.1x)
 KETHOH = 8.5D-12*EXP(70/TEMP)  ;
 KETHO3 = 1.6D-18  ;
 KALD2OH = 1.9D-11  ;
 KIOLEOH = 6.4D-11  ;
-KIOLEO3 = 6.0D-18  ;
+KIOLEO3 = 3.22D-15*EXP(-968/TEMP)  ;    ! MCM CBUT2ENE+O3 (旧 6e-18 偏慢 21x)
 * ;
 * Reaction definitions.  ;
 * ;

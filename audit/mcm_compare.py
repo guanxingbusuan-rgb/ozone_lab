@@ -183,6 +183,17 @@ def main(argv=None):
         "ALD2", "ALD2O2", "ALD2OOH", "PPAN",
         "IOLE", "IOLERO2", "IOLEOOH", "IOLENIT",
     }
+    # 集总物种 → MCM 代表分子（用于"跨机制可映射比对"）
+    # 这是第二道关口：纯无机比对只覆盖 57 条，集总物种的速率曾被漏查，
+    # 实测抓出 9 处错误（SESQ+O3 偏慢 100x、MGLY+OH 漏 EXP 项偏慢 7x 等）。
+    LUMP_MAP = {
+        "ALK": "C3H8", "OLE": "C3H6", "ARO1": "TOLUENE", "ARO2": "MXYL",
+        "KET": "CH3COCH3", "TERP": "APINENE", "SESQ": "BCARY",
+        "ISOP": "C5H8", "CH4": "CH4", "LALK": "NC6H14",
+        "ETH": "C2H4", "IOLE": "CBUT2ENE", "ALD2": "C2H5CHO",
+        "MEOH": "CH3OH", "ETOH": "C2H5OH", "ESTER": "ETHACET",
+        "MGLY": "MGLYOX", "GLY": "GLYOX",
+    }
     PHOT = re.compile(r"^J<\d+>$")
 
     rows, struct, skipped = [], [], 0
@@ -270,6 +281,55 @@ def main(argv=None):
                   f"{r['rel'] * 100:7.1f}% {r.get('n_branch', 1):4d}  {r['our_rate'][:20]}")
             print(f"{'':32s}{'':13s}{'':13s}{'':9s}{'':5s} MCM: {r['mcm_rate']}")
 
+    # ══ 第二道关口: 集总物种 → MCM 代表分子（跨机制可映射比对）══
+    lump_rows = []
+    for rate, lhs, rhs in our_rx:
+        if PHOT.match(rate) or not (lhs & set(LUMP_MAP)) or not (1 <= len(lhs) <= 2):
+            continue
+        mapped = frozenset(LUMP_MAP.get(x, x) for x in lhs)
+        if not mapped <= set(mcm_sp):
+            continue
+        hits2 = midx.get(mapped)
+        if not hits2:
+            continue
+        try:
+            v_our2 = evaluate(rate, our_rates)
+        except Exception:
+            continue
+        v_sum2, used2 = 0.0, []
+        for mr, mrhs in hits2:
+            try:
+                v2 = evaluate(mr, mcm_rates)
+            except Exception:
+                continue
+            if v2 > 0:
+                v_sum2 += v2
+                used2.append(mr)
+        if v_sum2 <= 0:
+            continue
+        lump_rows.append({
+            "lhs": " + ".join(sorted(lhs)),
+            "mapped": " + ".join(sorted(mapped)),
+            "v_our": v_our2, "v_mcm": v_sum2,
+            "rel": abs(v_our2 - v_sum2) / v_sum2,
+            "our_rate": rate, "n_branch": len(used2),
+        })
+    lump_rows.sort(key=lambda r: -r["rel"])
+    lump_over = [r for r in lump_rows if r["rel"] > args.threshold]
+
+    if not args.quiet and lump_rows:
+        print(f"\n{'=' * 78}")
+        print(f"集总物种跨机制比对 {len(lump_rows)} 条（映射到 MCM 代表分子）")
+        print("=" * 78)
+        print(f"{'本机制':26s} {'MCM 代表':22s} {'本值':>11s} {'MCM':>11s} {'偏差':>8s}")
+        print("-" * 78)
+        for r in lump_over:
+            print(f"{r['lhs'][:26]:26s} {r['mapped'][:22]:22s} "
+                  f"{r['v_our']:11.3e} {r['v_mcm']:11.3e} {r['rel'] * 100:7.1f}%")
+        if not lump_over:
+            print(f"  (全部在 {args.threshold:.0%} 内，最大 "
+                  f"{lump_rows[0]['rel'] * 100:.1f}%)")
+
     if not args.quiet and struct:
         print(f"\n{'=' * 78}")
         print(f"结构性差异 {len(struct)} 条（集总化/分支取舍 —— 非录入错误）")
@@ -282,10 +342,12 @@ def main(argv=None):
             print(f"    本: → {r['our_rhs'][:60]}")
             print(f"    MCM: → {r['mcm_rhs']}")
 
-    ok = len(over) == 0
+    max_rel = max([r["rel"] for r in rows + lump_rows] or [0])
+    ok = max_rel <= args.threshold
     print(f"\n[{'PASS' if ok else 'FAIL'}] 速率系数一致性 "
-          f"(最大偏差 {rows[0]['rel'] * 100:.1f}% vs 阈值 {args.threshold:.0%})"
-          if rows else "[SKIP] 无可比对反应")
+          f"({len(rows)} 条无机 + {len(lump_rows)} 条集总映射, "
+          f"最大偏差 {max_rel * 100:.1f}% vs 阈值 {args.threshold:.0%})"
+          if (rows or lump_rows) else "[SKIP] 无可比对反应")
     return 0 if ok else 1
 
 
