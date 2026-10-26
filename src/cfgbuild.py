@@ -33,24 +33,37 @@ def read_kv(path):
         out[k] = v
     return out
 
-def read_series(path):
+def read_series(path, allow_unit=True):
     """读 't v' 两列时间序列, 校验单调
-    单位指令: 文件头 '# unit: cm3|ppb|ppm' (缺省 cm3=molec/cm3) — 模板约定"""
+
+    allow_unit=True (浓度序列): 文件头 '# unit: cm3|ppb|ppm' 生效, 缺省 cm3=molec/cm3
+    allow_unit=False (气象等原生单位序列): 禁止出现 '# unit:' 指令。
+        原因: 该指令的作用是"乘以浓度换算因子"。若误写进气象文件,
+        '# unit: ppb' 会把 298.15 K 静默变成 7.33e12 (×2.46e10, 实测复现),
+        而 '# unit: K' 又会报"未知单位"。气象量用原生单位 (K/hPa/%/m/mm·h⁻¹/s⁻¹),
+        本就不该换算, 故显式拒绝比静默错 10 个量级安全。
+    """
     t, v = [], []
     unit = "cm3"
     for ln in open(path):
         s = strip_comment(ln)
         if not s:
             c = ln.strip()
-            if c.startswith("#") and "unit:" in c:
-                u = c.split("unit:", 1)[1].split()[0].lower()   # 首 token (容忍行内注释)
+            # 只认"行首指令"(# unit: ppb)，不认正文里提到该写法的说明文字
+            body = c.lstrip("#").strip() if c.startswith("#") else ""
+            if body.lower().startswith("unit:"):
+                if not allow_unit:
+                    raise ValueError(
+                        f"{path}: 气象序列不接受单位指令行 (气象量用原生单位, "
+                        f"浓度换算因子会把值放大 2.46e10 倍) — 请删除该行")
+                u = body.split(":", 1)[1].split()[0].lower()   # 首 token (容忍行内注释)
                 if u not in ("cm3", "ppb", "ppm"):
                     raise ValueError(f"{path}: 未知单位 '{u}' (cm3|ppb|ppm)")
                 unit = u
             continue
         p = s.split()
         t.append(float(p[0])); v.append(float(p[1]))
-    f = unit_factor(unit)
+    f = unit_factor(unit) if allow_unit else 1.0
     v = [x * f for x in v]
     for i in range(1, len(t)):
         if t[i] <= t[i-1]:
@@ -109,7 +122,7 @@ def compile_cfg(input_dir="input_v3", out_path="runtime_v3.dat", mech_override=N
     facs = [Path(mech_override)] if mech_override else sorted(inp.glob("mechanism_*.fac"))
     facs = [f for f in facs if f.exists()]
     if not facs:
-        errs.append("input/ 下无 mechanism_*.fac")
+        errs.append(f"{inp}/ 下无 mechanism_*.fac (且未用 --mech 指定)")
         fac = None; species = []
     else:
         fac = facs[0]
@@ -175,7 +188,7 @@ def compile_cfg(input_dir="input_v3", out_path="runtime_v3.dat", mech_override=N
             met_c[k] = met_defaults[k]; met_s[k] = 0
         elif val.startswith("file:"):
             fn = inp / val[5:]
-            t, v = read_series(fn)
+            t, v = read_series(fn, allow_unit=False)   # 气象量原生单位, 禁浓度换算
             if k == "BLH" and min(v) <= 0:
                 raise ValueError(f"{fn}: BLH 序列含非正值 (min={min(v):g}) — "
                                  f"物理账②④ 中 vd/BLH、dB/BLH 将除零")

@@ -35,8 +35,13 @@ __pycache__/
 *.egg-info/
 .pytest_cache/
 
-# ── 运行输出（实验产物，可由 make test / make batch 重生成）──
+# ── 运行输出（实验产物，可由 experiments/run/ 重生成）──
+# output/  = 实验 CSV 落盘目录（run_A..run_I 全部产物）
+# audit_reports/ = 历次自审自查的过程报告（AUDIT_R10..R16）
+# 两者都是"跑出来的"再生内容，不入库；结论已提炼进 README/OPERATIONS_MANUAL
+# 的 §11 自审记录，不需回溯原始报告文件。
 output/
+audit_reports/
 outp_*.csv
 *.nc
 

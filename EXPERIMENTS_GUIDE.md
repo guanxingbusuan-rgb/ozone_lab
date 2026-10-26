@@ -17,6 +17,9 @@
 
 ## 目录
 
+- [0. 实验运行脚本（experiments/run/）](#0-实验运行脚本experimentsrun--先读这一节)
+  - [0.3 十个运行脚本](#03-十个运行脚本ai--m-不含伴随反演)
+  - [0.3b 气象序列输入（实验 M）](#03b-气象序列输入实验-m-的完整打法)
 - [1. 环境与首次构建](#1-环境与首次构建)
 - [2. 化学基础（读实验前必读）](#2-化学基础读实验前必读)
 - [3. 数据如何进程序（12 类配置详解）](#3-数据如何进程序12-类配置详解)
@@ -35,7 +38,7 @@
 - [11. 实验 G：逐小时过程分析](#11-实验-g逐小时过程分析)
 - [12. 实验 H：灵敏度/伴随分析](#12-实验-h灵敏度伴随分析)
 - [13. 实验 I：情景矩阵](#13-实验-i情景矩阵)
-- [14. 五类可选输入数据文件接入操作（templates/ 逐一详解）](#14-五类可选输入数据文件接入操作templates-逐一详解)
+- [14. 六类可选输入数据文件接入操作（templates/ 逐一详解）](#14-六类可选输入数据文件接入操作templates-逐一详解)
 - [15. 输出契约（含真实样例行）](#15-输出契约含真实样例行)
 - [16. 指标解读手册（推导 + 实测 + 冲突案例）](#16-指标解读手册推导--实测--冲突案例)
 - [17. 质检四关卡](#17-质检四关卡机制代码变更后必过)
@@ -76,7 +79,7 @@ make clean-output    # ✓ 新增：只删 output/（需输入 y 确认）
 OZONE_OUT=$HOME/ozone_results python experiments/run/run_all.py
 ```
 
-### 0.3 九个运行脚本（A–I，**不含伴随反演**）
+### 0.3 十个运行脚本（A–I + M，**不含伴随反演**）
 
 | 脚本 | 实验 | 产物 | 耗时 |
 |---|---|---|---|
@@ -89,15 +92,70 @@ OZONE_OUT=$HOME/ozone_results python experiments/run/run_all.py
 | `run_G_hourlyPA.py` | 逐小时过程 + IPR↔IRR | `run_G/hourly_{ledger,share,rxn_top}.csv` `consistency.csv` | ~1 s |
 | `run_H_sensitivity.py` | OAT 敏感性（±10%） | `run_H/jacobian.csv` `sensitivity.csv` `oat_runs.csv` | ~11 s |
 | `run_I_scenario_matrix.py` | 情景 × 路线矩阵 | `run_I/matrix_{o3max,delta}.csv` `direction.csv` | ~4 s |
+| **`run_M_met_series.py`** | **气象观测序列驱动 + 单变量归因** | `run_M/summary.csv` `attribution.csv` `o3_timeseries.csv` | ~6 s |
 
-**总驱动**：`run_all.py`（顺序 A→B→D→G→E→F→H→I→C，全跑 **53 s**）
+**总驱动**：`run_all.py`（顺序 A→B→D→G→E→F→H→M→I→C，全跑 **78 s**）
 
 ```bash
 make all && make runtime_v3.dat                  # 前置
-python experiments/run/run_all.py                # 全跑九个
+python experiments/run/run_all.py                # 全跑十个
 python experiments/run/run_all.py A D            # 只跑指定
 python experiments/run/run_all.py --list         # 列出清单
 ```
+
+### 0.3b 气象序列输入（实验 M 的完整打法）
+
+**能。** 6 个气象量都可以写 `file:` 走时间序列，机制与 BC 浓度约束完全同源
+（`cfgbuild` 编译进 `runtime.dat` 的 `SERIES` 段）。
+
+```bash
+# 1) 已有 6 条 121 点逐时样例
+ls input_v3/constraints/met_*_demo.txt
+#    met_TEMP_demo.txt  met_PRES_demo.txt  met_RH_demo.txt
+#    met_BLH_demo.txt   met_RAIN_demo.txt  met_JFAC_demo.txt
+
+# 2) 切换驱动方式：改 input_v3/meteo.config（文件末尾已备好注释块，取消注释即可）
+#    TEMP = file:constraints/met_TEMP_demo.txt
+#    ...
+
+# 3) 一键跑完整对照实验（常数基准 / 六变量全序列 / 六个单变量）
+python experiments/run/run_M_met_series.py
+```
+
+**实验 M 的对照设计**（关键：把"平均强迫"与"时间结构"分离）：
+
+| run | 气象驱动 | 作用 |
+|---|---|---|
+| `M0_const` | 六变量全取各自 120 h **均值** | 对照基准（同一平均强迫，无时间结构） |
+| `M1_all` | 六变量**全部**逐时序列 | 真实驱动 |
+| `M2..M7_*_only` | 每次只让**一个**变量走序列 | 归因 |
+
+**实测结果**（`output/run_M/attribution.csv`，O3 峰值相对常数基准）：
+
+| 变量 | ΔO3max (ppb) | 说明 |
+|---|---|---|
+| BLH | **−45.4** | 主导项：BLH 序列均值 918 m，但夜间塌到 154 m 使积累与稀释的时序严重不对称 |
+| TEMP | **+16.8** | 次之：日均温相同时，日间高温时段恰好与光解峰值重合 → 放大 O3 |
+| JFAC | +2.6 | 云盖日削弱光解，但晴天日的增强部分抵消 |
+| RH | −1.2 | 改变 H2O → OH 初生，量级小 |
+| RAIN | +0.2 | 5 天仅 6 h 降水，湿沉降窗口太窄 |
+| PRES | 0.00 | 5 天 ≤1 hPa，经 M 的效应可忽略（实务中取常数即可） |
+
+⚠ **单变量效应不可加和**（−45.4 + 16.8 + 2.6 − 1.2 + 0.2 = −27.0，而 `M1_all` 实测 −33.1）。
+非线性来自 O3 对 BLH/TEMP 的耦合（温度影响速率常数又影响数密度，BLH 影响稀释又影响
+沉降）。所以 `attribution.csv` 的末列"占总效应百分比"会出现 **−137% 和 +50.6%**——
+这不是 bug，是"单个因子的贡献超过总量"的典型标志，写论文时应当写成
+"效应不可加，需用响应面/全因子设计"而不是硬凑成 100%。
+
+**三条硬规则**（`cfgbuild` 编译期强制）：
+
+1. **气象序列里绝不能写 `# unit: ppb` 这类浓度单位指令行**。那条指令的作用是"乘以
+   浓度换算因子"，写进气象文件会把 298.15 K 静默变成 7.33e12（×2.46e10）。
+   现在 `cfgbuild` 遇到会直接报错（`read_series(allow_unit=False)`），
+   并有专门的回归用例守卫。
+2. 序列**不循环**，超出首末时刻钳制到端点值 → 想覆盖 5 天就写满 120 h。
+3. 每序列 ≤128 点，且与 BC 序列**共享上限 8 的池子**。启用 6 个气象序列后，
+   BC 侧最多再用 2 个 `file:` 约束。
 
 ### 0.4 输入假设（与你的要求一致）
 
@@ -161,7 +219,7 @@ fac_v3 / fac_batch_omp                 (两个二进制)
 | # | 检查 | 期望输出 |
 |---|---|---|
 | 1 | `make smoke` | `[PASS] FAC-V3 冒烟 (conc 26 行, O3末=…)` + `1/1 PASS` |
-| 2 | `python tests/functional_test.py` | `functional_test: 24/24 PASS`（含 4 金值哨兵 + 7 条 R10-R13 防线 + sat2surf 5 项） |
+| 2 | `python tests/functional_test.py` | `functional_test: 27/27 PASS`（含 4 金值哨兵 + 7 条 R10-R13 防线 + sat2surf 5 项 + 2 条负向守卫） |
 | 3 | `python audit/element_audit.py mechanism/mechanism_3_full_chain.fac` | `全部 131 反应元素守恒 PASS` |
 | 4 | `ls facsimile_impl/fac_v3 facsimile_impl/fac_batch_omp` | 两个二进制存在 |
 
@@ -171,7 +229,7 @@ fac_v3 / fac_batch_omp                 (两个二进制)
 
 | 目录/文件 | 职责 | 你会不会改它 |
 |---|---|---|
-| `mechanism/` | 机制唯一事实源（.fac） | 扩机制时改 |
+| `mechanism/` | 机制唯一事实源（.fac）；`teaching/` 存 15sp 教学存档档 | 扩机制时改 |
 | `input_v3/` | **12 类生效配置** + `constraints/` 序列 | **最常改这里** |
 | `templates/` | 5 类数据落位模板（人读格式合同） | 只读（照它落位） |
 | `runtime_v3.dat` | cfgbuild 产物（Fortran 唯一输入） | 不手改（自动生成） |
@@ -182,8 +240,10 @@ fac_v3 / fac_batch_omp                 (两个二进制)
 | `diagnostics/` | 诊断库（diagnostics.py + indicators.py） | 改指标定义时 |
 | `audit/` | 元素审计与 C 证人 | 加机制时跑 |
 | `tests/` | 冒烟 + 功能测试 | 加哨兵时 |
-| `experiments/` | 7 个实验脚本（A–I 的载体） | 加实验时 |
-| `output/` | 所有实验产物 | 清理用 `make clean` |
+| `experiments/run/` | **10 个实跑脚本**（A–I + M，只落 CSV 不绘图） | 加实验时 |
+| `experiments/*.py` | 旧版实验脚本（含终端报告/绘图/反演） | 一般不用 |
+| `output/` | 所有实验产物（已 gitignore） | 清理用 `make clean-build` |
+| `audit_reports/` | 历次自审过程报告（已 gitignore，结论已进文档） | 只读 |
 | `figures/` | 机制图集（SCI 版 + 漫画版）与工程图 | 改图时 |
 
 ### 1.5 一次最小完整工作流（跑通它你就入门了）
@@ -388,6 +448,8 @@ JFAC   = 1.0                           # 光解缩放（云订正 0–1）
 - 7 个量都支持 `file:` 序列
 - BLH 用于：干沉降 `vd/BLH`、BLH 膨胀稀释 `−y·dB/BLH`（仅增长段）
 - **BLH 序列最小值必须 > 0**（cfgbuild 强制）
+- **六变量全序列的现成样例**：`constraints/met_{TEMP,PRES,RH,BLH,RAIN,JFAC}_demo.txt`
+  （各 121 点 / 0–120 h 逐时）。切换方式与配套实验 M 见 **§0.3b**。
 
 #### ④ `constraints/*.txt` —— 序列数据本体
 
@@ -399,9 +461,23 @@ JFAC   = 1.0                           # 光解缩放（云订正 0–1）
   43200   1500
 ```
 - 两列空白分隔；行内 `#` 后为注释
-- 单位指令 `# unit: ppb`（缺省 cm3=molec/cm³）；**只对 BC 约束文件有意义**
+- **单位指令行 `# unit: ppb` 只对浓度序列（BC 约束）有意义**。
+  气象序列**不允许**出现该行——它的作用是"乘以浓度换算因子"，
+  误写会把 298.15 K 静默变成 7.33e12。`cfgbuild` 现已编译期拒绝
+  （`read_series(allow_unit=False)`），并有回归用例守卫。
 - 上限：**每序列 ≤128 点、全池 ≤8 条**（气象 + BC 共享）
 - 外延：超出时间轴取端点值（**不是外推**）；缺测：直接省行，自动线性插值
+
+**现有序列文件清单**（`input_v3/constraints/`）：
+
+| 文件 | 点数 | 用途 |
+|---|---|---|
+| `met_BLH.txt` / `met_RAIN.txt` | 7 | 默认启用的轻量序列（5 天快照） |
+| `met_{TEMP,PRES,RH,BLH,RAIN,JFAC}_demo.txt` | 各 121 | 站点逐时样例（实验 M 用） |
+| `bc_O3_demo.txt` | 24 | 地面 O₃ 站点逐时 → BC 张弛约束 |
+| `bc_HCHO_demo.txt` | 24 | HCHO 站点/卫星 → BC 张弛约束 |
+| `bc_NO2_sat_demo.txt` | 24 | S5P TROPOMI NO₂ 柱 → BC 张弛约束 |
+
 
 #### ⑤ `bc.config` —— 边界/观测约束（张弛同化）
 
@@ -1798,7 +1874,7 @@ python3 experiments/scen5.py       # 路线×情景 O₃max 响应矩阵 (%Δ) +
 
 ---
 
-## 14. 五类可选输入数据文件接入操作（templates/ 逐一详解）
+## 14. 六类可选输入数据文件接入操作（templates/ 逐一详解）
 
 > **核心原则（源码实证）**：`templates/*.template` **不被任何程序读取**——它是
 > **格式合同**：告诉你原始数据长什么样、怎么换算、落到哪个路径、去哪个 config 登记。
@@ -1819,7 +1895,7 @@ python3 experiments/scen5.py       # 路线×情景 O₃max 响应矩阵 (%Δ) +
 > ```
 > **单位总参考**：[UNITS.md](UNITS.md)（449 行逐子量表 + 换算公式 + 硬编码登记）。
 
-### 14.0 五类模板总览
+### 14.0 六类模板总览
 
 | # | 模板 | 你提供什么 | 落位到 | 登记到 | 引擎直读? |
 |---|---|---|---|---|---|
@@ -1828,6 +1904,7 @@ python3 experiments/scen5.py       # 路线×情景 O₃max 响应矩阵 (%Δ) +
 | ③ | `surface_voc_station.template` | VOC 物种序列（一站一物种） | `constraints/voc_<物种>_<站名>.txt` | `bc.config` | ✓ |
 | ④ | `satellite_column.template` | 卫星柱浓度（molec/cm²） | **先离线转表面等效 ppb** | `bc.config` | ✗（0-D 无气柱） |
 | ⑤ | `emissions_inventory.template` | 排放清单 | **直接编辑** `emissions.config` | —（本身就是配置） | ✓ |
+| ⑥ | **`met_series.template`** | **气象逐时序列（K/hPa/%/m/mm·h⁻¹/1）** | `constraints/met_<量>_<站名>.txt` | **`meteo.config`** | ✓ |
 
 **序列文件的通用约束**（违反即 cfgbuild 编译期拒绝）：
 
@@ -1836,7 +1913,7 @@ python3 experiments/scen5.py       # 路线×情景 O₃max 响应矩阵 (%Δ) +
 | 每序列点数 | ≤ 128 | `序列 N 点 > Fortran 端上限 128` |
 | 全池序列数 | ≤ 8（气象+BC 共享） | `序列总数 9 > Fortran 端上限 8` |
 | 时间轴 | 自模拟起点秒、严格递增 | `时间非单调 @ t=…` |
-| 单位指令 | `# unit: cm3\|ppb\|ppm`（缺省 cm3） | `未知单位 'x'` |
+| 单位指令 | 浓度序列: `# unit: cm3\|ppb\|ppm`（缺省 cm3）<br>**气象序列: 禁止出现** | `未知单位 'x'` / `气象序列不接受单位指令行` |
 | 物种名 | ∈ 机制 VARIABLE 段 | `未知物种` |
 
 ---
@@ -2099,8 +2176,8 @@ print(f\"O3={d['O3_ppb']:.1f} ppb  FNR={d['FNR']:.2f}\")"
 
 | 文件 | 性质 | 被谁引用 | 物理含义 |
 |---|---|---|---|
-| `met_BLH.txt` | **气象序列** | `meteo.config` 的 `BLH = file:...` | 边界层高度（物理环境） |
-| `met_RAIN.txt` | **气象序列** | `meteo.config` 的 `RAIN = file:...` | 降水（物理环境） |
+| `met_BLH.txt` / `met_RAIN.txt` | **气象序列**（默认启用，7 点） | `meteo.config` 的 `BLH/RAIN = file:...` | 边界层高度 / 降水（物理环境） |
+| **`met_{TEMP,PRES,RH,BLH,RAIN,JFAC}_demo.txt`** | **气象序列样例**（各 121 点逐时） | 同上（6 变量全序列） | 实验 M 的驱动数据 |
 | **`bc_O3_demo.txt`** | **观测约束样例** | `bc.config` 的 `O3 = file:...` | 站点 O₃ 观测（真值校准） |
 | **`bc_HCHO_demo.txt`** | **观测约束样例** | `bc.config` 的 `HCHO = file:...` | HCHO 观测（FNR 分子） |
 | **`bc_NO2_sat_demo.txt`** | **观测约束样例** | `bc.config` 的 `NO2 = file:...` | 卫星反演 NO₂（弱 τ 专用） |
@@ -2120,7 +2197,15 @@ print(f\"O3={d['O3_ppb']:.1f} ppb  FNR={d['FNR']:.2f}\")"
 | `bc_HCHO_demo.txt` | `HCHO = file:constraints/bc_HCHO_demo.txt` | 21600 | **−4.03e11** ✓ |
 | `bc_NO2_sat_demo.txt` | `NO2 = file:constraints/bc_NO2_sat_demo.txt` | **43200**（必须弱） | **+3.02e11** ✓ |
 
-**最小试跑**（以 O₃ 为例，3 条命令）：
+**气象序列的最小试跑**（对照实验 M 会自动做这件事）：
+```bash
+# meteo.config 里把 6 行改成 file:（文件末尾已备好注释块）
+# 然后直接跑：常数基准 / 全序列 / 六个单变量，一次出 10 个 run
+python experiments/run/run_M_met_series.py
+# 看归因：output/run_M/attribution.csv
+```
+
+**观测约束的最小试跑**（以 O₃ 为例，3 条命令）：
 ```bash
 # ① bc.config 加一行（保留原有背景常数行）
 echo "O3 = file:constraints/bc_O3_demo.txt" >> input_v3/bc.config
@@ -2687,9 +2772,11 @@ E_CH4 → CH4
 
 ---
 
-### 14.6 气象序列（无模板，但同通路）
+### 14.6 模板⑥：气象序列（`met_series.template`）
 
-`meteo.config` 的 7 个量都支持 `file:`（格式同模板①，两列 + 可选注释）：
+**模板**：`templates/met_series.template`（6 条现成样例：`input_v3/constraints/met_*_demo.txt`）
+
+`meteo.config` 的 7 个量都支持 `file:`（两列 + 可选注释）：
 
 ```
 TEMP  = file:constraints/met_TEMP_mysite.txt      # K
@@ -2701,10 +2788,28 @@ JFAC  = file:constraints/met_JFAC_mysite.txt      # 0–1（云订正）
 RADIAT = file:constraints/met_RADIAT_mysite.txt   # W/m²（保留，当前不参与 J）
 ```
 
+**⚠ 与模板①的关键差别：气象序列里不能写 `# unit:` 行。**
+那条指令是浓度换算因子（ppb→2.46e10），写进气象文件会把 298.15 K
+静默变成 7.33e12。`cfgbuild` 现对气象序列调用 `read_series(allow_unit=False)`，
+遇到直接报错（`气象序列不接受单位指令行`），并有回归用例守卫。
+
 **注意**：
 - BLH 用于物理账②（`vd/BLH`）与账④（`−y·dB/BLH`）——**序列最小值必须 > 0**
-- 序列池与 BC 共享 ≤8 条（气象占 2 条时 BC 只剩 6 条）
+- 序列池与 BC 共享 ≤8 条。**6 变量全序列时 BC 只剩 2 条**
 - `JFAC` 序列 = 逐时云订正（比 `SCEN_CLOUD` 的全程常数更真实）
+- 序列不循环：超出首/末时刻钳制端点值，想覆盖 5 天就写满 120 h
+
+**完整示例（实验 M，10 个 run 实测）**：
+
+```bash
+python experiments/run/run_M_met_series.py
+# M0_const  六变量全取均值   O3max=111.15
+# M1_all    六变量全序列     O3max= 78.05
+# 单变量归因: BLH −45.4 | TEMP +16.8 | JFAC +2.6 | RH −1.2 | RAIN +0.2 | PRES 0.00
+```
+
+单变量效应**不可加和**（和 −27.0 vs 实际 −33.1），`attribution.csv` 末列的
+−137%/+50.6% 是这一非线性的定量标志，不是错误。
 
 ---
 

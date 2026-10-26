@@ -292,12 +292,23 @@ J = JFAC · l · cosχ^m · exp(−n/cosχ)      (cosχ ≤ 1e-3 → J = 0)
 
 ### 2.12 `constraints/*.txt` —— 时间序列（气象 / BC 共用）
 
-格式：**两列** `t[s]  值`，头部可写 `# unit: cm3|ppb|ppm`（**仅 BC 序列使用**；气象序列按 §2.2 各自单位）。
+格式：**两列** `t[s]  值`。头部 `# unit: cm3|ppb|ppm` **只能用于 BC 浓度序列**；
+气象序列各量用原生单位（见 §2.2），**禁止**出现该指令行。
+
+> ⚠ **这是硬拒绝，不是警告**：`# unit:` 的唯一作用是"乘以浓度换算因子"。
+> 气象文件误写 `# unit: ppb`，298.15 K 会被静默变成 7.33e12（×2.46e10）。
+> `cfgbuild` 现对气象序列调用 `read_series(allow_unit=False)`，遇到即报错；
+> `tests/functional_test.py` 有对应负向用例守卫。模板见
+> [`templates/met_series.template`](templates/met_series.template)。
 
 | 子量 | 单位 | 校验 |
 |---|---|---|
 | `t` | **秒，自模拟起点**，严格递增 | 非严格递增 → 拒绝；外延取端点值 |
-| `值` | 该量的原生单位（BLH: m / RAIN: mm·h⁻¹ / BC: 由 `# unit:` 决定） | ≤128 点（Fortran `ser_t(8,128)`） |
+| `值` | 该量原生单位（TEMP: K / PRES: hPa / RH: % / BLH: m / RAIN: mm·h⁻¹ / JFAC: 1 / BC: 由 `# unit:` 决定） | ≤128 点（Fortran `ser_t(8,128)`）；气象+BC 共享 8 条池 |
+
+**现有序列文件**：`met_BLH.txt`/`met_RAIN.txt`（默认 7 点）、
+`met_{TEMP,PRES,RH,BLH,RAIN,JFAC}_demo.txt`（121 点逐时样例，实验 M 用）、
+`bc_{O3,HCHO,NO2_sat}_demo.txt`（24 点 BC 约束样例）。
 
 ### 2.13 `mechanism_3_full_chain.fac` —— 见 §4
 
@@ -310,6 +321,7 @@ J = JFAC · l · cosχ^m · exp(−n/cosχ)      (cosχ ≤ 1e-3 → J = 0)
 | 模板 | 原始单位 | 需做的事 | 换算公式 |
 |---|---|---|---|
 | `surface_o3_station` | ppb | 头部 `# unit: ppb` + 两列 t[s]/值 | 无（cfgbuild 换算） |
+| `met_series` | **原生单位**（K / hPa / % / m / mm·h⁻¹ / 1） | **不写** `# unit:` 行 | 无（原样进方程） |
 | `surface_voc_station` | ppb（PAMS-57 / TO-15） | 同上，一站一物种 | 物种名须映射到机制物种 |
 | `surface_aqi_station` | **μg/m³**（CO 为 mg/m³） | **离线拆分+换算**（模板 §单位换算表） | `ppb = μg/m³ × 24.45 / M`（25 °C,1 atm）：O₃ ×0.509（M=48）、NO₂ ×0.531（M=46）… |
 | `satellite_column` | **molec/cm²**（TROPOMI 柱） | **用 `src/sat2surf.py` 转换**（引擎不读柱；工具含两法互证+QA+抽稀） | `ppb = 柱[molec/cm²] / BLH[cm] / 2.46e10`；⚠ 旧式 `柱/(2.15e25×混合层分数)` 缺 ×1e9（差 9 量级），已修正并被 FT-SAT 测试固化 |

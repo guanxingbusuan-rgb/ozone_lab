@@ -394,11 +394,11 @@ libquadmath.0.dylib
 | 类型 | 文件 | 角色 |
 |---|---|---|
 | `.fac`（1 个在役） | `mechanism/mechanism_3_full_chain.fac` | **机制唯一事实源**（74sp/131rx） |
-| `.fac`（1 个参考） | `input/mechanism_1_ozone_tutorial.fac` | 15sp 教学档（无路线承载，参考用） |
+| `.fac`（1 个存档） | `mechanism/teaching/mechanism_1_ozone_tutorial.fac` | 15sp 教学档（无路线承载，存档参考） |
 | `.config`（9 个） | `input_v3/*.config` | 12 类配置中的生效部分（人类可读） |
-| `.template`（5 个） | `templates/*.template` | **格式合同**（程序零直读） |
-| `.txt`（序列） | `input_v3/constraints/*.txt` | 观测/气象时间序列 |
-| `.dat`、`.csv` | `runtime_v3.dat`、`output/*` | 编译产物 / 实验产物 |
+| `.template`（6 个） | `templates/*.template` | **格式合同**（程序零直读） |
+| `.txt`（序列） | `input_v3/constraints/*.txt` | 观测/气象时间序列（`met_*_demo.txt` 6 条气象样例 + `bc_*_demo.txt` 3 条约束样例） |
+| `.dat`、`.csv` | `runtime_v3.dat`、`output/*` | 编译产物 / 实验产物（`output/` 已 gitignore） |
 | `.md`（6 个） | README / EXPERIMENTS_GUIDE / OPERATIONS_MANUAL / **ENVIRONMENT** / UNITS / SPECIES_INPUT_MATRIX | 文档体系 |
 
 ### 6b.6b 模型维度澄清：0-D 箱 + 参数扫描 ≠ 空间网格

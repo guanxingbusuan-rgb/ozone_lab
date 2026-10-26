@@ -24,6 +24,7 @@ run_all.py —— 全部实验运行总驱动（类似 CMAQ 的 run.cctm.csh 角
   output/run_G/  逐小时过程（hourly_ledger/share/rxn_top/consistency.csv）
   output/run_H/  OAT 敏感性（jacobian/sensitivity.csv）
   output/run_I/  情景矩阵（matrix_o3max/delta/direction.csv）
+  output/run_M/  气象序列驱动（summary/attribution/o3_timeseries.csv）
   output/run_all_manifest.json  全局清单（时间/耗时/产物）
 """
 import os
@@ -46,9 +47,10 @@ EXPERIMENTS = {
     "G": ("run_G_hourlyPA.py", "逐小时过程分析 + IPR↔IRR 互证"),
     "H": ("run_H_sensitivity.py", "OAT 敏感性（±10% 中心差分）"),
     "I": ("run_I_scenario_matrix.py", "情景 × 路线矩阵 + 方向一致性"),
+    "M": ("run_M_met_series.py", "气象观测序列驱动（站点逐时）+ 单变量归因"),
 }
 
-ORDER = ["A", "B", "D", "G", "E", "F", "H", "I", "C"]   # C 依赖 B，放最后
+ORDER = ["A", "B", "D", "G", "E", "F", "H", "M", "I", "C"]   # C 依赖 B，放最后
 
 
 def main(argv):

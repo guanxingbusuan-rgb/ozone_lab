@@ -1,6 +1,8 @@
 # experiments/run —— 实验运行脚本（类 CMAQ run.cctm.csh）
 
 > **定位**：**只负责"跑模拟 + 落 CSV 输出"**，不含任何绘图、不含伴随反演。
+> 十个实验：A 情景沙盘 · B 响应面 · C 屋脊对比 · D 过程诊断 · E 指示因子 ·
+> F OSSE · G 逐小时 · H 敏感性 · I 情景矩阵 · **M 气象序列驱动**。
 > 类比 CMAQ：`run.cctm.csh` 只跑化学输运并写输出文件，绘图是另外的 NCL/Python 脚本。
 > 本目录对应前者；绘图在 `figures/`。
 
@@ -17,7 +19,7 @@ input_v3/ ──cfgbuild──> runtime_v3.dat ──fac_v3/fac_batch_omp/mcm_ru
 
 | 目录 | 角色 | 内容 |
 |---|---|---|
-| **`output/`** | **实验产物（CSV 数据）** | `run_A/` … `run_I/`，每个实验一个子目录；全部是数值表，可直接 pandas/Excel 打开 |
+| **`output/`** | **实验产物（CSV 数据）** | `run_A/` … `run_M/`，每个实验一个子目录；全部是数值表，可直接 pandas/Excel 打开 |
 | **`figures/`** | **可视化** | `fig_response_v3.py` 等**读 output/ 的 CSV** 才是工程图；`gen_all.py`/`gen_cartoon.py` 生成的是**机制示意图**（不依赖输出数据） |
 
 **关键澄清**：
@@ -46,7 +48,7 @@ OZONE_OUT=$HOME/ozone_results python experiments/run/run_all.py
 
 ---
 
-## 3. 九个实验脚本（A–I）
+## 3. 十个实验脚本（A–I + M）
 
 | 脚本 | 实验 | 输入（假设已备好） | 输出（CSV） | 耗时 |
 |---|---|---|---|---|
@@ -59,8 +61,41 @@ OZONE_OUT=$HOME/ozone_results python experiments/run/run_all.py
 | `run_G_hourlyPA.py` | 逐小时过程 + IPR↔IRR 互证 | runtime | `hourly_ledger.csv` `hourly_share.csv` `hourly_rxn_top.csv` `consistency.csv` | ~1 s |
 | `run_H_sensitivity.py` | OAT 敏感性（±10%，18 次） | runtime | `jacobian.csv` `sensitivity.csv` `oat_runs.csv` | ~11 s |
 | `run_I_scenario_matrix.py` | 情景 × 路线矩阵 | runtime + mcm_run | `matrix_o3max.csv` `matrix_delta.csv` `direction.csv` | ~4 s |
+| `run_M_met_series.py` | **气象观测序列驱动 + 单变量归因** | runtime + `met_*_demo.txt` | `summary.csv` `attribution.csv` `o3_timeseries.csv` | ~6 s |
 
-**总驱动**：`run_all.py`（全跑 53 s）
+**总驱动**：`run_all.py`（全跑 78 s，顺序 A→B→D→G→E→F→H→M→I→C）
+
+---
+
+## 3.5 气象观测序列（实验 M）
+
+**能像站点约束那样喂气象变量吗？能。** 6 个气象量都支持 `file:` 序列：
+
+| 变量 | 序列样例 | 原生单位 | 物理入口 |
+|---|---|---|---|
+| `TEMP` | `met_TEMP_demo.txt` | K | Arrhenius 速率 + 数密度 M |
+| `PRES` | `met_PRES_demo.txt` | hPa | 数密度 M（三体反应） |
+| `RH` | `met_RH_demo.txt` | % | H₂O → O(¹D)+H₂O 供 OH |
+| `BLH` | `met_BLH_demo.txt` | m | 体积/稀释/沉降/膨胀 |
+| `RAIN` | `met_RAIN_demo.txt` | mm/h | 湿沉降 k_wet |
+| `JFAC` | `met_JFAC_demo.txt` | 1 | 全部 J 的乘子 |
+
+每条 121 点（0–120 h 逐时），样例含一段冷槽阵雨 + 一天云盖，方便看到效果。
+
+```bash
+# 改 input_v3/meteo.config（末尾已备好注释块）
+# 然后：
+make runtime_v3.dat
+python experiments/run/run_M_met_series.py
+```
+
+**对照设计**：`M0_const`（六变量全取均值）→ `M1_all`（全序列）→ `M2..M7_*_only`
+（单变量）。实测主导项是 **BLH（−45 ppb）** 与 **TEMP（+16.8 ppb）**，且二者
+**不可加和**（单变量和 −27 vs 实际 −33）——`attribution.csv` 末列出现 −137%/+50.6%
+正是"效应不可加"的标志，不是 bug。
+
+**硬规则**：气象序列里**不写 `# unit:` 行**（那是浓度换算指令，写了会被 cfgbuild
+直接拒绝；旧版会静默 ×2.46e10）。6 个气象序列会占掉序列池 8 个名额中的 6 个。
 
 ---
 
@@ -73,7 +108,7 @@ cd ozone_lab
 make all && make runtime_v3.dat      # 构建二进制 + 编译配置
 # mcm 相关实验还需: 见 §5
 
-# ── 全部实验（A–I，除反演）──
+# ── 全部实验（A–I + M，除反演）──
 python experiments/run/run_all.py
 
 # ── 单个实验 ──
@@ -83,6 +118,8 @@ python experiments/run/run_B_surface.py 13             # 13×13 网格
 python experiments/run/run_B_surface.py 9 0.6,0.8,1.0  # 加光解维
 python experiments/run/run_D_process.py output/run_A/BAU   # 复用已有输出
 python experiments/run/run_H_sensitivity.py 5          # ±5% 扰动
+python experiments/run/run_M_met_series.py             # 气象序列对照（10 个 run）
+python experiments/run/run_M_met_series.py --const-only  # 只跑常数基准
 
 # ── 换输出目录（不污染仓库）──
 OZONE_OUT=$HOME/ozone_results python experiments/run/run_all.py

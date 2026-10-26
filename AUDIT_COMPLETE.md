@@ -956,7 +956,7 @@ IPR_PROC                # ["P","L","E","D","B","X"]
 | P2-2 | `cfgbuild` 默认指向 15sp 遗产 `input/` | 默认改 `input_v3` / `runtime_v3.dat` |
 | P2-3 | `output/` 30 个陈旧测试产物（fac_run/EBI 时代） | 删除，仅留现行产物 + 4 个实验子目录 |
 | P2-4 | `make clean` 漏清 6 类（`oz.reac`/`oz.prod`/`gen_v3/*.mod`/`rad_photol_demo`/`*.dylib`/`*.nc`） | 补齐 |
-| P2-5 | `input/` 零消费者 | **不删**（15sp 教学参照），新建 `input/README.md` 标注"非工程入口"+ 正确/错误用法对照 |
+| P2-5 | `input/` 零消费者 | ~~**不删**（15sp 教学参照），新建 `input/README.md` 标注"非工程入口"~~ → **2026-10 决定改判：已彻底删除**。当时"保留+标注"的策略被证明无效——目录仍在，误用入口依旧存在；15sp 教学机制档移交 `mechanism/teaching/` 存档，其余 12 类配置为 `input_v3/` 的死副本，无保留价值 |
 
 ### 12.4 🟢 P3-1：孤儿二进制
 

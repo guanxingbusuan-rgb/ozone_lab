@@ -9,11 +9,12 @@
 > **路线现状（2026-10-26）**：现役 **fac_v3 / fac_batch_omp / mcm_run** 三条；
 > fac_run、kpp_run、kpp_batch、EBI、fac_expanded、fac_spgmr 已退役（详见 §1.1）。
 >
-> **六大分析能力**：①观测约束（nudging 同化）· ②响应面（4D 参数扫描，最高 262,144 案例）
+> **七大分析能力**：①观测约束（nudging 同化）· ②响应面（4D 参数扫描，最高 262,144 案例）
 > · ③情景分析（6 政策情景）· ④过程分析（IPR 六账 + IRR 131 反应）
-> · ⑤敏感性 OAT · ⑥反演（⚠ 非真伴随，FD+SVD）——索引见
+> · ⑤敏感性 OAT · ⑥反演（⚠ 非真伴随，FD+SVD）
+> · ⑦气象序列驱动（6 变量逐时观测）——索引见
 > [OPERATIONS_MANUAL §0.7](OPERATIONS_MANUAL.md)，详解见
-> [EXPERIMENTS_GUIDE §6.9–6.11](EXPERIMENTS_GUIDE.md)。
+> [EXPERIMENTS_GUIDE §6.9–6.11](EXPERIMENTS_GUIDE.md) 与 [§0.3b](EXPERIMENTS_GUIDE.md)。
 >
 > **环境要求**：gfortran 13.2 + SUNDIALS CVODE 2.7.0（含 `--enable-fcmix`）+
 > Python 3.9+（numpy/matplotlib）。**路径可通过环境变量覆盖**，无需改文件：
@@ -117,7 +118,7 @@ make figures
 
 | 机制版本 | 唯一事实源 (.fac) | 消费路线 |
 |---|---|---|
-| ~~15sp / 25rx~~ 教学核心（**退役**，.fac 仅存 `input/` 作参考） | `input/mechanism_1_ozone_tutorial.fac` | 无（fac_run/kpp_run 已退役） |
+| ~~15sp / 25rx~~ 教学核心（**退役**，.fac 移至 `mechanism/teaching/` 存档） | `mechanism/teaching/mechanism_1_ozone_tutorial.fac` | 无（fac_run/kpp_run 已退役） |
 | **74sp / 131rx** 工程 V2.3 全链条 | `mechanism/mechanism_3_full_chain.fac` | `fac_v3` + `fac_batch_omp`（共享 `gen_v3/`） |
 | **29sp / 71rx** 真实 MCM CH₄ | `mcm_city/input/mechanism_mcm_ch4.fac` | `mcm_run` |
 
@@ -129,7 +130,7 @@ make figures
 ### [退役] ~~`facsimile_impl/fac_run`~~ —— 旧教学主力（2026-10 退役；单箱/全物理能力由 fac_v3 全面接管）
 
 - **源码**：`oz_fac_core.f90` + `gen/oz_mech.f90`（mechc.py 编译自 `mechanism/ozone.fac`，
-  与 `input/mechanism_1_ozone_tutorial.fac` 逐字相同）
+  与 `mechanism/teaching/mechanism_1_ozone_tutorial.fac` 逐字相同）
 - **CLI**：`fac_run f_NOx f_VOC out_pref`（三参必选，`fac_run 1 1 ../output/base` 为基线）
 - **机制**：核心 15sp/25rx（NO NO2 O3 O1D O OH HO2 H2O2 CO HCHO CH4 CH3O2 CH3OOH CH3O HNO3）
 - **实读确认**：
@@ -221,15 +222,17 @@ mechc.py → gen*/、fac2kpp.py → KPP 三件套、cfgbuild --mech → runtime_
 
 | 文件 | 规模 | 编译去向 | 实读要点 |
 |---|---|---|---|
-| ~~`mechanism/ozone.fac`~~（已随 fac_run 退役删除） | 15sp/25rx | — | 15sp 核心教学机制仅存 `input/mechanism_1_ozone_tutorial.fac` 参考档 |
+| ~~`mechanism/ozone.fac`~~（已随 fac_run 退役删除） | 15sp/25rx | — | 15sp 核心教学机制存档于 `mechanism/teaching/mechanism_1_ozone_tutorial.fac` |
 | `mechanism/mechanism_3_full_chain.fac` | **74sp/131rx V2.2** | fac_v3 / fac_batch_omp `gen_v3/` | 六链条（①无机核心+HONO 晨爆 ②NO₃-N₂O₅ 夜化学 MCM KMT03/04 Troe 逐字 ③CH₄+PAN 储库 ④**isoprene 完整二代链** ISOPBO₂→MVK+MACR→MVKO₂/MACRO₂→MPAN/MGLY→CH₃CO₃ 回灌，0.1 硝酸酯支路 ⑤DMS→MSA ⑥卤素+ClONO₂/BrONO₂/HOCl/HOBr 储库）；O1D 速率已并入 H₂O/M（Day35 潜伏 bug 修复版）；每反应 C/H/N/O/S/Cl/Br 精确配平 |
-| `input/mechanism_2_mcm_ch4.fac` | 29sp/71rx | mcm_city `gen/` | AtChem2 自带 MCM v3.3.1 CH₄ 子集；完整无机组（NO₃/N₂O₅/HO₂NO₂/HONO）+ Troe（KMT01-03/KBPAN/KFPAN）+ HSO₃/SO₃ 硫链 + CL |
+| `mcm_city/input/mechanism_mcm_ch4.fac` | 29sp/71rx | mcm_city `gen/` | AtChem2 自带 MCM v3.3.1 CH₄ 子集；完整无机组（NO₃/N₂O₅/HO₂NO₂/HONO）+ Troe（KMT01-03/KBPAN/KFPAN）+ HSO₃/SO₃ 硫链 + CL |
 | ~~`kpp_impl/ozone_kpp.{spc,eqn,def}`~~（已随 KPP 路线退役删除） | — | — | `src/fac2kpp.py` 转换脚本保留 |
 | （已删）`input_v3/mechanism_3_full_chain.fac` | — | — | 旧副本已删除；cfgbuild 经 `--mech mechanism/mechanism_3_full_chain.fac` 直引真源 |
 
 ## 1.5 输入系统（12 类配置 → runtime.dat）
 
-`input/`（教学）与 `input_v3/`（工程）同构双份，文件名沿用 AtChem2 约定。
+**唯一工程输入目录是 `input_v3/`**（12 类配置，文件名沿用 AtChem2 约定）。
+旧的 `input/`（15sp 教学同构份）已于 2026-10 彻底删除——它零消费者且易被误
+当工程入口；其中唯一的 15sp 教学机制档已移入 `mechanism/teaching/` 存档。
 解析端（`runtime_dat_mod.read_runtime`）逐段实读确认的 12 段：
 
 ```
@@ -297,7 +300,8 @@ f_CO → CO              f_CH4 → CH4        另: jfac 乘 J 通道, dt 加 TEM
 > 该数字实为 `scen_build` **漏缩 6 个排放物种**（SO2/ALK/OLE/ARO1/ARO2/KET/TERP）的
 > 假象——VOC 根本没加。修复后 HVOC = +9.5%（与 batch 的 +8.0% 一致）。
 > **结论（NOx-limited）本身不变**（由屋脊位置独立证明），但论据已换。
-> 详见 [`AUDIT_COMPLETE.md`](AUDIT_COMPLETE.md) §10 与 [`audit_reports/AUDIT_R10.md`](audit_reports/AUDIT_R10.md)。
+> 详见 [`AUDIT_COMPLETE.md`](AUDIT_COMPLETE.md) §10（`audit_reports/AUDIT_R*.md`
+> 的原始过程报告已移出仓库并加入 .gitignore——结论均已提炼进本文档）。
 
 - **目的**：回答"减谁、减多少、O₃ 怎么变"（情景=排放组缩放×JFAC×ΔT 组合）。
 - **命令**：循环 `./fac_v3 SCEN_X ../output/x_v3 ../runtime_v3.dat`
@@ -419,7 +423,7 @@ f_CO → CO              f_CH4 → CH4        另: jfac 乘 J 通道, dt 加 TEM
 
 - **命令**：`mcm_run`（29sp MCM 子集）→ `fac_v3`（74sp V2.3）
 - **解读**：fac_v3 74 物种 0.19 s——RHS 光滑性修复的实证（10b #11）；
-  15sp 教学档与 30sp 旧扩展档均已退役（15sp .fac 仅存 `input/` 参考）。
+  15sp 教学档与 30sp 旧扩展档均已退役（15sp .fac 存于 `mechanism/teaching/`）。
 
 ### E4. MCM 真实机制城市案例
 
@@ -429,7 +433,7 @@ f_CO → CO              f_CH4 → CH4        另: jfac 乘 J 通道, dt 加 TEM
 
 ### E5. 机制→C 跨语言编译
 
-- **命令**：`python src/mechc_c.py input/mechanism_1_ozone_tutorial.fac perf/mech_rates.c --compile`
+- **命令**：`python src/mechc_c.py mechanism/teaching/mechanism_1_ozone_tutorial.fac perf/mech_rates.c --compile`
 - **解读**：同一 .fac 两条后端（Fortran/C），绕过 f2py 构建链。
 
 ## F 类：数值方法教学实验（10b 坑实录精选 8 个）
@@ -475,7 +479,7 @@ f_CO → CO              f_CH4 → CH4        另: jfac 乘 J 通道, dt 加 TEM
 
 ```
 ┌────────────────── 用户输入层 ──────────────────────────────────────────┐
-│  input/  input_v3/  (12 类配置, 人类可读, # 注释)                      │
+│  input_v3/          (12 类配置, 人类可读, # 注释)                      │
 │    mechanism_*.fac / initialConcentrations / meteo / constraints/     │
 │    bc / photolysis / photolysis-rates_MCM / emissions / dilution      │
 │    drydep / wetdep / scenarios / model.parameters                     │
@@ -556,7 +560,7 @@ f_CO → CO              f_CH4 → CH4        另: jfac 乘 J 通道, dt 加 TEM
 ### 4.2 配置编译器处理链
 
 ```
-input/ (12 类文本)
+input_v3/ (12 类文本)
   │ ① .fac → 物种表 + 命名速率 + 反应行      ⑥ BC → 常数/序列
   │ ② 光解表 → l/m/n (D→E 记法)             ⑦ 排放 → 日型
   │ ③ photolysis.config → J 映射            ⑧ 沉降/稀释 → 速率参数

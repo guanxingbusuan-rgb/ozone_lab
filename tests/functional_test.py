@@ -23,13 +23,43 @@ PY = sys.executable          # 用当前解释器（脱敏 + 更可移植）
 PPB = 2.46e10
 FS = np.array([0.3, 0.45, 0.67, 1.0, 1.5, 2.0, 2.5, 2.8, 3.0])
 
-# ================= print("== import tempfile, shutil
+# ================= 编译期负向用例 =================
+# 用完整的 input_v3 做底（保证能走到物种校验那一步），只注入一个假物种。
+# 旧写法只复制一个 .fac 到空目录 → cfgbuild 先因缺 photolysis.config 崩溃，
+# returncode 非 0 就"PASS"，其实从未校验过物种 —— 假绿。现改为断言错误信息本身。
 bad_dir = tempfile.mkdtemp()
-shutil.copy("input/mechanism_1_ozone_tutorial.fac", bad_dir + "/mechanism_bad.fac")
-open(bad_dir + "/initialConcentrations.config", "w").write("XXX_UNKNOWN 1.0e9\n")
-r = subprocess.run([PY, "src/cfgbuild.py", bad_dir, "/tmp/bad_rt.dat"],
+for f in os.listdir("input_v3"):
+    p = os.path.join("input_v3", f)
+    if os.path.isfile(p):
+        shutil.copy(p, bad_dir)
+shutil.copytree("input_v3/constraints", os.path.join(bad_dir, "constraints"))
+open(os.path.join(bad_dir, "initialConcentrations.config"), "a").write("XXX_UNKNOWN 1.0e9\n")
+r = subprocess.run([PY, "src/cfgbuild.py", bad_dir, "/tmp/bad_rt.dat", "--mech",
+                    "mechanism/mechanism_3_full_chain.fac"],
                    capture_output=True, text=True)
-check("未知物种被拒绝 (编译期)", r.returncode != 0, "跨文件校验前移")
+_out = (r.stdout or "") + (r.stderr or "")
+check("未知物种被拒绝 (编译期)", r.returncode != 0 and "XXX_UNKNOWN" in _out,
+      "错误信息含该物种名" if "XXX_UNKNOWN" in _out else "未命中物种校验 (可能假绿)")
+shutil.rmtree(bad_dir, ignore_errors=True)
+
+# 反向守卫: 气象序列若误写浓度单位指令, 必须报错而非静默 ×2.46e10
+bad_dir = tempfile.mkdtemp()
+for f in os.listdir("input_v3"):
+    p = os.path.join("input_v3", f)
+    if os.path.isfile(p):
+        shutil.copy(p, bad_dir)
+shutil.copytree("input_v3/constraints", os.path.join(bad_dir, "constraints"))
+with open(os.path.join(bad_dir, "meteo.config"), "w") as _f:
+    _f.write("TEMP = file:constraints/met_TEMP_demo.txt\n"
+             "BLH  = file:constraints/met_BLH_demo.txt\n")
+_metp = os.path.join(bad_dir, "constraints/met_TEMP_demo.txt")
+open(_metp, "w").write("# unit: ppb\n" + open(_metp).read())
+r = subprocess.run([PY, "src/cfgbuild.py", bad_dir, "/tmp/bad_rt2.dat", "--mech",
+                    "mechanism/mechanism_3_full_chain.fac"],
+                   capture_output=True, text=True)
+_out = (r.stdout or "") + (r.stderr or "")
+check("气象序列拒绝浓度单位指令 (防静默 ×2.46e10)", r.returncode != 0 and "气象序列" in _out,
+      "cfgbuild 拒绝并说明原因")
 shutil.rmtree(bad_dir, ignore_errors=True)
 
 

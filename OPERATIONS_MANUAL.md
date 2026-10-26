@@ -66,7 +66,7 @@
 | **`diagnostics/`** | **诊断层**（路线无关） | `indicators.py`：route_indicators/route_timeseries——从任意 conc/irr CSV+机制 FORMULA 计算 12 指标（NOy 自动判定，新 N 物种零改动接入）；`diagnostics.py`：经典库（load/indicators/irr_integrate/families/chem_ledger/report） |
 | **`experiments/`** | **实验层**（8 脚本 = 手册 §3-§13 执行体） | ipr_closure_check(D-1 闭合) / ipr_irr5(D-2 过程占比) / ridge5+fig_ridge5(C 屋脊对比) / scen5(I 情景矩阵) / obs_osse(F 观测同化 OSSE) / hourly_pa(G 逐时 PA+图) / sens_adj(H 灵敏度) |
 | **`templates/`** | **五类外数据格式合同**（零代码直读，人工落位规范） | 地面 O₃/AQI/VOC 站点 ×3 → bc.config 张弛；排放清单 → emissions.config；卫星柱（**语义例外**：离线转表面 ppb） |
-| **`input_v3/`** | **工程生效配置**（12 类） | 12 config + constraints/(BLH/RAIN 序列) → cfgbuild → runtime_v3.dat。`input/` 为教学遗产同构份（含 15sp 参考机制档） |
+| **`input_v3/`** | **工程生效配置**（12 类，唯一输入入口） | 12 config + constraints/(气象/BC 序列) → cfgbuild → runtime_v3.dat。旧 `input/` 已彻底删除（零消费者），15sp 教学机制档移入 `mechanism/teaching/` |
 | **`audit/`** | **机制质检** | `element_audit.py`：逐反应 C/H/N/O/S/Cl/Br 配平（131/131；储库方向限定防"非物理闭合掩盖真错"）；`oz_audit.c`：C 证人 |
 | **`tests/`** | **回归防线** | functional_test.py：**FT0 生成码一致性（物种+反应双守卫）**+ 批量自检 + 4 金值哨兵；smoke_test.sh |
 | **`figures/`** | **表达层** | SCI 版 9 图（A-I，Times+宋体 330 DPI PNG+PDF）+ comic 漫画版 9 图（场景化图标）+ 工程图 2 张（response_surface_v3/indicators_vs_ridge）+ 2 绘图脚本 |
@@ -87,7 +87,7 @@
 fac_run（15sp 教学，ridge5 守卫）· kpp_run/kpp_impl（EKMA IC 空间）· EBI ·
 fac_expanded · fac_spgmr · kpp_batch · `rate_sensitivity.py`/`species_constraint.py`
 （B3/B4 载体随 15sp 层退役，灵敏度对照由 sens_adj.py 承担）· 15sp 核心档
-（`input/mechanism_1_ozone_tutorial.fac` 保留 .fac 作参考，无路线承载）。
+（15sp .fac 存档于 `mechanism/teaching/mechanism_1_ozone_tutorial.fac`，无路线承载）。
 
 ---
 
@@ -172,7 +172,7 @@ mechanism_3 扩链之后拉一下，确认无机块未被新链条带偏（§0.6
 
 维护成本≈零（罐头：CLI 四参、无配置、make 主链不碰）——平时零代价，需要时一把就响。
 
-## 0.7 六大分析能力索引（速查 → 详解）
+## 0.7 七大分析能力索引（速查 → 详解）
 
 | # | 能力 | 类型 | 一句话 | 命令 | 详解 |
 |---|---|---|---|---|---|
@@ -182,11 +182,18 @@ mechanism_3 扩链之后拉一下，确认无机块未被新链条带偏（§0.6
 | 4 | **过程分析** | 过程归因 | IPR 六账 + IRR 131 反应（小时窗精确积分） | `hourly_pa.py` + `ipr_closure_check.py` | GUIDE §8 / §11 / §6.11.2 |
 | 5 | **敏感性 OAT** | 局部梯度 | 9 排放物种 ±10% → 雅可比（24×9） | `sens_adj.py` | GUIDE §12 / §6.10.2 |
 | 6 | **伴随/反演** | 推断 | ⚠ 非真伴随；FD 雅可比 + 截断 SVD（实测仅 1/9 模态） | `sens_adj.py` ② | GUIDE §6.10.3 |
+| 7 | **气象序列驱动** | 外部时序 | 6 个气象量（TEMP/PRES/RH/BLH/RAIN/JFAC）逐时观测 → `meteo.config` 的 `file:` | `run_M_met_series.py` | GUIDE §0.3b |
 
 > **三个必须分清的概念对**（详见 GUIDE）：
 > - **观测约束**（nudging 机制） ≠ **OSSE**（评价实验）——§6.10.1
 > - **OAT**（单参数局部梯度） ≠ **响应面**（多参数全局地图）——§6.10.0
 > - **`bc.config` 常数**（背景边界/定环境） ≠ **`bc.config` `file:`**（观测约束/定真值）——§6.10.1
+>
+> **气象序列 vs 观测约束**：两者**格式相同**（`t[s]` + 值、两列、≤128 点、共享 8 条序列池），
+> 但**登记位置和物理身份不同**——`meteo.config` 的 `file:` 是"物理环境"（进方程，
+> 不是真值），`bc.config` 的 `file:` 是"观测真值"（经 1/τ 张弛拉向）。且气象文件
+> **不允许**写 `# unit:` 浓度换算行（`cfgbuild` 会拒绝），否则 298.15 K 会被静默
+> 乘成 7.33e12。
 
 > **模型维度澄清**：本程序是 **0-D 箱体**（状态向量 = 74 物种，无 x/y/z、无平流扩散）。
 > "四维"指**参数扫描空间**（排放/光解/温度缩放因子），不是空间网格；`fac_batch_omp`
@@ -213,7 +220,7 @@ input_v3/ (12 类配置) → cfgbuild → runtime_v3.dat → fac_v3 / fac_batch_
 
 ## 2. 输入系统与五类外数据模板
 
-12 类配置在 `input_v3/`；**外部观测数据**走 `templates/` 五类模板
+12 类配置在 `input_v3/`；**外部数据**走 `templates/` 六类模板
 （详细格式说明内嵌于每个模板文件头）：
 
 > 📋 **全物种输入矩阵**：74 物种 × 5 通道完整清单 →
@@ -226,13 +233,16 @@ input_v3/ (12 类配置) → cfgbuild → runtime_v3.dat → fac_v3 / fac_batch_
 | `templates/surface_aqi_station.template` | 宽表拆分转换 → 同上 | AQI 多污染物（HJ 193, μg/m³）→ ppb 换算表 | 同上；PM 不接入；NO₂ 建议弱 τ |
 | `templates/surface_voc_station.template` | `bc.config: <物种> = file:…` | 一站一物种一时间序列 + PAMS-57 映射注记 | 同上（短寿命物种为宜） |
 | `templates/satellite_column.template` | **`src/sat2surf.py`** 转换 → 站点通路 | TROPOMI 柱浓度 molec/cm² → 表面等效 ppb | 直观式 `柱/BLH/2.46e10`；工具内置两法互证+QA 过滤+抽稀，**引擎不直读柱** |
+| **`templates/met_series.template`** | **`meteo.config: TEMP = file:…`** | **原生单位 K/hPa/%/m/mm·h⁻¹/1；禁止 `# unit:` 行** | **物理环境驱动（进方程，非真值）；6 变量可全序列** |
 
 序列文件通用约定：两列 `t[s] 值`、时间严格递增（cfgbuild 编译期校验）、
-`# unit:` 指令行内可带注释、缺失时段线性插值端点钳制、单序列 ≤128 点
-（Fortran 端 ser_t 上限，超限编译期拒绝）。
+浓度序列可用 `# unit:` 指令行（气象序列禁止）、缺失时段线性插值端点钳制、
+单序列 ≤128 点（Fortran 端 ser_t 上限，超限编译期拒绝）、
+**气象+BC 共享 8 条序列池**。
 
-> 📖 **五类模板的逐步接入操作（原始格式 → 换算 → 落位 → 登记 → 编译 → 验证 → 坑）
+> 📖 **模板的逐步接入操作（原始格式 → 换算 → 落位 → 登记 → 编译 → 验证 → 坑）
 > 详见 [EXPERIMENTS_GUIDE.md §14](EXPERIMENTS_GUIDE.md#14-五类可选输入数据文件接入操作templates-逐一详解)**；
+> 气象序列的完整对照实验见 [GUIDE §0.3b](EXPERIMENTS_GUIDE.md)；
 > 单位换算完整参考见 [UNITS.md](UNITS.md)。
 
 ### 2.1 端到端示例：AQI 站点 O₃ → 约束运行（已实测）
