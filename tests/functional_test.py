@@ -619,6 +619,38 @@ check("无「只产不耗且无物理汇」的死端物种", not _no_sink,
 _out_tracked = _sp2.run(["git", "ls-files", "output/"], capture_output=True,
                         text=True).stdout.strip()
 _out_ignored = _sp2.run(["git", "check-ignore", "-q", "output/"], capture_output=True)
+# FT-UNIT: 浓度三态单位自动换算（cm3/ppb/ppm 与排放 ppb/h）
+_unit_tmp = tempfile.mkdtemp()
+try:
+    import shutil as _sh
+    _ud = os.path.join(_unit_tmp, "in")
+    os.makedirs(_ud)
+    for _f in os.listdir("input_v3"):
+        _p = os.path.join("input_v3", _f)
+        if os.path.isfile(_p):
+            _sh.copy(_p, _ud)
+    _sh.copytree("input_v3/constraints", os.path.join(_ud, "constraints"))
+    open(os.path.join(_ud, "initialConcentrations.config"), "w").write(
+        "NO   5.0e8   cm3\nNO2  8.13   ppb\nO3   300    ppb\nHCHO 0.002  ppm\n")
+    _urt = os.path.join(_unit_tmp, "rt.dat")
+    _ur = subprocess.run([sys.executable, "src/cfgbuild.py", _ud, _urt,
+                          "--mech", "mechanism/mechanism_3_full_chain.fac"],
+                         capture_output=True, text=True)
+    _txt = open(_urt).read() if os.path.exists(_urt) else ""
+    _sp = re.search(r"^SPECIES (.*)$", _txt, re.M).group(1).split()
+    _ic = re.search(r"^IC\n\s+(.*)$", _txt, re.M).group(1).split()
+    _d = dict(zip(_sp, [float(v) for v in _ic]))
+    _PPB = 2.46e10
+    _ok = (_ur.returncode == 0
+           and abs(_d["NO"] - 5.0e8) / 5.0e8 < 1e-9
+           and abs(_d["NO2"] - 8.13 * _PPB) / (8.13 * _PPB) < 1e-9
+           and abs(_d["O3"] - 300 * _PPB) / (300 * _PPB) < 1e-9
+           and abs(_d["HCHO"] - 0.002 * 1e3 * _PPB) / (0.002 * 1e3 * _PPB) < 1e-9)
+    check("IC 三态单位自动换算 (cm3/ppb/ppm 混写)", _ok,
+          f"NO={_d['NO']:.3e} NO2={_d['NO2']:.3e} O3={_d['O3']:.3e} HCHO={_d['HCHO']:.3e}")
+finally:
+    _sh.rmtree(_unit_tmp, ignore_errors=True)
+
 check("output/ 无任何文件被 git 跟踪（仅本地保留）",
       not _out_tracked and _out_ignored.returncode == 0,
       "0 个跟踪 + 已被 ignore" if not _out_tracked

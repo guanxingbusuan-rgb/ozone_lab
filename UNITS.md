@@ -1,10 +1,10 @@
 # 输入单位与换算参考手册（INPUT_UNITS）
 
-> **适用范围**：ozone_lab 中**所有**可输入 / 可更改的数值——14 个数据配置文件（逐子量的
-> 单位、缺省、换算、校验）、5 类外部数据模板、机制 `.fac` 中的速率与计量、
+> **适用范围**：ozone_lab 中**所有**可输入 / 可更改的数值——12 类生效配置（逐子量的
+> 单位、缺省、换算、校验）、6 类外部数据模板、机制 `.fac` 中的速率与计量、
 > 以及 Fortran 侧的硬编码 / 半硬编码系数与参数。
 >
-> **基线版本**：V2.3（74sp/131rx · 三路线 · 2026-10-26）
+> **基线版本**：**V2.4+ 冻结版**（111sp/198rx · 三路线 · 2026-10-26）
 > **文档性质**：纯说明（不改代码）；每一条都对应 `src/cfgbuild.py`、
 > `modules/runtime_dat_mod.f90`、`modules/chem_phys_mod.f90` 的实际行为。
 > **变更单位约定时请同步更新本文档 + `OPERATIONS_MANUAL.md §2b`。**
@@ -87,7 +87,7 @@ NO   10.0   BOX  0.9   ← 10 ppb/h
 
 ---
 
-## 2. 14 个数据文件逐子量单位表
+## 2. 12 类配置逐子量单位表
 
 ### 2.1 `initialConcentrations.config` —— 初值（IC）
 
@@ -105,7 +105,7 @@ PAN     5.0e9             # 省略单位 → 按 cm3
 ```
 
 > 注意：`input_v3/initialConcentrations.config` 现有 15 行只是"非零初值"清单，
-> 其余 59 个物种按 0 起步（spin-up 由 5 天模拟完成）。
+> 其余 **96 个物种按 0 起步**（111−15；spin-up 由 5 天模拟完成）。
 
 ### 2.2 `meteo.config` —— 气象 7 量
 
@@ -145,16 +145,19 @@ PAN     5.0e9             # 省略单位 → 按 cm3
 | `dtout ≠ 3600` | ⚠ 警告：`h` 列是步序号非小时；"末24h"= 24 步；IRR 积分差 3600/dtout 倍 |
 | `nsteps < 24` | ⚠ 警告：末 24 步覆盖全程，含 spin-up |
 
-**ATOL 覆盖表**（`chem_phys_mod.tune_atol_by_name`，写死的）：
+**ATOL 覆盖表**（`chem_phys_mod.tune_atol_by_name`，**62 个物种**，V2.4+ 五档）：
 
-| 物种 | 实际 ATOL |
+| 实际 ATOL | 物种（个数） |
 |---|---|
-| CH₄ | 1e10 |
-| CO | 1e9 |
-| O₃, TERPCHO | 1e8 |
-| HCHO, PAN, MPAN, ISOP, SO₂, CH₃CHO, MVK, MACR, MGLY, RONO₂, OLENIT, TERPNIT, TERPOOH | 1e7 |
-| DMS, MSA, TERP | 1e6 |
-| 其余（含全部自由基） | **沿用第 4 行基线** |
+| **1e10** | CH₄ (1) |
+| **1e9** | CO (1) |
+| **1e8** | O₃ CH₃OOH ALK ARO1 GLY / NO₂ H₂O₂ HNO₃ OLE OLEOOH ALKOOH ARO₂ KET LALK / TERPCHO SESQCHO（16） |
+| **1e7** | HCHO PAN MPAN ISOP SO₂ CH₃CHO MVK MACR MGLY RONO₂ OLENIT TERPNIT TERPOOH NO NO₃ N₂O₅ ISOPNIT ISOPDNT ISOPOOH CSL CSLOOH CSLNIT TOLOOH XYLOOH LALKOOH LALKNIT MEOH ETH IOLE IOLENIT PPAN（31） |
+| **1e6** | ETOH MTBE ESTER ETHOOH ETHNIT ALD₂ IOLEOOH / DMS MSA TERP SESQ SESQOOH SESQNIT（13） |
+| **沿用第 4 行基线** | 其余 49 个（含全部自由基 OH/HO₂/各 RO₂/O/O¹D 等） |
+
+> 分档依据：取该物种典型浓度的 1e-3 ~ 1e-4 倍。改档只影响步数，不影响解
+> （实测 RTOL 1e-2→1e-10 结果一致）。
 
 **天数灵活设置（不必改文件）**：
 
