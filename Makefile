@@ -116,10 +116,12 @@ smoke: all runtime_v3.dat
 functional: all smoke
 	$(PY) tests/functional_test.py
 
+# 注: 原 scan_suite.py 已删除（职能分工见下）
+#   · 9×9 响应面 + 体制诊断 → make batch（同一命令）+ experiments/run/run_B_surface.py
+#   · 81 案例契约/屋脊/FNR/L_NOx-Q/OPE 断言 → tests/functional_test.py 已全覆盖
 test: functional
 	$(PY) audit/element_audit.py mechanism/mechanism_3_full_chain.fac
 	$(PY) audit/mcm_compare.py --quiet
-	$(PY) scan_suite.py
 
 # 仅比对 MCM 速率系数（快速，不跑仿真）
 mcmcheck:

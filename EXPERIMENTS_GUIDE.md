@@ -1171,7 +1171,7 @@ fnox,fvoc,jfac,dt
 | **实验 F `obs_osse.py`** | **τ_mix 4 档**（2/6/24/72 h）× 站点物种 × 卫星反演 | ~20 | RMSE 技能表 + 过冲指标 |
 | **实验 H `sens_adj.py`** | OAT 扰动 ±10% × 各排放组 + 截断 SVD | ~10 | 灵敏度斜率 + 反演对比 |
 | **实验 I `scen5.py`** | 6 情景 × 3 路线 | 18 | 方向一致性矩阵 |
-| `scan_suite.py` | 9×9 × 6 变量（旧 fac_run 载体，现走 batch） | 81 | `ozone_lab_response_suite.png` |
+| ~~`scan_suite.py`~~ **已删除** | 9×9 响应面 → 改用 `make batch` + `run_B_surface.py` | 81 | — |
 
 #### 6.9.5 与"经典 EKMA"的对应关系
 

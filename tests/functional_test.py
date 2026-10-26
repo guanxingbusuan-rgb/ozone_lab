@@ -651,6 +651,12 @@ try:
 finally:
     _sh.rmtree(_unit_tmp, ignore_errors=True)
 
+check("scan_suite.py 已删除（职能已并入 make batch + run_B + 本测试）",
+      not os.path.exists("scan_suite.py")
+      and "scan_suite.py" not in open("Makefile").read().replace(
+          "# 注: 原 scan_suite.py 已删除（职能分工见下）", ""),
+      "文件已移除，Makefile 无调用")
+
 check("output/ 无任何文件被 git 跟踪（仅本地保留）",
       not _out_tracked and _out_ignored.returncode == 0,
       "0 个跟踪 + 已被 ignore" if not _out_tracked

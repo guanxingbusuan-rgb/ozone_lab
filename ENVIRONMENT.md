@@ -339,7 +339,7 @@ libquadmath.0.dylib
 | `ipr_closure_check.py` | — | D-1：六账闭合校验 |
 | `experiments/fig_ridge5.py` | 54 | C 的绘图 |
 
-#### E. 测试与可视化（`tests/` + `figures/` + `scan_suite.py`）
+#### E. 测试与可视化（`tests/` + `figures/`）
 
 | 文件 | 行数 | 角色 |
 |---|---|---|
@@ -347,7 +347,7 @@ libquadmath.0.dylib
 | `figures/gen_all.py` | 915 | 9 张 SCI 版机制图（A–I） |
 | `figures/gen_cartoon.py` | 557 | 9 张漫画场景版（comic_A–I） |
 | `figures/fig_indicators_ridge.py` / `fig_response_v3.py` | 71 / 58 | 响应面与指示因子工程图 |
-| `scan_suite.py` | 61 | 响应面套件运行器 |
+| ~~`scan_suite.py`~~ | ~~61~~ | **已删除（2026-10）**：响应面 → `make batch`；诊断 → `run_B`；断言 → `functional_test` |
 | `modules/nc_output.py` | 66 | CSV → netCDF（**唯一的 Python 版 modules/ 文件**） |
 
 ### 6b.3 Fortran 层（9 个 .f90）—— 数值求解与物理

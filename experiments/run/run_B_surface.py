@@ -8,6 +8,7 @@ run_B_surface.py —— 实验 B：O3–NOx–VOC 响应面（4D 参数扫描）
   output/run_B/batch.csv              原始 24 列（fnox,fvoc,jfac,dt + 19 响应量 + nst）
   output/run_B/indicator_matrix_<var>.csv   每个响应量转成 fnox×fvoc 矩阵（便于直接画/读）
   output/run_B/slices.csv             fnox 切面（fvoc≈1）逐点序列
+  （终端另打印体制诊断：屋脊 / FNR 1-2 带 / L_NOx-Q 穿 0.5 / OPE 谷）
 
 用法:
   python experiments/run/run_B_surface.py                     # 9×9 二维
@@ -94,6 +95,21 @@ def main(argv):
     if in_band:
         log(f"  ★ FNR 落 1–2 带: fnox ∈ [{fnox[in_band[0]]:.3f}, {fnox[in_band[-1]]:.3f}]"
             f"  → 与屋脊 {'重合 ✓' if in_band[0] <= iridge <= in_band[-1] else '不重合'}")
+
+    # 体制诊断补充（原 scan_suite.py 的两项独有输出，已并入本实验）
+    try:
+        lq = col(hdr, data, "LnOxQ")[sel]
+        i_lq = next((k for k in range(len(lq) - 1) if lq[k] < 0.5 <= lq[k + 1]), None)
+        if i_lq is not None:
+            log(f"  ★ L_NOx/Q 穿 0.5 (Kleinman): fnox {fnox[i_lq]:.3f} → {fnox[i_lq + 1]:.3f}")
+    except KeyError:
+        pass
+    try:
+        ope = col(hdr, data, "OPE")[sel]
+        i_ope = int(np.nanargmin(ope))
+        log(f"  ★ OPE 谷: fnox={fnox[i_ope]:.3f} ({ope[i_ope]:.2f})  [谷=NOx 饱和标志]")
+    except KeyError:
+        pass
 
     mp = manifest(d, "B_surface",
                   {"ng": ng, "jfac": jf, "dt": dts, "cases": ncase},

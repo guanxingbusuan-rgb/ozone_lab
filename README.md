@@ -202,7 +202,6 @@ mechc.py → gen*/、fac2kpp.py → KPP 三件套、cfgbuild --mech → runtime_
 | # | 脚本 | 实读确认的功能 | 用法 |
 |---|---|---|---|
 | 1 | `src/cfgbuild.py` | 12 类配置 → Fortran 顺序表控 runtime.dat；段结构（与解析端 `runtime_dat_mod.read_runtime` 逐段对上）：`RUN ns nj nser nscen / SPECIES / MODEL days dtout rtol atol / IC / MET×7 / BC / PHOT lat doy + J idx l m n ×nj / EMIS×ns / DRY×ns / WET×ns / DIL / SCEN name fnox fvoc fco fch4 jfac dt / SERIES name n + t行 + v行`；编译期校验全过才写出 | `python src/cfgbuild.py input_v3 runtime_v3.dat` |
-| 3 | `scan_suite.py` | ① 9×9 网格（FS=[0.3,0.45,0.67,1.0,1.5,2.0,2.5,2.8,3.0]）× 6 变量逐案例调 fac_batch_omp（曾用已退役的 fac_run） | `python scan_suite.py` → `output/scan/s*.csv` + 根目录 `ozone_lab_response_suite.png` |
 | 3b | `src/sat2surf.py` | **卫星柱 → 地表等效 ppb 转换器**（两法互证/QA 过滤/BLH 序列插值/点数抽稀/量级自检；`--selftest` 内置校验） | `python src/sat2surf.py <raw> <out> [--blh-file ...]` |
 | 4 | `diagnostics/diagnostics.py` | 8 个纯函数（§6 函数级详表） | `import diagnostics as dg` |
 | 5 | `src/fac2kpp.py` | ozone.fac → KPP 三件套 (.spc/.eqn/.def) **逐字节复现**旧手写版；J 槽位→J 名映射、M→N2·1.21 三体、FIX 物种记账——KPP 侧降格为生成物（make 自动重建） | `make kpp_impl/ozone_kpp.eqn` |
@@ -266,7 +265,6 @@ f_CO → CO              f_CH4 → CH4        另: jfac 乘 J 通道, dt 加 TEM
 | fac_v3 irr | `h` + **198 反应** = **199 列**（**小时窗积分**，非速率） | `dg.irr_integrate` |
 | fac_v3 ipr | `h` + **111×6 账** = **667 列**（`P L E D B X`，小时窗积分） | `run_D_process` / 过程归因 |
 | batch CSV | `fnox,fvoc,O3max,O3mean,HCHOmax,NO2mean,FNR_mean,H2O2HNO3,O3NOy,HCHONOy,O3NOz,NOy_ppb,LnOxQ,PH2O2PHNO3,OPE,nst`（24 列） | figures 两脚本 |
-| output/scan/s* | 81 案例逐时浓度 | scan_suite.py |
 | mcm_city_* | 29 物种 + 71 反应 | 自定义分析 |
 
 **注意**：conc/irr 只写**末 24 h**（前 96 h 建立准稳态，全程 O₃max 走 stdout）；
@@ -360,7 +358,7 @@ f_CO → CO              f_CH4 → CH4        另: jfac 乘 J 通道, dt 加 TEM
 
 ### B3. 教学机制响应面（含功能测试锚点）
 
-- **命令**：`python scan_suite.py`（≈2 min）
+- **命令**：`make batch`（81 案例）→ `python experiments/run/run_B_surface.py`（响应面 + 体制诊断）
 - **产物**：`output/scan/s*` + 根目录 `ozone_lab_response_suite.png`
 - **解读**：HCHO/NO₂ 随 VOC↑ 单调增（0.08→0.70）、随 NOx↑ 单调减（0.08→0.02）——
   FNR 方向性机制级验证（FT5）；底部输出 FAC vs KPP 双实现对照。
@@ -506,7 +504,7 @@ f_CO → CO              f_CH4 → CH4        另: jfac 乘 J 通道, dt 加 TEM
  diagnostics/diagnostics.py  [纯函数诊断库]
    indicators / IRR / family / ledger / report
     │
- scan_suite.py + figures/*.py  [业务层/可视化]
+ experiments/run/*.py + figures/*.py  [业务层/可视化]
 ```
 
 ### 3.2 多语言角色矩阵
@@ -514,7 +512,7 @@ f_CO → CO              f_CH4 → CH4        另: jfac 乘 J 通道, dt 加 TEM
 | 语言 | 模块 | 职责 | 为什么是它 |
 |---|---|---|---|
 | **Python** | `src/cfgbuild.py` | 配置编译（12 类→平面文件） | 文本校验/正则/单位换算/跨文件一致性 |
-| **Python** | `diagnostics/` `scan_suite.py` `tests/` | 诊断/扫描/测试 | 数据分析生态 |
+| **Python** | `diagnostics/` `experiments/run/` `tests/` | 诊断/实验/测试 | 数据分析生态 |
 | **Fortran** | 三求解核 + runtime_dat_mod | 刚性 ODE 积分 + 物理层 | 编译性能 + CVODE/KPP 生态 |
 | **C** | CVODE 库 + 审计证人 | BDF 后端 + 独立记账 | SUNDIALS 是 C 库 |
 | **Shell** | Makefile + tests/smoke | 构建编排 | 通用构建语言 |
@@ -735,7 +733,7 @@ OPE 谷 13.35——机制/求解器改动造成的数值漂移被 make test 直�
 
 ### 7.3 `make test` 全链
 
-`functional(35/35) → element_audit(mechanism_3, 198/198) → scan_suite.py（81 案例 + 指示因子批量自检）`
+`functional(57/57, 含 81 案例契约与体制诊断断言) → element_audit(198/198) → mcm_compare(8.9%)`
 
 ---
 
@@ -749,7 +747,7 @@ OPE 谷 13.35——机制/求解器改动造成的数值漂移被 make test 直�
 | 教学机制五情景 MDA8 | BAU 8.0 / LNNOX 43.7 / HVOC 15.9 / COLD 8.7 / CLOUD 7.7 | §2-B3 同型 |
 | **V3 六情景 O₃max（R10 修复后重跑）** | **BAU 101.6 / LNNOX 53.9 / HVOC 111.3 / HOT 112.6 / CLOUD 84.3 / ISOPX 73.1**（HVOC 原 101.4 为情景缩放 bug 所致） | 实验 A |
 | **屋脊（V2.3）** | fnox=2.28 处 O₃max 125.5 ppb（回撤 90%） | batch_v3_indicators |
-| **指示因子-屋脊（V2.3）** | FNR 过渡 1.52→2.28 与屋脊重合；L_NOx/Q 穿 0.5 于 1.01→1.52；OPE 谷 5.4 | scan_suite |
+| **指示因子-屋脊（V2.4+）** | 屋脊 fnox=2.28；L_NOx/Q 穿 0.5 于 1.52→2.28；OPE 谷 2.28 | run_B / make batch |
 | **IPR 闭合** | 各物种中位 1.004–1.007（内步梯形） | ipr_closure_check |
 | **IPR↔IRR 一致** | O₃ 逐小时最大相对差 0.000% | hourly_pa |
 | **OSSE 技能（实验 F）** | 地面同化 HCHO RMSE +27%；卫星反演 E_NOx×1.34 → NO₂ RMSE +74% | obs_osse |
@@ -884,7 +882,7 @@ fvoc=1 切面经典 **O₃–NOx 屋脊**：29 ppb（fnox≈1.5）→12.6；FNR 
   网格 ng²×nj×nd——SCEN_CLOUD/HOT 的响应面版。
 - **F3 序列 BC 接线**：bc.config `file:` 序列经 chem_phys_mod 生效（bc_s 优先于常量）。
 - **F5 午后口径**：batch 新增 6 个 `*_pm` 列（12–18h 窗口，Sillman 1995 原文口径）。
-- **F4**：`make nc`（CSV→netCDF4 打包）；**P1**：scan_suite 换 batch 引擎
+- **F4**：`make nc`（CSV→netCDF4 打包）；**P1**：响应面由 `make batch` + `run_B` 承担（scan_suite 已删除）
   （111sp+指示因子，输出体制诊断表：屋脊/FNR 过渡/L_NOx-Q 穿越/OPE 谷）。
 
 ### 机制

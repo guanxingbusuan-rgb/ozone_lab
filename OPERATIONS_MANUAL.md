@@ -27,7 +27,7 @@
 > | H | 排放+观测灵敏性/伴随 | sens_adj.py | v3（差分法；真伴随随 fac_run 退役） |
 > | I | 情景矩阵（历史五路线口径） | scen5.py | 现役三路线 |
 >
-> **脚本位置**: `experiments/`（8 个实验/图脚本）；`scan_suite.py`（根目录套件
+> **脚本位置**: `experiments/run/`（10 个实跑脚本）；`experiments/`（旧版含绘图/反演）
 > 运行器）；`diagnostics/`（诊断库+indicators 引擎）；`audit/`（元素审计）。
 > 全部用 venv 解释器手跑或 `make` 目标（test/batch/figures/nc）。
 >
@@ -45,7 +45,7 @@
 
 ```
 ┌──────── 表达层 ──── figures/ (机制图集+响应面图)  OPERATIONS_MANUAL/README (文档)
-├──────── 实验层 ──── experiments/run/ (10 个实跑脚本)   scan_suite.py (体制诊断)
+├──────── 实验层 ──── experiments/run/ (10 个实跑脚本, 含体制诊断)
 ├──────── 诊断层 ──── diagnostics/ (indicators.py 引擎 + diagnostics.py 账本库)
 ├──────── 求解器层 ── facsimile_impl/ (fac_v3 + fac_batch_omp)   mcm_city/ (mcm_run)
 ├──────── 运行时层 ── modules/ (runtime_dat_mod + chem_phys_mod)
@@ -71,7 +71,7 @@
 | **`tests/`** | **回归防线** | functional_test.py：**FT0 生成码一致性（物种+反应双守卫）**+ 批量自检 + 4 金值哨兵；smoke_test.sh |
 | **`figures/`** | **表达层** | SCI 版 9 图（A-I，Times+宋体 330 DPI PNG+PDF）+ comic 漫画版 9 图（场景化图标）+ 工程图 2 张（response_surface_v3/indicators_vs_ridge）+ 2 绘图脚本 |
 | **`output/`** | 全部 CSV 产物 | batch 网格×2、expA 六情景、ridge5/scen5/osse/sens 子目录 |
-| **根目录** | 编排+文档 | `Makefile`（all/v3/batch/test/figures/nc）、`OPERATIONS_MANUAL.md`（本手册）、`README.md`（项目说明）、`scan_suite.py`（体制诊断）、`runtime_v3.dat`（编译产物） |
+| **根目录** | 编排+文档 | `Makefile`（all/v3/batch/test/figures/nc）、`OPERATIONS_MANUAL.md`（本手册）、`README.md`（项目说明）、`runtime_v3.dat`（编译产物） |
 
 ### 三路线 × 目录映射
 
@@ -364,7 +364,7 @@ cd facsimile_impl && ./fac_batch_omp 5 ../output/b4.csv ../runtime_v3.dat 0.6,1.
 （每案例末 24h IRR 均值，131 反应）。
 
 **判定**：O₃–NOx 屋脊（fvoc=1 列 O₃max 峰位）；FNR 过渡带 1–2（Sillman）；
-L_NOx/Q 穿 0.5（Kleinman）；OPE 谷在饱和区。体系诊断表：`python3 scan_suite.py 9`。
+L_NOx/Q 穿 0.5（Kleinman）；OPE 谷在饱和区。体系诊断表：`python3 experiments/run/run_B_surface.py`。
 
 ## 5. 实验 C：五路线屋脊对比（ridge5）
 
@@ -413,7 +413,7 @@ NOy 物种由 .fac FORMULA 段自动判定（含 N 物种，N₂O₅ 计双 N）
 >
 > **R13 数值格式**：CSV 输出用 `ES15.5E3`（强制 3 位指数带 E）。历史文件若含
 > `3.07932-174` 形态，用 `diagnostics/csvfloat.py` 的 `fix_fortran_exp()` 解析
-> （全部 7 个实验脚本 + scan_suite 已接入）。
+> （全部实验脚本已接入）。
 
 ```bash
 make nc          # CSV → netCDF4 (默认 output/expA_BAU → .nc; 可 NC_SRC=/NC_OUT= 覆盖)
