@@ -45,7 +45,7 @@
 
 ```
 ┌──────── 表达层 ──── figures/ (机制图集+响应面图)  OPERATIONS_MANUAL/README (文档)
-├──────── 实验层 ──── experiments/ (8 个实验脚本)   scan_suite.py (体制诊断)
+├──────── 实验层 ──── experiments/run/ (10 个实跑脚本)   scan_suite.py (体制诊断)
 ├──────── 诊断层 ──── diagnostics/ (indicators.py 引擎 + diagnostics.py 账本库)
 ├──────── 求解器层 ── facsimile_impl/ (fac_v3 + fac_batch_omp)   mcm_city/ (mcm_run)
 ├──────── 运行时层 ── modules/ (runtime_dat_mod + chem_phys_mod)
@@ -54,23 +54,22 @@
 └──────── 事实源 ──── mechanism/ (mechanism_3_full_chain.fac) + audit/ (元素守恒审计)
 ```
 
-### 逐目录详解（15 目录 + 根）
+### 逐目录详解（14 目录 + 根）
 
 | 目录 | 角色 | 关键文件 → 功能 |
 |---|---|---|
 | **`mechanism/`** | **机制唯一事实源**（1 个文件） | `mechanism_3_full_chain.fac`：V2.3 **74sp/131rx**，六链条（①无机核心+HONO 晨爆 ②NO₃/N₂O₅ 夜化学 Troe ③CH₄+PAN 储库 ④ISOP 二代三分支 ⑤DMS 硫链 ⑥卤素闭环）+ V2.3 补链（臭氧化 OH 产率 0.30/0.26、RONO₂/OLENIT 硝酸酯家族、TERP 五物种迷你链、PNA+OH）；自带 FORMULA 段；**规格书见 mechanism/README.md**（逐反应速率/配平方法论/对比定位）|
-| **`src/`** | **两个编译器**（Python，全部输入唯一入口） | `cfgbuild.py`：12 类 config+constraints → runtime_v3.dat，编译期校验（物种存在性/单位指令/单调性/≤128 点/情景表达式）；`mechc.py`：机制编译器（.fac → gen_v3 生成码）；`mechc_c.py`：C 后端（perf 优化） |
+| **`src/`** | **两个编译器**（Python，全部输入唯一入口） | `cfgbuild.py`：12 类 config+constraints → runtime_v3.dat，编译期校验（物种存在性/单位指令/单调性/≤128 点/情景表达式）；`mechc.py`：机制编译器（.fac → gen_v3 生成码）；`mechc_c.py`：C 后端（机制→C 速率函数，第二执行路径） |
 | **`modules/`** | **Fortran 共享模块层**（三路线共用） | `runtime_dat_mod.f90`：runtime.dat 唯一消费端（12 段解析+气象插值+SZA→J+BOX 日型+ser_interp+build_groups 组映射+scen_build）；`chem_phys_mod.f90`：**物理四账唯一实现**（排放①/干+湿沉②/BC 序列观测同化③/BLH 膨胀④）+ `tune_atol_by_name`（ATOL 单源）+ `eval_met_dt`/`eval_J_jf`；`rad_photol.f90`：B2 在线光解 demo |
 | **`facsimile_impl/`** | **工程主线**（两条活路线） | `gen_v3/`：生成码（oz_mech.f90 + oz.reac/prod 计量表，fac_v3/batch 共享）；`oz_fac_v3.f90`→`fac_v3`：单箱深度（情景名/观测同化/六账 IPR 逐时导出）；`fac_batch_omp.f90`+`cvode_c_mod.f90`→`fac_batch_omp`：批量广度（C-ABI 直连+OpenMP、NOy 17 物种权重表+运行期氮守恒不变量、24 列指示因子）；`oz_audit.c`：C 证人（NOx 望远镜闭合+O₃ 收支） |
 | **`mcm_city/`** | **真实机制对照**（刻意冻结，游离 make 主链外） | `mcm_driver.f90`→`mcm_run`：MCM v3.3.1 CH₄ 子集 29sp/71rx 城市模拟（CLI: days/pref/fnox/fvoc）；`gen/` 独立生成码；`input/` MCM .fac |
 | **`diagnostics/`** | **诊断层**（路线无关） | `indicators.py`：route_indicators/route_timeseries——从任意 conc/irr CSV+机制 FORMULA 计算 12 指标（NOy 自动判定，新 N 物种零改动接入）；`diagnostics.py`：经典库（load/indicators/irr_integrate/families/chem_ledger/report） |
-| **`experiments/`** | **实验层**（8 脚本 = 手册 §3-§13 执行体） | ipr_closure_check(D-1 闭合) / ipr_irr5(D-2 过程占比) / ridge5+fig_ridge5(C 屋脊对比) / scen5(I 情景矩阵) / obs_osse(F 观测同化 OSSE) / hourly_pa(G 逐时 PA+图) / sens_adj(H 灵敏度) |
-| **`templates/`** | **五类外数据格式合同**（零代码直读，人工落位规范） | 地面 O₃/AQI/VOC 站点 ×3 → bc.config 张弛；排放清单 → emissions.config；卫星柱（**语义例外**：离线转表面 ppb） |
+| **`experiments/`** | **实验层** | `run/`：**10 个实跑脚本**（A 情景/B 响应面/C 屋脊/D 过程/E 指标/F OSSE/G 逐时/H 敏感性/I 情景矩阵/M 气象序列），只落 CSV 不绘图；根下 `.py` 为旧版（含终端报告/绘图/反演） |
+| **`templates/`** | **六类外数据格式合同**（零代码直读，人工落位规范） | 地面 O₃/AQI/VOC 站点 ×3 → bc.config 张弛；排放清单 → emissions.config；卫星柱（**语义例外**：离线转表面 ppb）；**气象序列 → meteo.config** |
 | **`input_v3/`** | **工程生效配置**（12 类，唯一输入入口） | 12 config + constraints/(气象/BC 序列) → cfgbuild → runtime_v3.dat。旧 `input/` 已彻底删除（零消费者），15sp 教学机制档移入 `mechanism/teaching/` |
 | **`audit/`** | **机制质检** | `element_audit.py`：逐反应 C/H/N/O/S/Cl/Br 配平（131/131；储库方向限定防"非物理闭合掩盖真错"）；`oz_audit.c`：C 证人 |
 | **`tests/`** | **回归防线** | functional_test.py：**FT0 生成码一致性（物种+反应双守卫）**+ 批量自检 + 4 金值哨兵；smoke_test.sh |
 | **`figures/`** | **表达层** | SCI 版 9 图（A-I，Times+宋体 330 DPI PNG+PDF）+ comic 漫画版 9 图（场景化图标）+ 工程图 2 张（response_surface_v3/indicators_vs_ridge）+ 2 绘图脚本 |
-| **`perf/`** | 性能档案 | 6 项优化报告 + C 速率后端 + 负载闸门并行扫描 |
 | **`output/`** | 全部 CSV 产物 | batch 网格×2、expA 六情景、ridge5/scen5/osse/sens 子目录 |
 | **根目录** | 编排+文档 | `Makefile`（all/v3/batch/test/figures/nc）、`OPERATIONS_MANUAL.md`（本手册）、`README.md`（项目说明）、`scan_suite.py`（体制诊断）、`runtime_v3.dat`（编译产物） |
 
@@ -592,10 +591,10 @@ VOC-limited 侧翻转到了屋脊（fnox=2.28）左侧的 NOx-limited 侧**：
 |---|---|---|
 | CSV 值 `8.27280-108` 解析失败 | gfortran 三位指数省略 `E`（ES12.3 时偶发） | `diagnostics._fix_fortran_exp` 已兜底；自定义解析需同款处理 |
 | `ipr_closure_check` 比值远离 1 | IPR 与 conc 窗口错位 / 该物种无过程 | 核对 `h` 列对齐；检查物种是否真的被反应触碰 |
-| `scipy.io.netcdf_file` 读 b6 输出报错 | 文件是 **NETCDF4**（HDF5） | 用 `netCDF4.Dataset`（见 `perf/EXPAND_REPORT.md I.2`） |
+| `scipy.io.netcdf_file` 读 netCDF 输出报错 | 文件是 **NETCDF4**（HDF5），`scipy.io.netcdf_file` 只认 NETCDF3 | 用 `netCDF4.Dataset` 或 `xarray.open_dataset(engine="netcdf4")` |
 | nc 里找不到 `variables['O3']` | 物种名在**属性** `species_names`，变量是 `conc(species,time)` | 用索引 + 属性名列表 |
-| 并行/串行 `diff` 不通过 | **CSV 行序非确定**（`schedule(dynamic)`） | 按键 `(fnox,fvoc)` 归位后比（`perf/PERF_REPORT.md §III.4`） |
-| batch 耗时突然翻倍 | 系统负载 > ncpu | 看 `uptime`；负载闸门下测得的加速比无意义（§PERF III.1） |
+| 并行/串行 `diff` 不通过 | **CSV 行序非确定**（OpenMP `schedule(dynamic)` 导致写盘顺序随机） | 先按键 `(fnox,fvoc)` 归位再逐行比，或按行排序后比 |
+| batch 耗时突然翻倍 | 系统负载 > ncpu | 看 `uptime`；负载高时的墙钟加速比无意义，应看 CPU 时间 |
 | FNR 值 > 10 或 < 0.01 | 边缘格点（极低/极高 NOx） | 正常；判据只在 0.5–5 区间有物理意义 |
 
 ### 14.6 环境与工具链
@@ -735,7 +734,7 @@ fac_v3（O3max 102.31 ppb，nst 5566）→ **IPR NO2_B = +5.523e11**（基线 �
   | 文件 | 问题 | 处置 |
   |---|---|---|
   | `facsimile_impl/oz_audit.c` | 与 `audit/oz_audit.c` **逐字节相同**（1580B 重复副本） | 删除，保留 `audit/` 规范位置 |
-  | `perf/mech_rates.c` + `.dylib` | mechc_c.py 的陈旧生成物，**引用的 `mechanism_1_ozone_tutorial.fac` 已不存在**，且无任何消费者 | 删除源码与产物 |
+  | `perf/mech_rates.c` + `.dylib` | mechc_c.py 的陈旧生成物，引用的 `.fac` 已迁走，且无任何消费者 | 删除源码与产物（`mechc_c.py` 默认输出改 `output/mech_rates.c`；`perf/` 目录后续整体删除） |
 - 现 C 源文件仅剩 **1 个**（`audit/oz_audit.c`，独立 C 证人），Python 23 / Fortran 9 /
   Shell 2 与文档声明完全一致（已用脚本交叉核对 19 条路径的行数，全部一致）
 

@@ -98,7 +98,7 @@ def gen_c(fac_path, out_c):
 
 if __name__ == "__main__":
     fac = sys.argv[1] if len(sys.argv) > 1 else "mechanism/teaching/mechanism_1_ozone_tutorial.fac"
-    out = sys.argv[2] if len(sys.argv) > 2 else "perf/mech_rates.c"
+    out = sys.argv[2] if len(sys.argv) > 2 else "output/mech_rates.c"
     os.makedirs(os.path.dirname(out), exist_ok=True)
     gen_c(fac, out)
     # 自动编译

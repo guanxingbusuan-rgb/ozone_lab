@@ -107,7 +107,7 @@ test: functional
 clean-build:
 	cd facsimile_impl && rm -f *.o *.mod fac_v3 fac_batch_omp \
 	  gen/oz_mech.* gen_v3/oz_mech.* gen_v3/oz.reac gen_v3/oz.prod gen_v3/*.mod
-	rm -f modules/rad_photol_demo modules/*.mod audit/*.dylib perf/*.dylib
+	rm -f modules/rad_photol_demo modules/*.mod audit/*.dylib
 	cd mcm_city && rm -f *.o *.mod mcm_run gen/*.mod gen/oz_mech.f90 \
 	  gen/oz.reac gen/oz.prod
 	find . -name __pycache__ -type d -exec rm -rf {} + 2>/dev/null || true
@@ -121,7 +121,7 @@ clean-output:
 clean:
 	cd facsimile_impl && rm -f *.o *.mod fac_v3 fac_batch_omp \
 	  gen/oz_mech.* gen_v3/oz_mech.* gen_v3/oz.reac gen_v3/oz.prod gen_v3/*.mod
-	rm -f modules/rad_photol_demo modules/*.mod audit/*.dylib perf/*.dylib
+	rm -f modules/rad_photol_demo modules/*.mod audit/*.dylib
 	cd mcm_city && rm -f *.o *.mod mcm_run gen/*.mod gen/oz_mech.f90 \
 	  gen/oz.reac gen/oz.prod mcm_city_*.csv
 	rm -f *.nc output/*.nc

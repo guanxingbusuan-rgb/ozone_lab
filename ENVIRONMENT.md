@@ -291,12 +291,12 @@ libquadmath.0.dylib
 │ C  ——  三类角色                                                  │
 │   libsundials_*  (第三方)       ODE 求解引擎本体（BDF/Newton）   │
 │   audit/oz_audit.c            独立"证人"：NOx 守恒 + O₃ 收支      │
-│   (src/mechc_c.py 按需生成)    机制 → C 速率函数（perf #5 后端）  │
+│   (src/mechc_c.py 按需生成)    机制 → C 速率函数（第二执行后端）  │
 └─────────────────────────────────────────────────────────────────┘
                          ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │ Shell / Makefile  ——  构建编排与冒烟                              │
-│   Makefile          9 个目标：all/v3/batch/figures/test/clean…    │
+│   Makefile          all/v3/mcm/batch/nc/figures/test/clean…      │
 │   check_env.sh      环境体检（14 项只读检查）                     │
 │   tests/smoke_test.sh  fac_v3 冒烟                                │
 └─────────────────────────────────────────────────────────────────┘
@@ -309,7 +309,7 @@ libquadmath.0.dylib
 | 文件 | 行数 | 角色 | 做什么 |
 |---|---|---|---|
 | **`src/cfgbuild.py`** | 395 | **配置编译器（唯一前端入口）** | 读 12 类人类可读配置 → 校验（物种/单位/单调/点数/槽位）→ 写 `runtime_v3.dat`（Fortran 唯一输入）。**运行时零文本解析的秘密全在这里** |
-| `src/mechc_c.py` | 112 | 机制→C 代码生成 | `.fac` → C 速率函数 → `gcc -shared` → ctypes 直调。绕过 f2py 构建链（perf #5） |
+| `src/mechc_c.py` | 112 | 机制→C 代码生成 | `.fac` → C 速率函数 → `gcc -shared` → ctypes 直调。绕过 f2py 构建链 |
 | **`src/sat2surf.py`** | 282 | 卫星数据转换器 | TROPOMI 柱浓度 → 地表等效 ppb 序列（直观法主准则 + QA 过滤 + BLH 插值 + 点数抽稀） |
 
 #### B. 机制编译器（`facsimile_impl/mechc.py`，1 个）
@@ -375,7 +375,7 @@ libquadmath.0.dylib
 |---|---|---|
 | **`libsundials_cvode` 等（第三方）** | **ODE 求解引擎本体** | BDF/Newton/SPGMR 的实现是 C；Fortran 通过 fcmix（`FCVODE`）或 C API（`CVode`）调用。**整个项目的数值能力建立在它之上** |
 | **`audit/oz_audit.c`**（40 行） | **独立"证人"审计器（C 语言旁证）** | `nox_budget`（NOx 家族望远镜闭合，Kahan 求和）+ `o3_budget`（ΔO₃=∫(P−L)dt）。**用与 Fortran 完全无关的实现算同一笔账**——若两边不一致，说明有一边错了。需手动 `gcc -shared` 编译为 dylib 后由 Python 调 |
-| `src/mechc_c.py`（Python，非 C 文件） | **机制→C 代码生成后端** | 按需把 `.fac` 编译成 C 速率函数（`gcc -shared` → ctypes），提供 Fortran 之外的第二条机制执行路径（perf #5，约 2× 加速） |
+| `src/mechc_c.py`（Python，非 C 文件） | **机制→C 代码生成后端** | 按需把 `.fac` 编译成 C 速率函数（`gcc -shared` → ctypes），提供 Fortran 之外的第二条机制执行路径 |
 
 > **C 层的设计意图**：不是"用 C 重写求解器"，而是提供**独立的第二实现**做交叉验证
 > + 借助第三方 C 库获得成熟数值算法。当前唯一的 C 源文件 `oz_audit.c` 是历史
@@ -385,7 +385,7 @@ libquadmath.0.dylib
 
 | 文件 | 角色 | 做什么 |
 |---|---|---|
-| **`Makefile`**（9 个目标） | **构建编排与依赖管理的唯一入口** | `all`（两二进制）/ `v3` / `batch` / `figures` / `smoke` / `functional` / `test` / `clean`。**按时间戳判断依赖**：改 config 不触发编译，改 `.fac`/`.f90` 才重编 |
+| **`Makefile`**（13 个目标） | **构建编排与依赖管理的唯一入口** | `all`（两二进制）/ `v3` / `mcm` / `batch` / `nc` / `figures` / `smoke` / `functional` / `test` / `clean` / `clean-build` / `clean-output` / `FORCE`。**按时间戳判断依赖**：改 config 不触发编译，改 `.fac`/`.f90` 才重编；`runtime_v3.dat` 挂 `FORCE` 强制重建（防同秒编辑漏判） |
 | **`tests/smoke_test.sh`** | 冒烟 | fac_v3 跑基线，查输出非空 + ≥24 行 + O₃ 列健全 |
 | **`check_env.sh`** | 环境体检 | 14 项只读检查（Python/编译器/CVODE/二进制/依赖解析） |
 
