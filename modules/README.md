@@ -155,7 +155,7 @@ make nc NC_SRC=output/run_A/BAU NC_OUT=output/BAU.nc
 
 | 文档 | 内容 |
 |---|---|
-| [ops manual §0.4](../OPERATIONS_MANUAL.md) | 目录职责与编译边界 |
-| [ENVIRONMENT.md §6b](../ENVIRONMENT.md) | 逐文件行数 / 角色 / 混合语言分工 |
+| [ops manual §0.4](../docs/OPERATIONS_MANUAL.md) | 目录职责与编译边界 |
+| [ENVIRONMENT.md §6b](../environment/ENVIRONMENT.md) | 逐文件行数 / 角色 / 混合语言分工 |
 | [UNITS.md §8](../UNITS.md) | `RADIAT` 无消费者说明 |
-| [EXPERIMENTS_GUIDE §3](../EXPERIMENTS_GUIDE.md) | 12 类配置的逐段解读（对应 `runtime_dat_mod` 的读取逻辑） |
+| [EXPERIMENTS_GUIDE §3](../docs/EXPERIMENTS_GUIDE.md) | 12 类配置的逐段解读（对应 `runtime_dat_mod` 的读取逻辑） |

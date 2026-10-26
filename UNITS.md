@@ -4,10 +4,10 @@
 > 单位、缺省、换算、校验）、6 类外部数据模板、机制 `.fac` 中的速率与计量、
 > 以及 Fortran 侧的硬编码 / 半硬编码系数与参数。
 >
-> **基线版本**：**V2.4+ 冻结版**（111sp/198rx · 三路线 · 2026-10-26）
+> **基线版本**：**V2.5+ 冻结版**（111sp/203rx · 三路线 · 2026-10-27）
 > **文档性质**：纯说明（不改代码）；每一条都对应 `src/cfgbuild.py`、
 > `modules/runtime_dat_mod.f90`、`modules/chem_phys_mod.f90` 的实际行为。
-> **变更单位约定时请同步更新本文档 + `OPERATIONS_MANUAL.md §2b`。**
+> **变更单位约定时请同步更新本文档 + `docs/OPERATIONS_MANUAL.md §2b`。**
 
 ---
 
@@ -168,8 +168,8 @@ python src/cfgbuild.py input_v3 runtime_v3.dat --mech mechanism/mechanism_3_full
 ```
 
 `--days` 只对本次编译生效，`input_v3/model.parameters` 保持原值。
-实测收敛（末 24h O₃ 均值）：1 天 42.69 / 2 天 57.88 / 3 天 58.59 / 5 天 59.21 /
-7 天 59.23 ppb → **建议 ≥3 天，5 天最稳**。
+实测收敛（末 24h O₃ 均值，V2.4 口径标定）：1 天 42.69 / 2 天 57.88 / 3 天 58.59 /
+5 天 59.21 / 7 天 59.23 ppb（V2.5+ 5 天基线 58.4，同量级）→ **建议 ≥3 天，5 天最稳**。
 
 **RTOL / ATOL 含义**：CVODE 的自适应步长判据是
 `|err_i| ≤ RTOL×|y_i| + ATOL`（逐物种）。RTOL 管大数（主量），ATOL 管小数
@@ -178,7 +178,7 @@ ATOL 1e1→1e6 范围内 O₃ 结果完全一致（仅步数变化 4324–6019�
 **默认 `1e-6 / 1e3` 足够，除非求解失败不要动。**
 
 > 三个坑（步长耦合、天数过小、ATOL 按名覆盖）与 RTOL/ATOL 完整推导见
-> [EXPERIMENTS_GUIDE.md §3 ⑫⑬](EXPERIMENTS_GUIDE.md)。
+> [EXPERIMENTS_GUIDE.md §3 ⑫⑬](docs/EXPERIMENTS_GUIDE.md)。
 
 ### 2.4 `bc.config` —— 边界条件（观测张弛）
 
@@ -270,14 +270,14 @@ E₀ = 日均 / (0.1 + 0.225·amp)
 
 #### 2.8b 排放量级参考（判断自己的数是否合理）
 
-**当前配置的实际量级**（`input_v3/emissions.config`，V2.2 校准档）：
+**当前配置的实际量级**（`input_v3/emissions.config`，2026-10-27 读表）：
 
 | 物种 | E₀ [molec/cm³/s] | 日型/amp | 峰值 [molec/cm³/s] | 折算日均 | 折算峰值 |
 |---|---|---|---|---|---|
 | NO | 2.157e7 | BOX/0.9 | 1.96e7 | 0.95 ppb/h | 2.87 ppb/h |
-| OLE | 2.134e7 | BOX/0.9 | 1.94e7 | 0.94 ppb/h | 2.84 ppb/h |
-| ALK | 2.622e7 | BOX/0.9 | 2.39e7 | 1.16 ppb/h | 3.48 ppb/h |
-| ARO1 | 1.199e7 | BOX/0.9 | 1.09e7 | 0.53 ppb/h | 1.59 ppb/h |
+| OLE | 1.494e7 | BOX/0.9 | 1.36e7 | 0.66 ppb/h | 1.99 ppb/h |
+| ALK | 1.573e7 | BOX/0.9 | 1.43e7 | 0.70 ppb/h | 2.10 ppb/h |
+| ARO1 | 1.019e7 | BOX/0.9 | 9.27e6 | 0.45 ppb/h | 1.36 ppb/h |
 | ISOP | 2.037e6 | BOX/0.9 | 1.85e6 | 0.09 ppb/h | 0.27 ppb/h |
 
 **典型城市量级参考**（用于判断你的清单是否离谱）：
@@ -333,7 +333,7 @@ J = JFAC · l · cosχ^m · exp(−n/cosχ)      (cosχ ≤ 1e-3 → J = 0)
 
 | 列 | 单位 | 说明 |
 |---|---|---|
-| `j` | 槽位号（无量纲整数） | 机制 `J<j>` 引用；1–61，本机制用到 1–41 |
+| `j` | 槽位号（无量纲整数） | 机制 `J<j>` 引用。⚠ **行参数属于 MCM 指定给该槽的分子**（V2.5 对齐）：在用槽 13=CH₃CHO / 14=C₂H₅CHO(=ALD2) / 21=丙酮(=KET) / **31/32/33=GLYOX 三分支(=GLY)** / 34=MGLY / 41=ROOH 类；自定义槽（JMAP 文献 D 值）30=N₂O₅、45=ClO、25–29=BrO/ClONO₂/BrONO₂/HOCl/HOBr。**新增光解前必查 `mechanism/reference/` 官方导出中该槽的分子归属** |
 | `l` | **s⁻¹** | 天顶角 0 时的光解速率（D 记法，cfgbuild 自动转 E） |
 | `m` | 无量纲 | cosχ 幂指数 |
 | `n` | 无量纲 | 光程（secχ）衰减指数 |
@@ -390,7 +390,7 @@ J = JFAC · l · cosχ^m · exp(−n/cosχ)      (cosχ ≤ 1e-3 → J = 0)
 | 三体/Troe | 同上；`M` = **molec/cm³** | 运行时 `eval_env` 由 PRES/TEMP 算 M |
 | `H2O` / `O2` | **molec/cm³** | O₂ = 0.2095·M；H₂O 由 Magnus 公式 |
 | 光解 `J<n>` | s⁻¹（由 §2.10/2.11 提供） | 槽位必须被 JMAP/表覆盖，否则编译期拒绝 |
-| 化学计量系数 | **无量纲，允许分数** | 元素审计强制配平（198/198） |
+| 化学计量系数 | **无量纲，允许分数** | 元素审计强制配平（203/203） |
 | `VARIABLE` 物种名 | 无单位 | 重复 → mechc 拒绝 |
 | `FORMULA` 元素组成 | 整数元素计数 | 供审计 + NOy 自动判定 |
 
@@ -437,22 +437,19 @@ J = JFAC · l · cosχ^m · exp(−n/cosχ)      (cosχ ≤ 1e-3 → J = 0)
 
 ### 5.4 ATOL 按名调优表（`chem_phys_mod.tune_atol_by_name`，单源）
 
-| 物种 | ATOL [molec/cm³] |
-|---|---|
-| CH₄ | 1e10 |
-| CO | 1e9 |
-| O₃ | 1e8 |
-| HCHO / PAN / MPAN / ISOP / SO₂ / CH₃CHO / MVK / MACR / MGLY / RONO₂ / OLENIT / TERPNIT / TERPOOH | 1e7 |
-| DMS / MSA / TERP | 1e6 |
-| TERPCHO | 1e8 |
-| 其余 | 沿用 `model.parameters` 第 4 行（默认 1e3） |
+**五档 62 物种**（与 §2.3 覆盖表同源，全表见彼处）：
+1e10: CH₄ · 1e9: CO · 1e8: 16 物种（O₃/CH₃OOH/ALK/ARO1/GLY/NO₂/H₂O₂/HNO₃/OLE/
+OLEOOH/ALKOOH/ARO2/KET/LALK/TERPCHO/SESQCHO）· 1e7: 31 物种（HCHO/PAN/MPAN/ISOP/
+SO₂/CH₃CHO/MVK/MACR/MGLY/NO/NO₃/N₂O₅/ETH/IOLE/PPAN/CSL 系/LALK 系/XYL 系…）·
+1e6: 13 物种（DMS/MSA/TERP/SESQ 系/ETOH/MTBE/ESTER/ALD2…）·
+其余 49 个（全部自由基/O/O¹D 等）沿用 `model.parameters` 第 4 行（默认 1e3）。
 
 ### 5.5 物种→情景组映射（`runtime_dat_mod.build_groups`，单源）
 
 | 组 | 物种清单 |
 |---|---|
 | `E_NOx` | NO, NO₂ |
-| `E_VOC` | HCHO, CH3CHO, ISOP, DMS, MVK, MACR, MSA, SO₂, ALK, OLE, ARO1, ARO2, KET, **TERP** |
+| `E_VOC` | HCHO, CH3CHO, ISOP, DMS, MVK, MACR, MSA, SO2, ALK, OLE, ARO1, ARO2, KET, TERP + **V2.4 排放类**：CSL, LALK, MEOH, ETOH, MTBE, ESTER, SESQ, ETH, IOLE, ALD2（共 24） |
 | `E_CO` | CO |
 | `E_CH4` | CH₄ |
 
@@ -541,7 +538,7 @@ dy/dt −= y · (dBLH/BLH)     dBLH[cm/s], BLH[cm]
 | 8 | **序列总数 ≤8（气象+BC 共享池）** | `NSER_MAX=8`；超限编译期拒绝。 |
 | 9 | **极痕量物种可出现负值** | O/O₁D 实测 min = −4e−4 / −1.5e−71（相对峰值 <1e-7）。BDF 不保正性是正常行为（10b 坑 #5），**不施加 `max(y,0)`**（会引入 RHS 折点，曾致 15× 步数惩罚）。 |
 | 10 | **CSV 三位指数（历史产物）** | R13 前输出用 `ES13.5`，\|指数\|≥100 时静默丢 E（如 `3.07932-174`）。现已改 `ES15.5E3`；旧文件用 `diagnostics/csvfloat.fix_fortran_exp()` 解析。 |
-| 11 | **无风速/风向/平流/对流** | 0-D 箱体**结构上没有**这些通道：模型无 x/y/z 坐标、无输运算子，风速风向无处可用（不是"没实现"，是"维度不存在"）。水平输送由 **`dilution.config` 的 `DIL`**（一阶通风率 [s⁻¹]）集总替代，垂直混合由 **BLH** 表达，湍流扩散并入 BLH 膨胀项。实测 `DIL` 是强控制量：0 → O3max 157.5 ppb，1.16e-5 → 101.6，5e-5 → 55.6。需要真实风场驱动的平流/对流 → 必须上三维模式（CMAQ/GEOS-Chem/WRF-Chem），0-D 箱体无法承载。 |
+| 11 | **无风速/风向/平流/对流** | 0-D 箱体**结构上没有**这些通道：模型无 x/y/z 坐标、无输运算子，风速风向无处可用（不是"没实现"，是"维度不存在"）。水平输送由 **`dilution.config` 的 `DIL`**（一阶通风率 [s⁻¹]）集总替代，垂直混合由 **BLH** 表达，湍流扩散并入 BLH 膨胀项。实测 `DIL` 是强控制量（V2.3 口径扫参）：0 → O3max 157.5 ppb，1.16e-5 → 101.6（V2.5+ 基线 99.3），5e-5 → 55.6。需要真实风场驱动的平流/对流 → 必须上三维模式（CMAQ/GEOS-Chem/WRF-Chem），0-D 箱体无法承载。 |
 
 ---
 
@@ -567,7 +564,7 @@ DIL 1.16e-5 s^-1 ≈ 24 h 通风一次
 
 ## 相关文档
 
-- [`OPERATIONS_MANUAL.md §2b`](OPERATIONS_MANUAL.md) —— 四类输入/参数/硬编码总表（本手册的摘要版）
+- [`docs/OPERATIONS_MANUAL.md §2b`](docs/OPERATIONS_MANUAL.md) —— 四类输入/参数/硬编码总表（本手册的摘要版）
 - [`mechanism/README.md`](mechanism/README.md) —— 机制逐反应速率与配平方法论
 - [`templates/`](templates/) —— 五类外部数据格式合同（各含单位换算表）
 - [`README.md §4`](README.md) —— 输入系统 12 类格式详表 + 处理链

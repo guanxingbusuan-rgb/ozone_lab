@@ -1,11 +1,11 @@
 **********************************************************************  ;
-* ozone_lab 机制 v3 —— 工程主线（**V2.4+ 冻结版**，2026-10-26）          ;
+* ozone_lab 机制 v3 —— 工程主线（**V2.5+ 冻结版**，2026-10-27）          ;
 *                                                                      ;
-* ★ 冻结声明: 本文件为当前发布冻结版本，不再继续迭代。                   ;
-*   后续升级方案与必要性评估见 V25_ASSESSMENT.md（11 项中仅 P1-4 推荐）。 ;
+* ★ 冻结声明: 本文件为当前发布冻结版本（V2.5+），不再继续迭代。           ;
+*   升级评估与 MCM 审计全记录见 V25_ASSESSMENT.md。                     ;
 *                                                                      ;
-* 规模: 111 物种 / 198 反应 / 124 命名速率 / 41 光解槽位                 ;
-* 质量: element_audit 198/198 PASS（每条 C/H/N/O/S/Cl/Br 精确配平）      ;
+* 规模: 111 物种 / 203 反应 / 127 命名速率 / 45 光解槽位                 ;
+* 质量: element_audit 203/203 PASS（每条 C/H/N/O/S/Cl/Br 精确配平）      ;
 *       mcm_compare 48 条可比对，最大偏差 8.9%（含 32 无机 + 16 集总映射）;
 *       其中 34 条产物一致者与 MCM v3.3.1 逐位相同（偏差 0.0%）          ;
 *                                                                      ;
@@ -297,7 +297,10 @@ KPNAT = 1.3D+16*EXP(-10400/TEMP)  ;
 KAPHO2 = 5.2D-13*EXP(980/TEMP)  ;        ! 酰基过氧 + HO2 通用
 KCH3O2NO = 2.3D-12*EXP(360/TEMP)  ;      ! CH3O2+NO 专用 (通用 KRO2NO = 2.7e-12)
 KCH3O2NO3 = 1.2D-12  ;                   ! CH3O2+NO3 专用 (通用 KRO2NO3 = 2.3e-12)
-KCH3O2HO2 = 3.8D-13*EXP(780/TEMP)*(1-1/(1+498*EXP(-1160/TEMP)))  ;  ! CH3O2+HO2 专用
+KCH3O2HO2 = 3.8D-13*EXP(780/TEMP)*(1-1/(1+498*EXP(-1160/TEMP)))  ;
+KO3HO2 = 2.03D-16*(TEMP/300)@(4.57)*EXP(693/TEMP)  ;   ! MCM: HO2+O3 (V2.5 补缺)
+KO3OH = 1.70D-12*EXP(-940/TEMP)  ;                     ! MCM: OH+O3 (V2.5 补缺)
+KIOLENO3 = 3.5D-13  ;                                  ! MCM CBUT2ENE+NO3 (V2.5: 内烯烃专属, 原挪用丙烯的 9.4e-15 偏慢 37x)  ! CH3O2+HO2 专用
 
 * ;
 * Peroxy radicals.  ;
@@ -348,6 +351,8 @@ KIOLEO3 = 3.22D-15*EXP(-968/TEMP)  ;    ! MCM CBUT2ENE+O3 (旧 6e-18 偏慢 21x)
 % KHO2HO2B : HO2 + HO2 = H2O2  ;
 % KH2O2OH : H2O2 + OH = HO2  ;
 % 4.8D-11*EXP(250/TEMP) : OH + HO2 = O2  ;
+% KO3HO2 : HO2 + O3 = OH + 2 O2  ;
+% KO3OH : O3 + OH = HO2 + O2  ;
 * ;
 * ---- ② NO3/N2O5 夜化学 ([MCM] 行逐字拷贝) ----  ;
 % J<5> : NO3 = NO  ;
@@ -390,7 +395,7 @@ KIOLEO3 = 3.22D-15*EXP(-968/TEMP)  ;    ! MCM CBUT2ENE+O3 (旧 6e-18 偏慢 21x)
 * 烷氧分解 → 一代羰基 (MVK/MACR 各半 + HCHO)  ;
 % 7.3D-13*EXP(580/TEMP)*O2 : ISOPBO + O2 = 0.50 MVK + 0.50 MACR + HCHO + HO2  ;
 * 氢过氧化物循环 (OH 回收 → 低 NOx 下 O3 生成效率维持)  ;
-% J<21> : ISOPOOH = ISOPBO + OH  ;
+% J<41> : ISOPOOH = ISOPBO + OH  ;
 % 1.9D-11 : ISOPOOH + OH = ISOPBO2  ;
 * NO3 加成支链: 过氧硝酸酯 (NOx 储库) + 断裂通道  ;
 % 4.0D-12 : ISOPNO3 + NO = MACR + HCHO + 2 NO2  ;
@@ -409,7 +414,7 @@ KIOLEO3 = 3.22D-15*EXP(-968/TEMP)  ;    ! MCM CBUT2ENE+O3 (旧 6e-18 偏慢 21x)
 % 7.3D-13*EXP(580/TEMP)*O2 : MACROO + O2 = MGLY + CO + OH  ;
 % KRO2HO2*0.625 : MACRO2 + HO2 = MACROOH  ;
 * MGLY 终局: 光解 + OH → CH3CO3 回灌 (闭环)  ;
-% J<22> : MGLY + 2 O2 = CH3CO3 + CO + HO2  ;
+% J<34> : MGLY + 2 O2 = CH3CO3 + CO + HO2  ;
 % KMGLYOH : MGLY + OH = CH3CO3 + CO  ;
 * ;
 * ---- ⑤ 硫链 ----  ;
@@ -436,7 +441,7 @@ KIOLEO3 = 3.22D-15*EXP(-968/TEMP)  ;    ! MCM CBUT2ENE+O3 (旧 6e-18 偏慢 21x)
 % J<29> : HOBr = Br + OH  ;
 % KBRHCHO : Br + HCHO = HBr + HO2 + CO  ;
 % KHBROH : HBr + OH = Br  ;
-% J<24> : ClO = Cl + O  ;
+% J<45> : ClO = Cl + O  ;
 % J<25> : BrO = Br + O  ;
 
 * ---- ⑦ V2.2: VOC 降解谱集总类 (烯烃/烷烃/芳烃/酮/二羰基) ----  ;
@@ -457,8 +462,10 @@ KIOLEO3 = 3.22D-15*EXP(-968/TEMP)  ;    ! MCM CBUT2ENE+O3 (旧 6e-18 偏慢 21x)
 % KRO2NO : ARO2O2 + NO + 2.50 O2 = 0.50 GLY + MGLY + 2.00 CH3CO3 + NO2  ;
 % KKETOH : KET + OH = KETRO2 + H2O  ;
 % KRO2NO : KETRO2 + NO + O2 = CH3CO3 + HCHO + NO2  ;
-% J<15> : KET = CH3CO3 + CH3O2 + 0.50 O2  ;
-% J<16> : GLY = HCHO + CO  ;
+% J<21> : KET = CH3CO3 + CH3O2 + 0.50 O2  ;
+% J<31> : GLY = CO + CO + H2  ;
+% J<32> : GLY = HCHO + CO  ;
+% J<33> : GLY + 2 O2 = CO + CO + HO2 + HO2  ;
 * ---- ⑧ V2.2: 支撑化学补全 (PNA / N2O5 白天光解 / OH+HNO3) ----  ;
 % KPNAF : HO2 + NO2 = PNA  ;
 % KPNAT : PNA = HO2 + NO2  ;
@@ -476,7 +483,7 @@ KIOLEO3 = 3.22D-15*EXP(-968/TEMP)  ;    ! MCM CBUT2ENE+O3 (旧 6e-18 偏慢 21x)
 % KRO2HO2 : TERPNIT + HO2 = TERPCHO + HNO3 + H2  ;
 
 * TERPCHO = SOA 代理终产物 (汇走 drydep.config; 不设气相 OH 汇)  ;
-% J<14> : N2O5 = NO2 + NO3  ;
+% J<30> : N2O5 = NO2 + NO3  ;
 % KMT11 : HNO3 + OH = NO3 + H2O  ;
 % KRO2NO3 : ISOPBO2 + CH3O2 = ISOPBO + HCHO + HO2  ;
 * ;
@@ -532,7 +539,7 @@ KIOLEO3 = 3.22D-15*EXP(-968/TEMP)  ;    ! MCM CBUT2ENE+O3 (旧 6e-18 偏慢 21x)
 % KRONO2OH : ETHNIT + OH + 0.25 O2 = HNO3 + 2 HCHO + 0.5 H2O  ;
 % KALD2OH : ALD2 + OH + O2 = ALD2O2 + H2O  ;
 % KNO3AL : ALD2 + NO3 + 2.5 O2 = HNO3 + CH3CO3 + CO2 + H2O  ;
-% J<13> : ALD2 + 0.5 O2 = CH3CHO + CO + H2  ;
+% J<14> : ALD2 + 0.5 O2 = CH3CHO + CO + H2  ;
 % KRO2NO : ALD2O2 + NO + 2 O2 = CH3CO3 + CO2 + NO2 + H2O  ;
 % KFPAN : ALD2O2 + NO2 = PPAN  ;
 % KBPAN : PPAN = ALD2O2 + NO2  ;
@@ -540,7 +547,8 @@ KIOLEO3 = 3.22D-15*EXP(-968/TEMP)  ;    ! MCM CBUT2ENE+O3 (旧 6e-18 偏慢 21x)
 % KRO2HO2 : ALD2OOH + OH = ALD2O2 + H2O + O2  ;
 % KIOLEOH : IOLE + OH + O2 = IOLERO2  ;
 % KIOLEO3 : IOLE + O3 = 2 HCHO + CH3CHO  ;
-% KOLENO3 : IOLE + NO3 + 0.5 H2O + 0.25 O2 = IOLENIT  ;
+% KIOLENO3 : IOLE + NO3 + 0.5 H2O + 0.25 O2 = IOLENIT  ;
+% 3.3D-12*EXP(-2880/TEMP) : ETH + NO3 + 0.5 H2O + 0.25 O2 = ETHNIT  ;
 % 0.85*KRO2NO : IOLERO2 + NO + O2 = 2 CH3CHO + HO2 + NO2  ;
 % 0.15*KRO2NO : IOLERO2 + NO = IOLENIT  ;
 % KRO2HO2 : IOLERO2 + HO2 = IOLEOOH  ;

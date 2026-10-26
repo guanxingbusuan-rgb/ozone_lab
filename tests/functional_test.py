@@ -226,13 +226,11 @@ check("屋脊存在 (先升后峰后回撤≥20%)",
 check("FNR 随 NOx 单调下降", fnr[-1] < fnr[0]*0.3, f"{fnr[0]:.2f} → {fnr[-1]:.2f}")
 # ---------- 回归哨兵: 基准格点金值 (抓数值漂移, 如 OPE 双计类 bug) ----------
 SENT = [  # (fnox, 列, 期望, 容差) — 列为 0 基 CSV 索引 (24 列格式)
-    # 沿革: V2.3 132.10/93.68/3.539/6.487
-    #       → V2.4+MCM无机对齐 142.54/146.75/5.014/3.899
-    #       → V2.5 (集总速率+光解JMAP修正) 138.39/123.91/4.988/4.234
-    ("2.28", 4, 138.39, 0.10),   # O3max 屋脊上升段
-    ("3.42", 4, 123.91, 0.10),   # O3max 峰值
-    ("1.01", 8, 4.988, 0.15),   # FNR 转折带
-    ("2.28", 16, 4.234, 0.15),  # OPE 饱和区谷
+    # 沿革: V2.3 → V2.4 → V2.4b → V2.5 → V2.5+ (详见各版本 commit)
+    ("2.28", 4, 139.04, 0.10),   # O3max 屋脊上升段
+    ("3.42", 4, 144.58, 0.10),   # O3max 峰值
+    ("1.01", 8, 5.239, 0.15),   # FNR 转折带
+    ("2.28", 16, 3.832, 0.15),  # OPE 饱和区谷
 ]
 for fn, c, exp, tol in SENT:
     row = next(r for r in data if abs(float(r[0]) - float(fn)) < 0.01 and abs(float(r[1]) - 1.0125) < 0.01)
@@ -522,6 +520,93 @@ try:
 finally:
     shutil.rmtree(_mp_tmp, ignore_errors=True)
 
+# ================= FT-MECHK: mechc 解析器防御（防计量表静默损坏） =================
+print("== FT-MECHK mechc 计量表生成防御 ==")
+_mechk_tmp = tempfile.mkdtemp()
+try:
+    _mech_src = open("mechanism/mechanism_3_full_chain.fac").read()
+    _mechc = os.path.abspath("facsimile_impl/mechc.py")
+
+    def _run_mechc(_fac, _tag):
+        _gd = os.path.join(_mechk_tmp, _tag)
+        return subprocess.run([sys.executable, _mechc, _fac, _gd],
+                              capture_output=True, text=True), _gd
+
+    # ① 行尾 ! 注释: 必须被剥离, 编译成功且计量表完整 (2026-10 实测事故复现)
+    _lines = _mech_src.splitlines()
+    for _i, _l in enumerate(_lines):
+        if "ISOPOOH = ISOPBO + OH" in _l and _l.strip().startswith("%"):
+            _lines[_i] = _l.rstrip(";").rstrip() + "  ;   ! FT 文档注释污染测试"
+            break
+    _pol = os.path.join(_mechk_tmp, "polluted.fac")
+    open(_pol, "w").write("\n".join(_lines) + "\n")
+    _r1, _g1 = _run_mechc(_pol, "g1")
+    _sp1 = re.search(r"(?m)^VARIABLE\s*\n(.*?);", _mech_src, re.S).group(1).replace(";", " ").split()
+    _sid1 = {n: i + 1 for i, n in enumerate(_sp1)}
+    _rl = [l.strip() for l in _mech_src.splitlines()
+           if l.strip().startswith("%") and "=" in l]
+    _iso_idx = next(i for i, l in enumerate(_rl, 1) if "ISOPOOH = ISOPBO" in l)
+    _prod_line = open(os.path.join(_g1, "oz.prod")).read().splitlines()[_iso_idx - 1]
+    check("mechc: 反应行尾 ! 注释被剥离且计量表完整",
+          _r1.returncode == 0 and str(_sid1["OH"]) in _prod_line.split(),
+          f"ISOPOOH 光解 oz.prod = {_prod_line.strip()}")
+
+    # ② 物种名手误: 必须硬失败并给出可操作错误 (旧版静默丢项)
+    _lines2 = _mech_src.splitlines()
+    for _i, _l in enumerate(_lines2):
+        if "ISOPOOH = ISOPBO + OH" in _l and _l.strip().startswith("%"):
+            _lines2[_i] = _l.replace("ISOPBO", "ISOPB0")
+            break
+    _typo = os.path.join(_mechk_tmp, "typo.fac")
+    open(_typo, "w").write("\n".join(_lines2) + "\n")
+    _r2, _g2 = _run_mechc(_typo, "g2")
+    _err = ((_r2.stderr or "") + (_r2.stdout or ""))
+    check("mechc: 未知产物/反应物硬失败 (防静默丢项)",
+          _r2.returncode != 0 and "未知产物" in _err,
+          "编译期拒绝" if _r2.returncode != 0 else "⚠ 静默通过!")
+
+    # ③ 全量计量表核对: 正式机制的 oz.reac/oz.prod 与 .fac 声明逐一一致
+    _r0, _g0 = _run_mechc(os.path.abspath("mechanism/mechanism_3_full_chain.fac"), "g0")
+    _fac_lines = [l.strip().rstrip(";").strip() for l in
+                  _mech_src.splitlines() if l.strip().startswith("%") and "=" in l]
+    _resv = {"O2", "H2O", "M", "N2", "CO2", "H2"}
+
+    def _declared(_side_txt):
+        _ids, _pairs = [], []
+        for _tok in _side_txt.split("+"):
+            _tok = _tok.strip()
+            if not _tok:
+                continue
+            _pp = _tok.split()
+            _nn = _pp[1] if len(_pp) == 2 else _pp[0]
+            _cc = float(_pp[0]) if len(_pp) == 2 else 1.0
+            if _nn in _sid1:
+                _ids.append(str(_sid1[_nn]))
+                _pairs.append(f"{_sid1[_nn]} {_cc:g}")
+        return _ids, sorted(_pairs)
+
+    _mismatch = 0
+    for _i, _l in enumerate(_fac_lines, 1):
+        _, _eq = _l[1:].split(":", 1)
+        _lhs_s, _rhs_s = _eq.split("=", 1)
+        _d_rids, _ = _declared(_lhs_s)
+        _d_pids, _d_ppairs = _declared(_rhs_s)
+        _reac_row = open(os.path.join(_g0, "oz.reac")).read().splitlines()[_i - 1].split()
+        _reac_ids = _reac_row[1:1 + int(_reac_row[0])]
+        _prod_row = open(os.path.join(_g0, "oz.prod")).read().splitlines()[_i - 1].split()
+        _prod_pairs = sorted(f"{_prod_row[j]} {float(_prod_row[j+1]):g}"
+                             for j in range(1, len(_prod_row), 2))
+        if _reac_ids != _d_rids or _prod_pairs != _d_ppairs:
+            _mismatch += 1
+            if _mismatch <= 3:
+                print(f"      ✗ #{_i}: reac {_reac_ids} vs {_d_rids}; "
+                      f"prod {_prod_pairs} vs {_d_ppairs}")
+    check("mechc: oz.reac/oz.prod 与 .fac 全量一致 (202 反应×两侧)",
+          _r0.returncode == 0 and _mismatch == 0,
+          "全表一致" if _mismatch == 0 else f"{_mismatch} 处不一致")
+finally:
+    shutil.rmtree(_mechk_tmp, ignore_errors=True)
+
 # ================= FT-FREEZE: 冻结版规格守卫 =================
 print("== FT-FREEZE 冻结版规格一致性 ==")
 _mech_txt = open("mechanism/mechanism_3_full_chain.fac").read()
@@ -534,11 +619,11 @@ sys.path.insert(0, "facsimile_impl")
 import mechc as _mc
 _n_rate = len(_mc.parse_fac("mechanism/mechanism_3_full_chain.fac").rates)
 
-check("冻结版: .fac 头声明 111 物种 198 反应",
-      "111 物种" in _mech_txt and "198 反应" in _mech_txt,
+check("冻结版: .fac 头声明 111 物种 202 反应",
+      "111 物种" in _mech_txt and "203 反应" in _mech_txt,
       f"实际 {_n_sp}sp/{_n_rx}rx")
 check("冻结版: .fac 实物计数与声明一致",
-      (_n_sp, _n_rx) == (111, 198), f"{_n_sp}sp/{_n_rx}rx")
+      (_n_sp, _n_rx) == (111, 203), f"{_n_sp}sp/{_n_rx}rx")
 check("冻结版: README 规格表与实物一致",
       f"{_n_sp} 物种" in _readme_txt and f"{_n_rx} 反应" in _readme_txt
       and f"{_n_rate} 个命名速率" in _readme_txt,
@@ -546,9 +631,10 @@ check("冻结版: README 规格表与实物一致",
 check("冻结版: .fac 含冻结声明", "冻结声明" in _mech_txt, "头部已标注")
 check("冻结版: README 标注冻结状态", "冻结版" in _readme_txt and "已冻结" in _readme_txt,
       "规格书已标注")
-check("冻结版: V25_ASSESSMENT 存在且提及 P1-4",
+check("冻结版: V25_ASSESSMENT 存在且覆盖核心审计维度",
       os.path.exists("mechanism/V25_ASSESSMENT.md")
-      and "P1-4" in open("mechanism/V25_ASSESSMENT.md").read(),
+      and "V2.5+" in open("mechanism/V25_ASSESSMENT.md").read()
+      and "Criegee" in open("mechanism/V25_ASSESSMENT.md").read(),
       "评估报告已归档")
 check("冻结版: V25_PLAN 已删除（避免与评估冲突）",
       not os.path.exists("mechanism/V25_PLAN.md"), "预备方案已移除")
@@ -686,10 +772,10 @@ check("output/ 无任何文件被 git 跟踪（仅本地保留）",
       "0 个跟踪 + 已被 ignore" if not _out_tracked
       else f"仍有 {len(_out_tracked.splitlines())} 个文件被跟踪")
 
-check("audit_reports/ 已删除（结论已并入 AUDIT_COMPLETE）",
+check("audit_reports/ 与 AUDIT_COMPLETE.md 均已删除（历史归档不再保留）",
       not os.path.exists("audit_reports")
-      and os.path.exists("AUDIT_COMPLETE.md"),
-      "目录已移除，R1–R16 记录合并于 AUDIT_COMPLETE.md")
+      and not os.path.exists("AUDIT_COMPLETE.md"),
+      "审计结论已固化为功能测试断言，原始档案可查 git 历史")
 
 check("mechc_c.py 已删除（零消费者，避免误用）",
       not os.path.exists("src/mechc_c.py"), "已移除")

@@ -3,8 +3,9 @@
 > **本文回答**：跑通 ozone_lab 到底需要装什么？版本是多少？装在哪？
 > 哪些是**硬依赖**、哪些只在特定路线/工具下才需要？
 >
-> **实测时间**：2026-10-26 · 全部版本号与路径均为本机实测值。
+> **实测时间**：2026-10-27 复检（首测 2026-10-26）· 全部版本号与路径均为本机实测值。
 > **平台**：macOS 12.7.6（Darwin 21.6.0）· x86_64 · 4 逻辑核
+> **位置说明**：本文件与 `check_env.sh` 位于 `environment/` 子目录（环境类资料归档）。
 
 ---
 
@@ -36,7 +37,7 @@
 | 6 | Pillow (PIL) | 11.1.0 | 同上 | 可选 | 图片后处理/验证 |
 | 7 | fontTools | 4.55.3 | 同上 | 可选 | 字体覆盖自检（排版排查用） |
 | 8 | **gfortran** | 13.2.0 | `~/gcc-13.2.0/bin` | **硬** | 无法编译求解核 |
-| 9 | **gcc** | 13.2.0 | `~/gcc-13.2.0/bin` | 半硬 | 仅 C 审计器 `audit/oz_audit.c` 需要 |
+| 9 | **gcc** | 13.2.0 | `~/gcc-13.2.0/bin` | 半硬 | 编译 Fortran 求解核（gfortran 同套件） |
 | 10 | **SUNDIALS CVODE** | 2.7.0（库 2.9.0/2.7.0 版本号见 §4） | `~/soft/atmenv/cvode` | **硬** | 所有 Fortran 路线无法链接 |
 | 11 | libgomp（OpenMP） | 随 gcc 13.2.0 | `~/gcc-13.2.0/lib` | 半硬 | `fac_batch_omp` 无并行（仍可串行） |
 | 12 | KPP | 3.2.0 | `~/soft/src/KPP-3.2.0` | **已退役** | 无影响（KPP 路线已删） |
@@ -263,11 +264,11 @@ libquadmath.0.dylib
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│ Python (23 个 .py)  ——  前端 + 后端分析 + 可视化                 │
+│ Python (33 个 .py)  ——  前端 + 后端分析 + 可视化                 │
 │   src/          配置编译 / 机制编译 / C 后端 / 卫星转换          │
 │   diagnostics/  指示因子与过程诊断（纯函数，只吃 CSV）           │
-│   experiments/  8 个实验脚本                                     │
-│   tests/        功能测试（24 断言）                              │
+│   experiments/  经典脚本 8 个 + run/ 批量入口（实验 A–I）        │
+│   tests/        功能测试（62 断言）                              │
 │   figures/      9+9 张机制图生成                                 │
 │   modules/      nc 输出（唯一的 Python-in-modules）              │
 └────────────────────────┬────────────────────────────────────────┘
@@ -290,25 +291,25 @@ libquadmath.0.dylib
 ┌─────────────────────────────────────────────────────────────────┐
 │ C  ——  三类角色                                                  │
 │   libsundials_*  (第三方)       ODE 求解引擎本体（BDF/Newton）   │
-│   audit/oz_audit.c            独立"证人"：NOx 守恒 + O₃ 收支      │
+│   (已删除: oz_audit.c)        原 C 证人（零调用方，Python/Fortran 已覆盖）│
 │   (已删除: mechc_c.py)        原 C 速率函数后端（零消费者）      │
 └─────────────────────────────────────────────────────────────────┘
                          ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │ Shell / Makefile  ——  构建编排与冒烟                              │
 │   Makefile          all/v3/mcm/batch/nc/figures/test/clean…      │
-│   check_env.sh      环境体检（14 项只读检查）                     │
+│   environment/check_env.sh   环境体检（14 项只读检查）           │
 │   tests/smoke_test.sh  fac_v3 冒烟                                │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-### 6b.2 Python 层（23 个文件）—— 前端 + 分析 + 可视化
+### 6b.2 Python 层（33 个文件）—— 前端 + 分析 + 可视化
 
 #### A. 输入前端（`src/`，3 个）
 
 | 文件 | 行数 | 角色 | 做什么 |
 |---|---|---|---|
-| **`src/cfgbuild.py`** | 395 | **配置编译器（唯一前端入口）** | 读 12 类人类可读配置 → 校验（物种/单位/单调/点数/槽位）→ 写 `runtime_v3.dat`（Fortran 唯一输入）。**运行时零文本解析的秘密全在这里** |
+| **`src/cfgbuild.py`** | 518 | **配置编译器（唯一前端入口）** | 读 12 类人类可读配置 → 校验（物种/单位/单调/点数/槽位）→ 写 `runtime_v3.dat`（Fortran 唯一输入）。支持 `--days/--dtout` 覆盖。**运行时零文本解析的秘密全在这里** |
 | ~~`src/mechc_c.py`~~ | ~~112~~ | ~~机制→C 代码生成~~ | **已删除（2026-10）**：零消费者、不在构建链、无测试 |
 | **`src/sat2surf.py`** | 282 | 卫星数据转换器 | TROPOMI 柱浓度 → 地表等效 ppb 序列（直观法主准则 + QA 过滤 + BLH 插值 + 点数抽稀） |
 
@@ -316,7 +317,7 @@ libquadmath.0.dylib
 
 | 文件 | 行数 | 角色 | 做什么 |
 |---|---|---|---|
-| **`facsimile_impl/mechc.py`** | 145 | **FACSIMILE→Fortran 编译器** | 解析 `.fac` 的物种表/速率名/反应行 → 生成 `gen_v3/oz_mech.f90`（含 `ns/nr/nq` 常量、`update_rates` 速率函数）+ `oz.reac`/`oz.prod` 计量表。**改机制 → 它重跑 → gfortran 重编**，这是"机制即代码"的实现 |
+| **`facsimile_impl/mechc.py`** | 180 | **FACSIMILE→Fortran 编译器** | 解析 `.fac` 的物种表/速率名/反应行 → 生成 `gen_v3/oz_mech.f90`（含 `ns/nr/nq` 常量、`update_rates` 速率函数）+ `oz.reac`/`oz.prod` 计量表。V2.5 硬化：`!` 注释剥离 + 未知物种令牌硬失败（防化学计量静默损坏）。**改机制 → 它重跑 → gfortran 重编**，这是"机制即代码"的实现 |
 
 #### C. 诊断与分析（`diagnostics/`，3 个）
 
@@ -326,7 +327,7 @@ libquadmath.0.dylib
 | `diagnostics/diagnostics.py` | 70 | CSV 读入与 IPR 解析 | `load()`（读 conc/irr）、`ipr_from_fac()`（六账梯形积分） |
 | `diagnostics/csvfloat.py` | 50 | 数值解析共享件 | 处理 gfortran 的 `8.27280-108` 三位指数省略 E 的坑（R13） |
 
-#### D. 实验脚本（`experiments/`，8 个）
+#### D. 实验脚本（`experiments/`，经典 8 个 + `run/` 批量入口）
 
 | 文件 | 行数 | 角色 |
 |---|---|---|
@@ -338,12 +339,13 @@ libquadmath.0.dylib
 | `experiments/hourly_pa.py` | 129 | G：逐小时过程分析 |
 | `ipr_closure_check.py` | — | D-1：六账闭合校验 |
 | `experiments/fig_ridge5.py` | 54 | C 的绘图 |
+| **`experiments/run/`**（11 个） | — | **A–I 九实验的"只跑+落 CSV"批量入口**（统一输出目录/CSV 契约，见 [../experiments/run/README.md](../experiments/run/README.md)） |
 
 #### E. 测试与可视化（`tests/` + `figures/`）
 
 | 文件 | 行数 | 角色 |
 |---|---|---|
-| **`tests/functional_test.py`** | 369 | **24 条功能断言**（含 FT-SAT 5 条 + 选择性输入 2 条 + 金值哨兵） |
+| **`tests/functional_test.py`** | 906 | **62 条功能断言**（12 族 FT-*：CFG/CFGSPEC/DAYS/FREEZE/GIT/MECHK/MP/PHOT/SAT/SYNC/TPL/UNIT，含金值哨兵） |
 | `figures/gen_all.py` | 915 | 9 张 SCI 版机制图（A–I） |
 | `figures/gen_cartoon.py` | 557 | 9 张漫画场景版（comic_A–I） |
 | `figures/fig_indicators_ridge.py` / `fig_response_v3.py` | 71 / 58 | 响应面与指示因子工程图 |
@@ -357,11 +359,11 @@ libquadmath.0.dylib
 | **`modules/runtime_dat_mod.f90`** | 364 | module | **输入消费端**：解析 `runtime_v3.dat`（SPECIES/IC/MET/BC/PHOT/EMIS/DRY/WET/DIL/SCEN/SERIES 12 段）+ `eval_met`（气象插值）+ `eval_env`（M/O₂/H₂O）+ `eval_J`（SZA→光解）+ `build_groups`（情景分组）+ `scen_build`。纯数据模块，无求解器依赖，双胞胎共享 |
 | **`modules/chem_phys_mod.f90`** | 107 | module | **物理四账唯一实现**（双胞胎共享）：排放 / 干湿沉降 / BC 松弛+稀释 / BLH 膨胀；`tune_atol_by_name`（ATOL 调优单源） |
 | `modules/rad_photol.f90` | 82 | module+demo | **在线辐射光解**（Beer-Lambert + 太阳天顶角），独立可执行 demo，未接入主链 |
-| **`facsimile_impl/oz_fac_v3.f90`** | 281 | program | **工程主线驱动**：读 runtime → CVODE fcmix BDF+DENSE → 111 物种全列 CSV + 198 IRR + 六账 IPR |
+| **`facsimile_impl/oz_fac_v3.f90`** | 282 | program | **工程主线驱动**：读 runtime → CVODE fcmix BDF+DENSE → 111 物种全列 CSV + 203 IRR + 六账 IPR |
 | **`facsimile_impl/fac_batch_omp.f90`** | 622 | program | **批量并行驱动**：网格扫描 + 预算表（NOy 17 物种/Q/L_NOx/OPE）+ 24 列指示因子 + OpenMP |
 | `facsimile_impl/cvode_c_mod.f90` | 108 | module | **CVODE C API 的 Fortran 绑定**：`CVodeCreate`/`CVode`/`N_VNew` 等 `bind(C)`，绕开 fcmix 的 COMMON 块限制（多线程必需） |
 | `mcm_city/mcm_driver.f90` | 263 | program | **MCM 对照案例**：29sp 子集 + 城市排放 + SPGMR |
-| `facsimile_impl/gen_v3/oz_mech.f90` | 247 | **生成码** | mechc.py 产出（勿手改）：`ns=74, nr=131, nq=105, nj=41` + `update_rates` + 计量表 |
+| `facsimile_impl/gen_v3/oz_mech.f90` | 341 | **生成码** | mechc.py 产出（勿手改）：`ns=111, nr=203, nq=127, nj=45` + `update_rates` + 计量表 |
 | `mcm_city/gen/oz_mech.f90` | 221 | **生成码** | 同上（MCM 29sp/71rx 版） |
 
 **Fortran 层的设计原则**：
@@ -374,11 +376,11 @@ libquadmath.0.dylib
 | 项 | 角色 | 说明 |
 |---|---|---|
 | **`libsundials_cvode` 等（第三方）** | **ODE 求解引擎本体** | BDF/Newton/SPGMR 的实现是 C；Fortran 通过 fcmix（`FCVODE`）或 C API（`CVode`）调用。**整个项目的数值能力建立在它之上** |
-| **`audit/oz_audit.c`**（40 行） | **独立"证人"审计器（C 语言旁证）** | `nox_budget`（NOx 家族望远镜闭合，Kahan 求和）+ `o3_budget`（ΔO₃=∫(P−L)dt）。**用与 Fortran 完全无关的实现算同一笔账**——若两边不一致，说明有一边错了。需手动 `gcc -shared` 编译为 dylib 后由 Python 调 |
+| ~~`audit/oz_audit.c`~~ | **已删除（2026-10）** | 原"独立 C 证人"（NOx 望远镜闭合 + O₃ 收支）。**从未被编译或调用**：无 Makefile 规则、无 ctypes 消费者、无 dylib 产物。同款校验已由活代码承担——元素守恒 `element_audit.py`(203/203)、氮守恒在线不变量 `fac_batch_omp.f90:313`、六账闭合 `run_D` + `FT-IPR` |
 | ~~`src/mechc_c.py`~~（已删除） | ~~机制→C 代码生成后端~~ | 原为性能实验 #5 的产物；因零消费者已移除。当前唯一机制编译路径 = `facsimile_impl/mechc.py` |
 
 > **C 层的设计意图**：不是"用 C 重写求解器"，而是提供**独立的第二实现**做交叉验证
-> + 借助第三方 C 库获得成熟数值算法。当前唯一的 C 源文件 `oz_audit.c` 是历史
+> + 借助第三方 C 库获得成熟数值算法。（`oz_audit.c` 已删除：零调用方；现无自研 C 源文件）
 > "C 证人"角色，未接入自动构建（需手动编译）。
 
 ### 6b.5 Shell / Makefile（2 个 .sh + 1 个 Makefile）
@@ -387,21 +389,20 @@ libquadmath.0.dylib
 |---|---|---|
 | **`Makefile`**（13 个目标） | **构建编排与依赖管理的唯一入口** | `all`（两二进制）/ `v3` / `mcm` / `batch` / `nc` / `figures` / `smoke` / `functional` / `test` / `clean` / `clean-build` / `clean-output` / `FORCE`。**按时间戳判断依赖**：改 config 不触发编译，改 `.fac`/`.f90` 才重编；`runtime_v3.dat` 挂 `FORCE` 强制重建（防同秒编辑漏判） |
 | **`tests/smoke_test.sh`** | 冒烟 | fac_v3 跑基线，查输出非空 + ≥24 行 + O₃ 列健全 |
-| **`check_env.sh`** | 环境体检 | 14 项只读检查（Python/编译器/CVODE/二进制/依赖解析） |
+| **`environment/check_env.sh`** | 环境体检 | 14 项只读检查（Python/编译器/CVODE/二进制/依赖解析），自动锚定工程根 |
 
 ### 6b.6 数据/文本资产（非代码，但属于接口合同）
 
 | 类型 | 文件 | 角色 |
 |---|---|---|
-| `.fac`（1 个在役） | `mechanism/mechanism_3_full_chain.fac` | **机制唯一事实源**（111sp/198rx，V2.4） |
-| `.fac`（1 个在役） | `mechanism/mechanism_3_full_chain.fac` | **V2.4+ 冻结版**（111sp/198rx） |
+| `.fac`（1 个在役） | `mechanism/mechanism_3_full_chain.fac` | **机制唯一事实源 · V2.5+ 冻结版**（111sp/203rx） |
 | `.fac`（1 个参考） | `mechanism/reference/mcm_v3.3.1_export.fac` | MCM v3.3.1 官方导出（5832sp/17224rx，系数比对基准） |
-| `.fac`（1 个对照） | `mcm_city/input/mechanism_mcm_ch4.fac` | MCM CH₄ 子集 29sp/71rx（独立子树，见 [mcm_city/README.md](mcm_city/README.md)） |
+| `.fac`（1 个对照） | `mcm_city/input/mechanism_mcm_ch4.fac` | MCM CH₄ 子集 29sp/71rx（独立子树，见 [mcm_city/README.md](../mcm_city/README.md)） |
 | `.config`（9 个） | `input_v3/*.config` | 12 类配置中的生效部分（人类可读） |
 | `.template`（6 个） | `templates/*.template` | **格式合同**（程序零直读） |
 | `.txt`（序列） | `input_v3/constraints/*.txt` | 观测/气象时间序列（`met_*_demo.txt` 6 条气象样例 + `bc_*_demo.txt` 3 条约束样例） |
 | `.dat`、`.csv` | `runtime_v3.dat`、`output/*` | 编译产物 / 实验产物（`output/` 已 gitignore） |
-| `.md`（6 个） | README / EXPERIMENTS_GUIDE / OPERATIONS_MANUAL / **ENVIRONMENT** / UNITS / SPECIES_INPUT_MATRIX | 文档体系 |
+| `.md`（17 个） | 根：README / UNITS；`docs/`：EXPERIMENTS_GUIDE / OPERATIONS_MANUAL；`environment/`：本文；`templates/`：SPECIES_INPUT_MATRIX；各子目录 README（mechanism / experiments/run / diagnostics / audit / tests / src / modules / facsimile_impl / mcm_city / figures） | 文档体系 |
 
 ### 6b.6b 模型维度澄清：0-D 箱 + 参数扫描 ≠ 空间网格
 
@@ -454,7 +455,7 @@ libquadmath.0.dylib
 |---|---|---|
 | matplotlib | 图生成失败，但 cfgbuild/fac_v3 正常 | 只看 CSV |
 | libgomp | `fac_batch_omp` 编译失败或串行 | 改用 fac_v3 逐点跑 |
-| gcc | C 审计器（`liboz_audit.dylib`）不可编 | 跳过 C 证人，用 Python 审计 |
+| gcc | —（C 审计器已删除） | 元素/守恒审计全在 Python/Fortran 内 |
 | 系统 `mkdir`/`sh` | fac_v3 的 `ensure_dir` 与 smoke 脚本失败 | 手动建目录 |
 
 ### 7.3 纯可选（特定工具/实验才用）
@@ -500,7 +501,7 @@ cd /path/to/ozone_lab
 
 # ── ⑤ 构建 + 自检 ──
 make all
-make test        # 冒烟 1/1 → 功能 35/35 → 审计 198/198
+make test        # 冒烟 1/1 → 功能 62/62 → 审计 203/203
 ```
 
 ### 8.2 完整环境（含图集与全部实验）
@@ -516,58 +517,21 @@ python experiments/ridge5.py    # 屋脊跨路线对比
 
 ## 9. 环境自检脚本
 
-把下面保存为 `check_env.sh` 一键体检（**只读，不改环境**）：
+体检脚本已随仓库提供：**[`environment/check_env.sh`](check_env.sh)**（**只读，不改环境**，
+14 项检查，自动锚定工程根——从任意目录运行均可）：
 
-```bash
-#!/bin/sh
-# ozone_lab 环境自检 —— 只读检查, 不修改任何东西
-PY=${PY:-python3}
-ok=0; bad=0
-chk() {  # chk <描述> <命令>
-  if eval "$2" >/dev/null 2>&1; then echo "  [OK]   $1"; ok=$((ok+1));
-  else echo "  [MISS] $1"; bad=$((bad+1)); fi
-}
-
-echo "== Python =="
-chk "python 可用 ($($PY --version 2>&1 | cut -d' ' -f2))" "$PY --version"
-chk "numpy"      "$PY -c 'import numpy'"
-chk "matplotlib" "$PY -c 'import matplotlib'"
-chk "scipy (可选)"      "$PY -c 'import scipy'"
-chk "netCDF4 (可选)"    "$PY -c 'import netCDF4'"
-
-echo "== 编译器 =="
-GF=${FC:-gfortran}
-chk "gfortran ($($GF --version 2>/dev/null | head -1))" "$GF --version"
-chk "gcc" "gcc --version"
-
-echo "== CVODE =="
-CV=${CVODE_ROOT:-$HOME/soft/atmenv/cvode}
-chk "libsundials_cvode"     "test -e $CV/lib/libsundials_cvode.dylib -o -e $CV/lib/libsundials_cvode.so"
-chk "libsundials_fcvode (fcmix Fortran 接口)" \
-    "test -e $CV/lib/libsundials_fcvode.a -o -e $CV/lib/libsundials_fcvode.so"
-chk "cvode.h 头文件"        "test -e $CV/include/cvode/cvode.h"
-
-echo "== 项目构建 =="
-chk "fac_v3 二进制存在"       "test -x facsimile_impl/fac_v3"
-chk "fac_batch_omp 二进制存在" "test -x facsimile_impl/fac_batch_omp"
-chk "runtime_v3.dat 存在"     "test -f runtime_v3.dat"
-
-echo "== 二进制依赖可解析 =="
-if command -v otool >/dev/null; then
-  n=$(otool -L facsimile_impl/fac_v3 2>/dev/null | grep -c "not found")
-  [ "$n" = "0" ] && { echo "  [OK]   fac_v3 无未解析依赖"; ok=$((ok+1)); } \
-                 || { echo "  [MISS] fac_v3 有 $n 个未解析依赖"; bad=$((bad+1)); }
-fi
-
-echo
-echo "== 汇总: $ok OK, $bad MISS =="
-[ "$bad" = "0" ] && echo "环境就绪 ✓" || echo "请先补齐 MISS 项"
-```
+| 检查组 | 项 |
+|---|---|
+| Python | 解释器可用 + numpy / matplotlib / scipy(可选) / netCDF4(可选)（默认优先用项目 venv，与 Makefile 一致；可用 `PY=…` 覆盖） |
+| 编译器 | gfortran（读 `FC`）+ gcc |
+| CVODE | `libsundials_cvode`、`libsundials_fcvode`（fcmix）、`cvode.h`（读 `CVODE_ROOT`，默认 `~/soft/atmenv/cvode`） |
+| 项目构建 | `fac_v3` / `fac_batch_omp` 二进制可执行 + `runtime_v3.dat` 存在 |
+| 依赖解析 | `otool -L`（macOS）确认 fac_v3 无 `not found` |
 
 运行：
 
 ```bash
-sh check_env.sh
+sh environment/check_env.sh
 ```
 
 ---
@@ -613,8 +577,8 @@ flex      2.6.4 (/usr/bin)               [同上]
 
 | 文档 | 内容 |
 |---|---|
-| [README.md](README.md) | 项目总览、路线清单 |
-| [EXPERIMENTS_GUIDE.md](EXPERIMENTS_GUIDE.md) | 实验操作（环境章节见 §1） |
-| [OPERATIONS_MANUAL.md](OPERATIONS_MANUAL.md) | 架构、速查、编译边界 |
-| [UNITS.md](UNITS.md) | 单位与换算参考 |
-| [templates/SPECIES_INPUT_MATRIX.md](templates/SPECIES_INPUT_MATRIX.md) | 111 物种 × 5 通道可输入矩阵 |
+| [README.md](../README.md) | 项目总览、路线清单 |
+| [EXPERIMENTS_GUIDE.md](../docs/EXPERIMENTS_GUIDE.md) | 实验操作（环境章节见 §1） |
+| [OPERATIONS_MANUAL.md](../docs/OPERATIONS_MANUAL.md) | 架构、速查、编译边界 |
+| [UNITS.md](../UNITS.md) | 单位与换算参考 |
+| [templates/SPECIES_INPUT_MATRIX.md](../templates/SPECIES_INPUT_MATRIX.md) | 111 物种 × 5 通道可输入矩阵 |

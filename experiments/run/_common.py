@@ -72,7 +72,7 @@ def require_prereq(need_batch=False, need_mcm=False, need_rt=True):
     if need_batch and not os.path.exists(BATCH):
         problems.append(f"缺少 {BATCH}\n      → 先运行: make all")
     if need_mcm and not os.path.exists(MCM):
-        problems.append(f"缺少 {MCM}\n      → 先构建 mcm_city/ (见 ENVIRONMENT.md)")
+        problems.append(f"缺少 {MCM}\n      → 先构建 mcm_city/ (见 environment/ENVIRONMENT.md)")
     if problems:
         log("✗ 前置条件不满足:")
         for p in problems:

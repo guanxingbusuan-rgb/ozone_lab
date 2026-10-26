@@ -5,13 +5,17 @@
 > 判读要点 → 变异玩法 → 常见坑**八段式。零基础按 §1→§4 顺序读，之后按需跳章节。
 >
 > **四份文档分工**：
-> [README.md](README.md)（项目是什么）· [OPERATIONS_MANUAL.md](OPERATIONS_MANUAL.md)
+> [README.md](../README.md)（项目是什么）· [OPERATIONS_MANUAL.md](OPERATIONS_MANUAL.md)
 > （架构与速查）· **本文（实验怎么做，手把手）** ·
 > `figures/README.md`（机制图集与七机制对比；该目录**不入库**，本地自备）。
 >
-> **适用版本**：2026-10-26 · mechanism_3 **V2.3（74sp/131rx/41 光解）** ·
+> **适用版本**：2026-10-27 · mechanism_3 **V2.5+ 冻结版（111sp/203rx/45 光解）** ·
 > 现役三路线（fac_v3 / fac_batch_omp / mcm_run）·
-> **本文所有命令与数字均为当日实测**（可复现）。
+> 命令与产物契约均为现版实测（可复现）。
+>
+> **数值口径**：正文标注"V2.3/V2.4 实测"的段落为该版本时期的**历史快照**——
+> 方法学与判读逻辑仍有效，绝对数值以 [`experiments/run/`](../experiments/run/README.md)
+> 在 V2.5+ 下重跑为准（六情景现值见 OPERATIONS_MANUAL §3）。
 
 ---
 
@@ -86,7 +90,7 @@ OZONE_OUT=$HOME/ozone_results python experiments/run/run_all.py
 | `run_A_scenarios.py` | 六情景政策沙盘 | `run_A/<SCEN>_{conc,irr,ipr}.csv` + `summary.csv` | ~3 s |
 | `run_B_surface.py` | 响应面（4D） | `run_B/batch.csv` + **17 个 `indicator_matrix_*.csv`** + `slices.csv` | ~15 s |
 | `run_C_ridge.py` | 屋脊跨路线对比 | `run_C/ridge_{batch,mcm,compare}.csv` | ~16 s |
-| `run_D_process.py` | IPR 六账 + IRR 反应级 | `run_D/ipr_ledger.csv`（74×6）`closure.csv` `irr_top.csv` | ~1 s |
+| `run_D_process.py` | IPR 六账 + IRR 反应级 | `run_D/ipr_ledger.csv`（111×6）`closure.csv` `irr_top.csv` | ~1 s |
 | `run_E_indicators.py` | 12 指标工具箱 | `run_E/<tag>_indicators.csv` `_timeseries.csv` `compare.csv` | <1 s |
 | `run_F_osse.py` | OSSE 同化技能 | `run_F/obs_samples.csv` `skill_rmse.csv` `skill_delta.csv` | ~4 s |
 | `run_G_hourlyPA.py` | 逐小时过程 + IPR↔IRR | `run_G/hourly_{ledger,share,rxn_top}.csv` `consistency.csv` | ~1 s |
@@ -169,7 +173,7 @@ python experiments/run/run_M_met_series.py
 ### 0.5 详细说明
 
 完整用法、输出契约、mcm 前置构建、与旧脚本的对应关系：
-**[experiments/run/README.md](experiments/run/README.md)**
+**[experiments/run/README.md](../experiments/run/README.md)**
 
 ---
 
@@ -177,8 +181,8 @@ python experiments/run/run_M_met_series.py
 
 ### 1.1 依赖清单
 
-> 完整版（版本号、路径、依赖分层、从零复现、自检脚本）见 [ENVIRONMENT.md](ENVIRONMENT.md)；
-> 一键体检：`sh check_env.sh`
+> 完整版（版本号、路径、依赖分层、从零复现、自检脚本）见 [ENVIRONMENT.md](../environment/ENVIRONMENT.md)；
+> 一键体检：`sh environment/check_env.sh`
 
 | 依赖 | 位置 | 版本 | 用途 | 缺失后果 |
 |---|---|---|---|---|
@@ -201,7 +205,7 @@ make test    # 全链自检（见 1.3）
 构建链内部做了什么（理解它有助排错）：
 
 ```
-mechanism/mechanism_3_full_chain.fac   (74sp/131rx 机制唯一事实源)
+mechanism/mechanism_3_full_chain.fac   (111sp/203rx V2.5 机制唯一事实源)
       │ mechc.py  ← 只在 .fac 变更时触发
       ▼
 facsimile_impl/gen_v3/oz_mech.f90      (生成码: ns/nr/nq 常量 + update_rates + 计量表)
@@ -219,8 +223,8 @@ fac_v3 / fac_batch_omp                 (两个二进制)
 | # | 检查 | 期望输出 |
 |---|---|---|
 | 1 | `make smoke` | `[PASS] FAC-V3 冒烟 (conc 26 行, O3末=…)` + `1/1 PASS` |
-| 2 | `python tests/functional_test.py` | `functional_test: 35/35 PASS`（含 4 金值哨兵 + 7 条 R10-R13 防线 + sat2surf 5 项 + 负向守卫 + FT-PHOT/FT-MP/FT-DAYS） |
-| 3 | `python audit/element_audit.py mechanism/mechanism_3_full_chain.fac` | `全部 131 反应元素守恒 PASS` |
+| 2 | `python tests/functional_test.py` | `functional_test: 59/59 PASS`（含 4 金值哨兵 + 7 条 R10-R13 防线 + sat2surf 5 项 + 负向守卫 + FT-PHOT/FT-MP/FT-DAYS） |
+| 3 | `python audit/element_audit.py mechanism/mechanism_3_full_chain.fac` | `全部 203 反应元素守恒 PASS` |
 | 4 | `ls facsimile_impl/fac_v3 facsimile_impl/fac_batch_omp` | 两个二进制存在 |
 
 ❌ 任何一项失败 → 先看 §18 故障排查，不要继续做实验（垃圾进垃圾出）。
@@ -229,7 +233,7 @@ fac_v3 / fac_batch_omp                 (两个二进制)
 
 | 目录/文件 | 职责 | 你会不会改它 |
 |---|---|---|
-| `mechanism/` | 机制唯一事实源（**V2.4+ 冻结版** 111sp/198rx）+ `reference/` MCM 官方导出 | 冻结，不再改 |
+| `mechanism/` | 机制唯一事实源（**V2.5+ 冻结版** 111sp/203rx）+ `reference/` MCM 官方导出 | 冻结，不再改 |
 | `input_v3/` | **12 类生效配置** + `constraints/` 序列 | **最常改这里** |
 | `templates/` | 5 类数据落位模板（人读格式合同） | 只读（照它落位） |
 | `runtime_v3.dat` | cfgbuild 产物（Fortran 唯一输入） | 不手改（自动生成） |
@@ -301,7 +305,7 @@ HCHO + hν (J₄) → 2 HO₂ + CO        一张 HCHO 光解 = 两个 HO₂
 产生 O → O+O₂ → O₃，于是净多了一个 O₃。走滴定边（O₃+NO）再走光解则是净零。
 **P(O₃) = k[HO₂][NO] + k[RO₂][NO]** —— 这就是 IRR 里的净化学生成。
 
-### 2.2 mechanism_3 V2.3 十段链条（对应图 H 的十个进料管）
+### 2.2 mechanism_3 十段链条（对应图 H 的十个进料管）
 
 | 链 | 名称 | 关键内容 | 涉及物种（举例） |
 |---|---|---|---|
@@ -497,10 +501,13 @@ CH4 = 4.5e13
 MODE = MCM            # MCM 参数化（SZA 驱动）或 DIRECT（查表）
 LAT  = 40.0           # 纬度（决定 SZA 日变化）
 DOY  = 172.0          # 年积日（172≈夏至）
-JMAP = 13=D4.0e-5,14=D1.0e-5,...   # 槽位→l 参数（速率表未定义时的直给）
+JMAP = 25=D1.0e-6,...,30=D1.0e-5,45=D2.0e-5  # 槽位→l 参数（速率表未定义时的直给）
 ```
 - J 计算式：`J = JFAC·l·cosᵐχ·exp(−n/cosχ)`；`cosχ≤1e-3 → J=0`（夜间）
-- 槽位 1–41，机制用到 23 个；MAPPING 缺省恒等
+- 槽位编号沿用 MCM 官方语义（V2.4b 对齐）：13=CH₃CHO / 14=C₂H₅CHO(=ALD2) /
+  21=丙酮(=KET) / 32=GLY / 34=MGLY / 41=ROOH 类；自定义槽 30=N₂O₅、45=ClO、
+  25–29=BrO/ClONO₂/BrONO₂/HOCl/HOBr（文献 D 值）。
+  **新增光解反应前必查 `mechanism/reference/` 官方导出中该槽的分子归属**
 - **LAT/DOY 是光解的唯二地理控制**：SZA 由 `LAT + DOY + 时角` 现算，
   所以 METEO 里的 RADIAT **不需要、也无法**参与（见下）
 - 实测：lat=60 时夏至 O3max 99.77 ppb vs 冬至 10.95 ppb（差 9×）
@@ -875,11 +882,11 @@ E=2.157e7 → SS ≈ 1.7e9 ≈ **70 ppb**，与城市量级吻合 ✓。
 | | ① fac_v3 | ② fac_batch_omp | ③ mcm_run |
 |---|---|---|---|
 | **一句话** | 显微镜：单点问"为什么" | 望远镜：曲面问"在哪转折" | 体检器：无机块有没有被带偏 |
-| 机制 | V2.3 74sp/131rx（gen_v3） | 同左（共享生成码） | MCM 29sp/71rx（独立子树） |
+| 机制 | V2.5 111sp/203rx（gen_v3） | 同左（共享生成码） | MCM 29sp/71rx（独立子树） |
 | 内核 | fcmix CVODE-BDF+DENSE | **C-ABI 直连 CVODE + OpenMP** | fcmix CVODE-BDF+DENSE |
 | 输入 | runtime.dat 全通路 + 观测同化 | 同左 + 网格参数 | CLI 四参（days/pref/fnox/fvoc） |
 | 一次运行 | 1 情景 | 81+ 格点 | 1 案例 |
-| 输出 | 逐时 111 物种 + 198 IRR + 六账 | 24 列指示因子（末 24h 均值） | 29 物种 + 71 IRR + 六账 |
+| 输出 | 逐时 111 物种 + 203 IRR + 六账 | 24 列指示因子（末 24h 均值） | 29 物种 + 71 IRR + 六账 |
 | 生产角色 | ✓ 主力 | ✓ 批量 | ✗ 对照 |
 
 ### 4.2 决策树
@@ -1392,7 +1399,7 @@ for S in BAU LNNOX HVOC HOT CLOUD ISOPX; do
 done
 cd .. && python3 experiments/scen5.py    # → 情景×路线方向一致性矩阵
 
-# ═══ 6. 过程分析（IPR 六账 + IRR 131 反应）═══
+# ═══ 6. 过程分析（IPR 六账 + IRR 203 反应）═══
 cd facsimile_impl && ./fac_v3 SCEN_BAU ../output/pa_demo ../runtime_v3.dat && cd ..
 python3 experiments/hourly_pa.py output/pa_demo    # → 逐小时六账 + 反应级 top4 + 一致性
 python3 experiments/ipr_closure_check.py          # → 六账闭合校验（1.004–1.019）
@@ -1665,7 +1672,7 @@ batch:   LNNOX −47.4✓  HVOC +8.0✓  ISOPX −34.1✓
 | 账本 | 名称 | 粒度 | 内容 | 输出 |
 |---|---|---|---|---|
 | **IPR** | Integrated Process Rate（过程速率积分） | **过程级**（6 类） | ①机制P ②机制L ③排放 ④干+湿沉 ⑤BC+稀释 ⑥BLH膨胀 | `<pref>_ipr.csv`（111 物种 × 6 账） |
-| **IRR** | Integrated Reaction Rate（反应速率积分） | **反应级**（131 条） | 逐反应速率的小时窗精确积分 | `<pref>_irr.csv`（r1..r131） |
+| **IRR** | Integrated Reaction Rate（反应速率积分） | **反应级**（203 条） | 逐反应速率的小时窗精确积分 | `<pref>_irr.csv`（r1..r203） |
 
 **关键设计：IPR 是"小时窗精确积分"，不是快照**
 - `fac_v3` 在内步（CVODE 内部子步）累积，输出每小时窗口的积分量（molec/cm³）
@@ -1705,7 +1712,7 @@ O3 六账: P=+4.63e13  L=−4.16e13  E=0.00  D=−2.48e12  B=−2.26e12  X=0.00
 |---|---|
 | 每物种每过程的贡献分解（六账） | 空间过程的分解（无空间维） |
 | 逐小时演变（何时主导） | 单网格点的过程分析（0-D 箱整体） |
-| 反应级 top 预算（131 反应排名） | 单分子/单事件的轨迹追踪 |
+| 反应级 top 预算（203 反应排名） | 单分子/单事件的轨迹追踪 |
 | 跨路线过程结论一致性 | 非均相/液相过程的独立账（目前并入机制 P/L） |
 
 #### 6.11.3 四项分析与情景/过程的关系
@@ -1714,7 +1721,7 @@ O3 六账: P=+4.63e13  L=−4.16e13  E=0.00  D=−2.48e12  B=−2.26e12  X=0.00
 响应面 (Where?)      fac_batch_omp    全局地图: 屋脊在哪 / 体制在哪转折
     │
     ├→ 情景分析 (What if?)   scenarios.config   在关键区试政策组合
-    │       └→ 过程分析 (Why?)   IPR + IRR        为什么变 (六账/131 反应)
+    │       └→ 过程分析 (Why?)   IPR + IRR        为什么变 (六账/203 反应)
     │              └→ 敏感性 OAT (How much?)  sens_adj.py   精确梯度 ∂y/∂p
     │
     └→ 反演/伴随 (推断)   FD+SVD   从观测反推排放
@@ -1732,7 +1739,7 @@ O3 六账: P=+4.63e13  L=−4.16e13  E=0.00  D=−2.48e12  B=−2.26e12  X=0.00
 | 1 | **观测约束** | 数据同化 | ✅ 生产级 | `bc.config` + `TAU_MIX` | IPR 的 B 账 |
 | 2 | **响应面** | **全局扫描** | ✅ 4D 参数空间 | `fac_batch_omp` | 24 列 CSV → 114 曲面族 |
 | 3 | **情景分析** | **离散场景对比** | ✅ 政策沙盘 | `scenarios.config` + `scen5.py` | 情景矩阵 + 方向一致性 |
-| 4 | **过程分析** | **过程归因** | ✅ **核心差异化** | `hourly_pa.py` + IPR/IRR | 六账 + 131 反应优先级 |
+| 4 | **过程分析** | **过程归因** | ✅ **核心差异化** | `hourly_pa.py` + IPR/IRR | 六账 + 203 反应优先级 |
 | 5 | **敏感性 OAT** | **局部梯度** | ✅ | `sens_adj.py` | `jacobian.csv`（24×9） |
 | 6 | **伴随/反演** | 推断（非真伴随） | ⚠ 仅 1/9 模态可辨识 | `sens_adj.py` ② | FD 雅可比 + 截断 SVD |
 
@@ -1861,7 +1868,7 @@ for k, l in enumerate(mech, 1):
 
 ### 8.7 变异玩法
 
-- 换物种：`ipr_from_fac` 返回 74 物种全账，任取
+- 换物种：`ipr_from_fac` 返回 111 物种全账，任取
 - 换窗口：改 `model.parameters` 的天数/步长
 - 逐时看账：直接读 `_ipr.csv` 的原始行（实验 G）
 
@@ -2115,7 +2122,7 @@ python3 experiments/scen5.py       # 路线×情景 O₃max 响应矩阵 (%Δ) +
 > ① 按模板格式准备数据  →  ② 落位到 input_v3/constraints/（或直接编辑 emissions.config）
 > ③ 在 bc.config / meteo.config 登记一行 file:  →  ④ make runtime_v3.dat 重编译
 > ```
-> **单位总参考**：[UNITS.md](UNITS.md)（449 行逐子量表 + 换算公式 + 硬编码登记）。
+> **单位总参考**：[UNITS.md](../UNITS.md)（449 行逐子量表 + 换算公式 + 硬编码登记）。
 
 ### 14.0 六类模板总览
 
@@ -2704,8 +2711,8 @@ python3 src/sat2surf.py --selftest
 支持时间格式：`YYYY-MM-DDTHH:MM` / `YYYY-MM-DD HH:MM` / `YYYYMMDDHH`。
 QA 低于阈值（默认 0.75）的过境自动剔除并打印。
 
-> 📋 **全物种输入矩阵**：74 物种 × 5 通道（IC/BC/EMIS/DRY/WET）的完整可输入清单
-> 与物理合理性判断见 [templates/SPECIES_INPUT_MATRIX.md](templates/SPECIES_INPUT_MATRIX.md)。
+> 📋 **全物种输入矩阵**：111 物种 × 5 通道（IC/BC/EMIS/DRY/WET）的完整可输入清单
+> 与物理合理性判断见 [templates/SPECIES_INPUT_MATRIX.md](../templates/SPECIES_INPUT_MATRIX.md)。
 > 每物种每个通道标注 **✓ 推荐 / △ 可行有前提 / ✗ 无意义**。
 
 #### 14.4.2b 支持哪些卫星产品？（无白名单，凡机制物种皆可）
@@ -3263,19 +3270,19 @@ PNA/RONO₂/OLENIT/TERPNIT 时，该不变量抓住了 4 个格点的 FAIL。
 
 | # | 关卡 | 工具 | 抓什么 | 通过标准 |
 |---|---|---|---|---|
-| 1 | 元素守恒 | `audit/element_audit.py` | 每反应 C/H/N/O/S/Cl/Br 配平 | 131/131 PASS |
+| 1 | 元素守恒 | `audit/element_audit.py` | 每反应 C/H/N/O/S/Cl/Br 配平 | 203/203 PASS |
 | 2 | 氮守恒不变量 | batch `diag_selfcheck`（运行期） | NOy 权重表漏物种 | FAIL = 0 |
 | 3 | 金值哨兵 | `functional_test` SENT 表 | 机制/求解改动的数值漂移 | 4 点位 ±10–15% |
 | 4 | mcm_run 对照 | `mcm_city/mcm_run` | 无机块跨机制行为 | 定性一致 |
 
-**金值哨兵 4 点位**（V2.2 标定，V2.3 实测全在容差内）：
+**金值哨兵 4 点位**（V2.5+ 标定，`tests/functional_test.py` SENT 表，容差 ±10–15%）：
 
-| 点位 | 金值 | 列索引 | V2.3 实测 |
+| 点位 | 金值 | 列索引 | fnox |
 |---|---|---|---|
-| 屋脊峰 O₃max | 132.10 | 4 | 125.5 ✓ |
-| 饱和区 O₃ | 93.68 | 4 | 85.75 ✓ |
-| FNR 转折 | 3.539 | 8 | 3.447 ✓ |
-| OPE 谷 | 6.487 | 16 | 5.933 ✓ |
+| 屋脊上升段 O₃max | 139.04 | 4 | 2.28 |
+| 峰值 O₃max | 144.58 | 4 | 3.42 |
+| FNR 转折带 | 5.239 | 8 | 1.01 |
+| OPE 饱和区谷 | 3.832 | 16 | 2.28 |
 
 ---
 
@@ -3482,7 +3489,7 @@ make runtime_v3.dat
 
 | 文档 | 回答 |
 |---|---|
-| [README.md](README.md) | 项目是什么、路线清单、机制对比、限制与勘误 |
+| [README.md](../README.md) | 项目是什么、路线清单、机制对比、限制与勘误 |
 | [OPERATIONS_MANUAL.md](OPERATIONS_MANUAL.md) | 架构地图、路线速查、编译边界、实验 A–I 速览、自纠自查记录 |
 | **本文** | **实验怎么做（手把手八段式）+ 数据接入 + 指标解读 + 排错** |
 | `figures/README.md`（本地，不入库） | 9 张机制图逐图讲解 + 七机制链对比 |

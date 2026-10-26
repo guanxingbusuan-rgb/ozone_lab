@@ -144,4 +144,4 @@ make mcm          # = 生成 gen/oz_mech.f90 + 编译 mcm_run
 | [mechanism/README.md](../mechanism/README.md) §10 | 七机制对比（本路线 = "真实 MCM 子集"档） |
 | [mechanism/V25_ASSESSMENT.md](../mechanism/V25_ASSESSMENT.md) | 机制升级评估（含"为何 mcm 与主机制方向会相反"） |
 | [experiments/run/README.md](../experiments/run/README.md) §5 | C/I 实验对 mcm_run 的前置构建要求 |
-| [ENVIRONMENT.md](../ENVIRONMENT.md) §6b | 混合语言分工与子目录职责 |
+| [ENVIRONMENT.md](../environment/ENVIRONMENT.md) §6b | 混合语言分工与子目录职责 |

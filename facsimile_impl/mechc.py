@@ -24,7 +24,9 @@ def parse_fac(path):
     in_form = False
     for raw in lines:
         s = raw.strip()
-        if not s or s.startswith("*"):
+        if "!" in s:                     # V2.5 防御: 行内注释剥离——否则反应行尾的
+            s = s.split("!", 1)[0].strip()  # '! 说明' 会并入最后的产物 token,
+        if not s or s.startswith("*"):      # 经 if n in sid 静默丢失该产物(实测踩坑)
             continue
         if s == "VARIABLE":
             in_vars = True; continue
@@ -145,17 +147,29 @@ def convert(fac, gen_dir):
     L.append("  end subroutine update_rates")
     L.append("end module oz_mech")
     Path(gen_dir, "oz_mech.f90").write_text("\n".join(L) + "\n")
-    # 计量数据只记演化物种: RESERVED(O2/M/H2O)浓度恒定, 由速率表达式承载
+    # 计量数据只记演化物种: 储库(O2/H2O/M/N2/CO2/H2)浓度恒定不入表——
+    # 但【未知 token 一律硬失败】。旧版静默过滤无法区分"储库"与"手误/注释污染",
+    # 曾致 oz.prod 丢产物 → ODE 与 IPR 双错且无任何报警 (V2.5 修复)。
+    RESERVOIR = {"O2", "H2O", "M", "N2", "CO2", "H2"}
     with open(Path(gen_dir, "oz.reac"), "w") as f:
-        for _, lhs, _ in m.reactions:
-            idx = [sid[n] for _, n in lhs if n in sid]
+        for k, (_, lhs, _) in enumerate(m.reactions, 1):
+            idx = []
+            for _, n in lhs:
+                if n in sid:
+                    idx.append(sid[n])
+                elif n not in RESERVOIR:
+                    raise SystemExit(f"[mechc] 反应#{k}: 未知反应物 '{n}' "
+                        f"(非机制物种亦非储库 O2/H2O/M/N2/CO2/H2) — 拒绝生成")
             f.write(f"{len(idx)}  " + "  ".join(map(str, idx)) + "\n")
     with open(Path(gen_dir, "oz.prod"), "w") as f:
-        for _, _lhs, rhs in m.reactions:   # 元组序=(rate,lhs,rhs): 第二位是反应物!
+        for k, (_, _lhs, rhs) in enumerate(m.reactions, 1):  # 元组序=(rate,lhs,rhs)
             toks = []
             for c, n in rhs:
                 if n in sid:
                     toks += [str(sid[n]), f"{c:g}"]
+                elif n not in RESERVOIR:
+                    raise SystemExit(f"[mechc] 反应#{k}: 未知产物 '{n}' "
+                        f"(非机制物种亦非储库 O2/H2O/M/N2/CO2/H2) — 拒绝生成")
             f.write(f"{len(toks)//2}  " + "  ".join(toks) + "\n")
     print(f"[mechc] {ns} 物种, {nr} 反应, {nq} 命名速率, nj={jn[-1][1:]} 光解 → {gen_dir}/")
 

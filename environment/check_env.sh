@@ -1,6 +1,13 @@
 #!/bin/sh
 # ozone_lab 环境自检 —— 只读检查, 不修改任何东西
-PY=${PY:-python3}
+# 锚定到工程根（本脚本位于 environment/ 下），从任意目录运行均可
+cd "$(dirname "$0")/.." || exit 1
+# 优先用项目 venv 的 Python（与 Makefile 一致），否则回退 PATH 里的 python3
+if [ -x "$HOME/miniconda3/envs/venv/bin/python" ]; then
+  PY=${PY:-$HOME/miniconda3/envs/venv/bin/python}
+else
+  PY=${PY:-python3}
+fi
 ok=0; bad=0
 chk() {  # chk <描述> <命令>
   if eval "$2" >/dev/null 2>&1; then echo "  [OK]   $1"; ok=$((ok+1));
