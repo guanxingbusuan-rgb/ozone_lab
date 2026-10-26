@@ -240,14 +240,14 @@ KNO3AL = 1.4D-12*EXP(-1860/TEMP)  ;
 * ---- 无机核心速率 (JPL 推荐) ----  ;
 KCH4OH = 2.45D-12*EXP(-1775/TEMP)  ;
 KCOOH = 1.44D-13*(1+(M/4.2D19))  ;
-KHCHOOH = 1.0D-11  ;
-KHO2NO = 8.6D-12*EXP(270/TEMP)  ;
+KHCHOOH = 5.4D-12*EXP(135/TEMP)  ;      ! MCM v3.3.1 (旧写死 1.0e-11, 偏快 18%)
+KHO2NO = 3.45D-12*EXP(270/TEMP)  ;      ! MCM/JPL (旧 8.6e-12 偏快 2.5 倍)
 KH2O2OH = 1.8D-12  ;
 KO1DM = 2.9D-11*M  ;
 KO1DH2O = 2.2D-10*H2O  ;
 KO3NO = 1.4D-12*EXP(-1310/TEMP)  ;
 KO3NO2NO3 = 1.4D-13*EXP(-2470/TEMP)  ;
-KONO2 = 1.0D-11  ;
+KONO2 = 5.5D-12*EXP(188/TEMP)  ;        ! MCM KMT02 低压极限 (旧偏快 20%)
 KHONOOH = 2.5D-12*EXP(260/TEMP)  ;
 * ;
 * ---- isoprene 链速率 (JPL/Atkinson) ----  ;
@@ -255,15 +255,15 @@ KISOPOH = 2.7D-11*EXP(390/TEMP)  ;
 KISOPO3 = 1.28D-17  ;                 ! Atkinson 298K; Criegee OH 产率 0.26 (ISOP)/0.30 (OLE)
 KISOPNO3 = 3.03D-12*EXP(-446/TEMP)  ;
 KISOPBO2NO = 4.0D-12  ;
-KMVKOH = 4.13D-12*EXP(452/TEMP)  ;
-KMACROH = 4.2D-12*EXP(540/TEMP)  ;
+KMVKOH = 2.6D-12*EXP(610/TEMP)  ;       ! MCM 总速率 (0.3+0.7)
+KMACROH = 8.0D-12*EXP(380/TEMP)  ;      ! MCM 总速率 (0.45+0.47+0.08)
 KMGLYOH = 1.9D-12  ;
-KMPANTH = 1.6D-3*EXP(-13500/TEMP)  ;
+KMPANTH = 1.6D+16*EXP(-13500/TEMP)  ;   ! MCM (旧 D-3 写错 → 慢 19 量级)
 * ;
 * ---- 硫链速率 ----  ;
 KSO2OH = 9.0D-13  ;
 KSO3HYD = 1.0D-2  ;
-KDMSOH = 5.0D-12*EXP(-330/TEMP)  ;
+KDMSOH = 1.12D-11*EXP(-250/TEMP)  ;     ! MCM 加成通道 (旧偏慢 3 倍)
 KDMSNO3 = 1.9D-13*EXP(520/TEMP)  ;
 * ;
 * ---- 卤素速率 (JPL) ----  ;
@@ -295,7 +295,12 @@ KOLENITOH = 1.2D-12  ;                 ! OLENIT+OH  ;
 KTERPOH = 1.2D-10  ;                   ! 单萜+OH (扩散控制级, pinene)  ;
 KTERPO3 = 8.0D-17  ;                   ! 单萜+O3 (高 OH 产率 ~0.8)  ;
 KTERPNO3 = 3.8D-12  ;                  ! 单萜+NO3 (夜间主要汇)  ;
-KPNAT = 1.3D+16*EXP(-10400/TEMP)  ;    ! PNA 热分解 (温度计)  ;
+KPNAT = 1.3D+16*EXP(-10400/TEMP)  ;
+* ---- V2.5-pre: MCM 官方 CH3O2 专属速率 + KAPHO2 ----  ;
+KAPHO2 = 5.2D-13*EXP(980/TEMP)  ;        ! 酰基过氧 + HO2 通用
+KCH3O2NO = 2.3D-12*EXP(360/TEMP)  ;      ! CH3O2+NO 专用 (通用 KRO2NO = 2.7e-12)
+KCH3O2NO3 = 1.2D-12  ;                   ! CH3O2+NO3 专用 (通用 KRO2NO3 = 2.3e-12)
+KCH3O2HO2 = 3.8D-13*EXP(780/TEMP)*(1-1/(1+498*EXP(-1160/TEMP)))  ;  ! CH3O2+HO2 专用
 
 * ;
 * Peroxy radicals.  ;
@@ -361,20 +366,20 @@ KIOLEO3 = 6.0D-18  ;
 * ;
 * ---- ③ CH4 氧化链 + PAN 储库 ----  ;
 % KCH4OH : CH4 + OH = CH3O2  ;
-% KRO2NO : CH3O2 + NO = CH3O + NO2  ;
-% KRO2HO2 : CH3O2 + HO2 = CH3OOH  ;
+% KCH3O2NO : CH3O2 + NO = CH3O + NO2  ;
+% KCH3O2HO2 : CH3O2 + HO2 = CH3OOH  ;
 % 1.03D-13*EXP(365/TEMP) : CH3O2 + CH3O2 = HCHO + HCHO + HO2 + HO2  ;
 % J<41> : CH3OOH = CH3O + OH  ;
-% 5.3D-12 : CH3OOH + OH = HCHO + OH  ;
+% 5.3D-12*EXP(190/TEMP)*0.4 : CH3OOH + OH = HCHO + OH  ;
 % 7.3D-13*EXP(580/TEMP)*O2 : CH3O + O2 = HCHO + HO2  ;
-% KRO2NO3 : CH3O2 + NO3 = CH3O + NO2  ;
+% KCH3O2NO3 : CH3O2 + NO3 = CH3O + NO2  ;
 % J<13> : CH3CHO = CH3O2 + CO + HO2  ;
-% 5.6D-12 : CH3CHO + OH = CH3CO3  ;
+% 4.7D-12*EXP(345/TEMP)*0.95 : CH3CHO + OH = CH3CO3  ;
 % KNO3AL : CH3CHO + NO3 = HNO3 + CH3CO3  ;
 % KFPAN : CH3CO3 + NO2 = PAN  ;
 % KBPAN : PAN = CH3CO3 + NO2  ;
 % 2.0D-11 : CH3CO3 + NO = CH3O2 + CO2 + NO2  ;
-% 4.2D-13 : CH3CO3 + HO2 = CH3O2 + CO2 + OH  ;
+% KAPHO2*0.44 : CH3CO3 + HO2 = CH3O2 + CO2 + OH  ;
 % 2.0D-12 : CH3CO3 + CH3O2 = HCHO + HO2 + CO2 + CH3O2  ;
 * ;
 * ---- ④ isoprene 完整二代链 ----  ;
@@ -383,7 +388,7 @@ KIOLEO3 = 6.0D-18  ;
 % KISOPNO3 : ISOP + NO3 = ISOPNO3  ;
 % KISOPO3 : ISOP + O3 = 0.50 MVK + 0.50 MACR + 0.57 HCHO + 0.15 CH3CHO + 0.13 CO2 + 0.26 OH + 0.38 O2  ;
 % KISOPBO2NO : ISOPBO2 + NO = 0.90 ISOPBO + 0.90 NO2 + 0.10 ISOPNIT  ;
-% KRO2HO2 : ISOPBO2 + HO2 = ISOPOOH  ;
+% KRO2HO2*0.706 : ISOPBO2 + HO2 = ISOPOOH  ;
 % KRO2NO3 : ISOPBO2 + NO3 = ISOPBO + NO2  ;
 * 烷氧分解 → 一代羰基 (MVK/MACR 各半 + HCHO)  ;
 % 7.3D-13*EXP(580/TEMP)*O2 : ISOPBO + O2 = 0.50 MVK + 0.50 MACR + HCHO + HO2  ;
@@ -396,16 +401,16 @@ KIOLEO3 = 6.0D-18  ;
 * MVK 二代氧化 → CH3CO3 回灌  ;
 % KMVKOH : MVK + OH = MVKO2  ;
 % KRO2NO : MVKO2 + NO = MVKO + NO2  ;
-% KRO2HO2 : MVKO2 + HO2 = MVKOOH  ;
-% 1.9D-11 : MVKOOH + OH = MVKO2  ;
+% KRO2HO2*0.625 : MVKO2 + HO2 = MVKOOH  ;
+% 1.90D-12*EXP(190/TEMP) : MVKOOH + OH = MVKO2  ;
 % 7.3D-13*EXP(580/TEMP)*O2 : MVKO + O2 = CH3CO3 + HCHO + HCHO  ;
 * MACR 二代氧化 → MPAN (经典 isoprene-O3 关联) + MGLY  ;
-% KMACROH : MACR + OH = MACRO2  ;
+% KMACROH*0.47 : MACR + OH = MACRO2  ;
 % KFPAN : MACRO2 + NO2 = MPAN  ;
 % KMPANTH : MPAN = MACRO2 + NO2  ;
 % 4.0D-12 : MACRO2 + NO = MACROO + NO2  ;
 % 7.3D-13*EXP(580/TEMP)*O2 : MACROO + O2 = MGLY + CO + OH  ;
-% KRO2HO2 : MACRO2 + HO2 = MACROOH  ;
+% KRO2HO2*0.625 : MACRO2 + HO2 = MACROOH  ;
 * MGLY 终局: 光解 + OH → CH3CO3 回灌 (闭环)  ;
 % J<22> : MGLY + 2 O2 = CH3CO3 + CO + HO2  ;
 % KMGLYOH : MGLY + OH = CH3CO3 + CO  ;

@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 scan_suite.py —— ozone_lab 排放/气象响应面套件 (P1: batch 引擎)
-  引擎: fac_batch_omp (74sp mechanism_3, 线程级并行, 16→24 列指示因子+IPR)
+  引擎: fac_batch_omp (111sp mechanism_3 V2.4, 线程级并行, 16→24 列指示因子+IPR)
   ① 运行 9×9 (f_NOx×f_VOC) 响应面 → output/batch_v3_indicators.csv (+_ipr.csv)
   ② 体制诊断表: 屋脊位置 / FNR 过渡带 / L_NOx-Q 穿越 / OPE 谷
   ③ 图: make figures (fig_indicators_ridge / fig_response_v3)
@@ -44,7 +44,7 @@ def main():
     fnr = [r[8] for r in col]
     lq = [r[14] for r in col]
     ope = [r[16] for r in col]
-    print("\n===== 体制诊断 (f_VOC=1 切面, 74sp mechanism_3) =====")
+    print("\n===== 体制诊断 (f_VOC=1 切面, 111sp mechanism_3 V2.4) =====")
     print(f"  屋脊: f_NOx = {col[iridge][0]:.2f} (O3max {o3[iridge]:.1f} ppb)")
     it = next((i for i in range(len(fnr) - 1) if fnr[i] > 2 >= fnr[i + 1]), None)
     if it is not None:

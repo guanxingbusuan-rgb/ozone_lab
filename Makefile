@@ -21,7 +21,7 @@ CVODELIB ?= $(HOME)/soft/atmenv/cvode/lib
 FFLAGS := -Wall -O2 -ffree-line-length-none
 export PATH := $(CONDA_ENV)/bin:$(PATH)
 
-.PHONY: all mcm smoke functional test v3 batch run figures nc clean clean-build clean-output FORCE
+.PHONY: all mcm mcmcheck smoke functional test v3 batch run figures nc clean clean-build clean-output FORCE
 
 all: facsimile_impl/fac_v3 facsimile_impl/fac_batch_omp
 
@@ -124,7 +124,12 @@ functional: all smoke
 
 test: functional
 	$(PY) audit/element_audit.py mechanism/mechanism_3_full_chain.fac
+	$(PY) audit/mcm_compare.py --quiet
 	$(PY) scan_suite.py
+
+# 仅比对 MCM 速率系数（快速，不跑仿真）
+mcmcheck:
+	$(PY) audit/mcm_compare.py
 
 # ── 安全清理变体（做实验期间用这两个，别用 make clean）──
 # clean-build: 只删编译产物与生成码，保留 output/ 里所有实验结果
