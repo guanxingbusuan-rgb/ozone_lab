@@ -1,0 +1,68 @@
+# ═══════════════════════════════════════════════════════════════
+# ozone_lab .gitignore
+# 原则: 只提交源码/配置/文档/机制图；不提交编译产物与运行输出
+# ═══════════════════════════════════════════════════════════════
+
+# ── 编译产物 ──
+*.o
+*.mod
+*.so
+*.dylib
+*.a
+facsimile_impl/fac_v3
+facsimile_impl/fac_batch_omp
+mcm_city/mcm_run
+modules/rad_photol_demo
+
+# ── 自动生成的机制代码（由 mechc.py 从 .fac 重新生成）──
+facsimile_impl/gen/oz_mech.f90
+facsimile_impl/gen/oz.reac
+facsimile_impl/gen/oz.prod
+facsimile_impl/gen_v3/oz_mech.f90
+facsimile_impl/gen_v3/oz.reac
+facsimile_impl/gen_v3/oz.prod
+mcm_city/gen/oz_mech.f90
+mcm_city/gen/oz.reac
+mcm_city/gen/oz.prod
+
+# ── 编译出的配置平面文件（由 cfgbuild.py 从 input*/ 重新生成）──
+runtime.dat
+runtime_v3.dat
+
+# ── Python 缓存 ──
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# ── 运行输出（实验产物，可由 make test / make batch 重生成）──
+output/
+outp_*.csv
+*.nc
+
+# ── 机制图 ──
+# 说明: 18 张机制图（PNG 330dpi + PDF 矢量）是教学交付物，全部入库（~24MB）。
+#       如需重生成: python figures/gen_all.py && python figures/gen_cartoon.py
+#       仅排除临时验证图（非交付物）:
+figures/*.tmp.png
+
+# ── 系统/编辑器杂物 ──
+.DS_Store
+*.swp
+*~
+.idea/
+.vscode/
+*.sublime-*
+
+# ── 个人环境与密钥（安全兜底）──
+.env
+.env.*
+*credential*
+*secret*
+*api_key*
+*apikey*
+*.pem
+*.key
+*.p12
+.zcode/
+.mcp.json

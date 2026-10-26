@@ -1,0 +1,409 @@
+**********************************************************************  ;
+* ozone_lab 机制 v3 (V2.3) —— 完整机制链条 (工程版)                    ;
+* 74 物种 131 反应 · 每条反应 C/H/N/O/S/Cl/Br 元素精确配平             ;
+*   (audit/element_audit.py 全量审计 131/131, 储库 H2O/O2/CO2/H2/M/N2   ;
+*    自动推断但方向限定: CO2/H2 只许产物侧, O2 反应物侧 ≤2.5)           ;
+*                                                                      ;
+* 版本沿革:                                                            ;
+*   V2.1 (53sp): 无机核心 + CH4/PAN + ISOP 二代 + 硫链 + 卤素闭环       ;
+*   V2.2 (67sp/119rx): +VOC 降解谱集总类 OLE/ALK/ARO1/ARO2/KET/GLY      ;
+*     (烯烃/烷烃/芳烃两档/酮, 产物回灌既有池) + 支撑化学 (PNA 温度计/   ;
+*     N2O5 白天光解/OH+HNO3 再循环/ISOPBO2 交叉)                        ;
+*   V2.3 (74sp/131rx, 本版):                                           ;
+*     + 臭氧化 OH 产率显式化 (OLE+O3→0.30OH, ISOP+O3→0.26OH —           ;
+*       Criegee 夜间/黎明 OH 源, Atkinson 产率)                         ;
+*     + 烷基硝酸盐家族 (ALK 15%/OLE 3% RO2+NO 分支 → RONO2/OLENIT,      ;
+*       ISOPNIT 死物种复活 +OH→HNO3+ISOPBO — NOx 远程输送)              ;
+*     + 单萜迷你链 (TERP: OH[1.2e-10]/O3[OH=0.80]/NO3 三入口,           ;
+*       TERPCHO 为 SOA 代理终产物走 drydep.config)                      ;
+*     + PNA+OH 汇 (HO2NO2 温度计闭环)                                   ;
+* 六链条: ① NOx-O3-HOx 无机核心 + HONO 晨爆                            ;
+*         ② NO3/N2O5 夜化学 (MCM KMT03/04/07/08/11 Troe 逐字拷贝)       ;
+*         ③ CH4 氧化链 + PAN/CH3CO3 储库循环                            ;
+*         ④ isoprene 完整二代链: ISOP→(OH/NO3/O3)→过氧三分支→           ;
+*           (烷氧/硝酸酯/氢过氧化物)→MVK/MACR→MVKO2/MACRO2→             ;
+*           MPAN/MGLY→CH3CO3 回灌 (0.1 硝酸酯支路)                      ;
+*         ⑤ 硫链: DMS→SO2→SO3→H2SO4 (+MSA/NO3 夜通道)                  ;
+*         ⑥ 卤素催化 O3 损耗 + ClONO2/BrONO2/HOCl/HOBr 储库             ;
+*         ⑦ VOC 降解谱集总类 ⑧ 支撑化学 ⑨ 烷基硝酸盐 ⑩ 单萜             ;
+* 历史修正 (相对 mechanism_0_expanded, 详见 README):                    ;
+*   - O3+NO2 产物 NO→NO3; Cl+HCHO 快 150 倍; 删重复 Br+O3 行;           ;
+*     ClO+NO2→ClONO2 储库; O1D+H2O/M 与 RO+O2 速率并入浓度表达式        ;
+* 已知省略 (工程决策): MACR+NO3; Criegee 显式物种 (产率法等效);          ;
+*   RO2 交叉缔合仅 CH3O2 代表; ALD2/CSL/IOLE/倍半萜 (见 mechanism/README) ;
+**********************************************************************  ;
+* ;
+VARIABLE
+NO NO2 O3 O1D O OH HO2 H2O2 CO HCHO HNO3 HONO NO3 N2O5
+CH4 CH3O2 CH3OOH CH3O
+CH3CHO CH3CO3 PAN
+ISOP ISOPBO2 ISOPBO ISOPNO3 ISOPNIT ISOPDNT ISOPOOH
+MVK MVKO2 MVKO MVKOOH MACR MACRO2 MACROO MACROOH MPAN MGLY
+SO2 SO3 H2SO4 DMS MSA
+Cl ClO ClONO2 Br BrO BrONO2 HCl HBr HOCl HOBr
+OLE OLERO2 OLEOOH ALK ALKRO2 ALKOOH
+ARO1 ARO1O2 ARO2 ARO2O2 KET KETRO2 GLY PNA
+RONO2 OLENIT
+TERP TERPRO2 TERPOOH TERPNIT TERPCHO  ;
+FORMULA
+NO       N1 O1
+NO2      N1 O2
+O3       O3
+O1D      O1
+O        O1
+OH       O1 H1
+HO2      H1 O2
+H2O2     H2 O2
+CO       C1 O1
+HCHO     C1 H2 O1
+HNO3     H1 N1 O3
+HONO     H1 N1 O2
+NO3      N1 O3
+N2O5     N2 O5
+CH4      C1 H4
+CH3O2    C1 H3 O2
+CH3OOH   C1 H4 O2
+CH3O     C1 H3 O1
+CH3CHO   C2 H4 O1
+CH3CO3   C2 H3 O3
+PAN      C2 H3 N1 O5
+ISOP     C5 H8
+ISOPBO2  C5 H9 O3
+ISOPBO   C5 H9 O2
+ISOPNO3  C5 H8 N1 O5
+ISOPNIT  C5 H9 N1 O4
+ISOPDNT  C5 H9 N1 O5
+ISOPOOH  C5 H10 O3
+MVK      C4 H6 O1
+MVKO2    C4 H7 O4
+MVKO     C4 H7 O3
+MVKOOH   C4 H8 O4
+MACR     C4 H6 O1
+MACRO2   C4 H5 O3
+MACROO   C4 H5 O2
+MACROOH  C4 H6 O3
+MPAN     C4 H5 N1 O5
+MGLY     C3 H4 O2
+SO2      S1 O2
+SO3      S1 O3
+H2SO4    H2 S1 O4
+DMS      C2 H6 S1
+MSA      C1 H4 O3 S1
+Cl       Cl1
+ClO      Cl1 O1
+ClONO2   Cl1 N1 O3
+Br       Br1
+BrO      Br1 O1
+BrONO2   Br1 N1 O3
+HCl      H1 Cl1
+HBr      H1 Br1
+HOCl     H1 O1 Cl1
+OLE      C3 H6
+OLERO2   C3 H7 O3
+OLEOOH   C3 H8 O3
+ALK      C3 H8
+ALKRO2   C3 H7 O2
+ALKOOH   C3 H8 O2
+ARO1     C7 H8
+ARO1O2   C7 H9 O3
+ARO2     C8 H10
+ARO2O2   C8 H11 O3
+KET      C3 H6 O1
+KETRO2   C3 H5 O3
+GLY      C2 H2 O2
+PNA      H1 N1 O4
+RONO2    C3 H7 N1 O3
+OLENIT   C3 H7 N1 O4
+TERP     C10 H16
+TERPRO2  C10 H17 O3
+TERPOOH  C10 H18 O5
+TERPNIT  C10 H16 N1 O3
+TERPCHO  C10 H14 O2
+HOBr     H1 O1 Br1 ;
+* ;
+* ---- 通用速率常数 (MCM v3.3.1 逐字拷贝部分注明 [MCM]) ----  ;
+* ;
+* [MCM] Troe 基元: N2O5 生成 KMT03 / 热解 KMT04  ;
+K30 = 3.6D-30*M*(TEMP/300)@-4.1  ;
+K3I = 1.9D-12*(TEMP/300)@0.2  ;
+KR3 = K30/K3I  ;
+FC3 = 0.35  ;
+NC3 = 0.75-1.27*(LOG10(FC3))  ;
+F3 = 10@(LOG10(FC3)/(1+(LOG10(KR3)/NC3)@2))  ;
+KMT03 = (K30*K3I)*F3/(K30+K3I)  ;
+K40 = 1.3D-3*M*(TEMP/300)@-3.5*EXP(-11000/TEMP)  ;
+K4I = 9.7D+14*(TEMP/300)@0.1*EXP(-11080/TEMP)  ;
+KR4 = K40/K4I  ;
+FC4 = 0.35  ;
+NC4 = 0.75-1.27*(LOG10(FC4))  ;
+F4 = 10@(LOG10(FC4)/(1+(LOG10(KR4)/NC4)@2))  ;
+KMT04 = (K40*K4I)*F4/(K40+K4I)  ;
+* [MCM] Troe: OH+NO=HONO KMT07 / OH+NO2=HNO3 KMT08  ;
+K70 = 7.4D-31*M*(TEMP/300)@-2.4  ;
+K7I = 3.3D-11*(TEMP/300)@-0.3  ;
+KR7 = K70/K7I  ;
+FC7 = 0.81  ;
+NC7 = 0.75-1.27*(LOG10(FC7))  ;
+F7 = 10@(LOG10(FC7)/(1+(LOG10(KR7)/NC7)@2))  ;
+KMT07 = (K70*K7I)*F7/(K70+K7I)  ;
+K80 = 3.2D-30*M*(TEMP/300)@-4.5  ;
+K8I = 3.0D-11  ;
+KR8 = K80/K8I  ;
+FC8 = 0.41  ;
+NC8 = 0.75-1.27*(LOG10(FC8))  ;
+F8 = 10@(LOG10(FC8)/(1+(LOG10(KR8)/NC8)@2))  ;
+KMT08 = (K80*K8I)*F8/(K80+K8I)  ;
+* [MCM] PAN 生成/热解 (KC0/KCI 生成, KD0/KDI 热解)  ;
+KC0 = 3.28D-28*M*(TEMP/300)@-6.87  ;
+KCI = 1.125D-11*(TEMP/300)@-1.105  ;
+KRC = KC0/KCI  ;
+FCC = 0.30  ;
+NC = 0.75-1.27*(LOG10(FCC))  ;
+FC = 10@(LOG10(FCC)/(1+(LOG10(KRC)/NC)@2))  ;
+KFPAN = (KC0*KCI)*FC/(KC0+KCI)  ;
+KD0 = 1.10D-05*M*EXP(-10100/TEMP)  ;
+KDI = 1.90D17*EXP(-14100/TEMP)  ;
+KRD = KD0/KDI  ;
+FCD = 0.30  ;
+NCD = 0.75-1.27*(LOG10(FCD))  ;
+FD = 10@(LOG10(FCD)/(1+(LOG10(KRD)/NCD)@2))  ;
+KBPAN = (KD0*KDI)*FD/(KD0+KDI)  ;
+* [MCM] 水汽增强因子 KMT06 + HO2 自缔合双通道  ;
+KMT06 = 1 + (1.40D-21*EXP(2200/TEMP)*H2O)  ;
+KHO2HO2A = 2.20D-13*KMT06*EXP(600/TEMP)  ;
+KHO2HO2B = 1.90D-33*M*KMT06*EXP(980/TEMP)  ;
+* [MCM] OH+HNO3 压力依赖 (KMT11 = K1+K2)  ;
+K1H = 2.40D-14*EXP(460/TEMP)  ;
+K3H = 6.50D-34*EXP(1335/TEMP)  ;
+K4H = 2.70D-17*EXP(2199/TEMP)  ;
+K2H = (K3H*M)/(1+(K3H*M/K4H))  ;
+KMT11 = K1H + K2H  ;
+* [MCM] 通用 RO2 速率  ;
+KRO2NO = 2.7D-12*EXP(360/TEMP)  ;
+KRO2HO2 = 2.91D-13*EXP(1300/TEMP)  ;
+KRO2NO3 = 2.3D-12  ;
+KNO3AL = 1.4D-12*EXP(-1860/TEMP)  ;
+* ;
+* ---- 无机核心速率 (JPL 推荐) ----  ;
+KCH4OH = 2.45D-12*EXP(-1775/TEMP)  ;
+KCOOH = 1.44D-13*(1+(M/4.2D19))  ;
+KHCHOOH = 1.0D-11  ;
+KHO2NO = 8.6D-12*EXP(270/TEMP)  ;
+KH2O2OH = 1.8D-12  ;
+KO1DM = 2.9D-11*M  ;
+KO1DH2O = 2.2D-10*H2O  ;
+KO3NO = 1.4D-12*EXP(-1310/TEMP)  ;
+KO3NO2NO3 = 1.4D-13*EXP(-2470/TEMP)  ;
+KONO2 = 1.0D-11  ;
+KHONOOH = 2.5D-12*EXP(260/TEMP)  ;
+* ;
+* ---- isoprene 链速率 (JPL/Atkinson) ----  ;
+KISOPOH = 2.7D-11*EXP(390/TEMP)  ;
+KISOPO3 = 1.28D-17  ;                 ! Atkinson 298K; Criegee OH 产率 0.26 (ISOP)/0.30 (OLE)
+KISOPNO3 = 3.03D-12*EXP(-446/TEMP)  ;
+KISOPBO2NO = 4.0D-12  ;
+KMVKOH = 4.13D-12*EXP(452/TEMP)  ;
+KMACROH = 4.2D-12*EXP(540/TEMP)  ;
+KMGLYOH = 1.9D-12  ;
+KMPANTH = 1.6D-3*EXP(-13500/TEMP)  ;
+* ;
+* ---- 硫链速率 ----  ;
+KSO2OH = 9.0D-13  ;
+KSO3HYD = 1.0D-2  ;
+KDMSOH = 5.0D-12*EXP(-330/TEMP)  ;
+KDMSNO3 = 1.9D-13*EXP(520/TEMP)  ;
+* ;
+* ---- 卤素速率 (JPL) ----  ;
+KCLO3 = 2.3D-11*EXP(-200/TEMP)  ;
+KCLONO = 6.4D-12*EXP(290/TEMP)  ;
+KCLONO2 = 1.6D-12  ;
+KCLOHO2 = 2.2D-12*EXP(300/TEMP)  ;
+KCLCH4 = 9.6D-12*EXP(-1140/TEMP)  ;
+KCLHCHO = 8.1D-11*EXP(-34/TEMP)  ;
+KHCLOH = 7.8D-13*EXP(-290/TEMP)  ;
+KBRO3 = 1.6D-12*EXP(-780/TEMP)  ;
+KBRONO = 8.7D-12*EXP(260/TEMP)  ;
+KBRONO2 = 1.5D-12  ;
+KBROHO2 = 2.5D-12*EXP(520/TEMP)  ;
+KBRHCHO = 3.4D-12*EXP(-640/TEMP)  ;
+KHBROH = 1.1D-11  ;
+* ---- V2.2: VOC 降解谱集总类速率 (烯烃/烷烃/芳烃/酮) ----  ;
+KOLEOH = 2.6D-11  ;                    ! 丙烯代理 (C3H6 一致)  ;
+KOLEO3 = 1.0D-17  ;                    ! 烯烃臭氧化集总  ;
+KOLENO3 = 9.4D-15  ;                   ! 夜交通 NO3 加成 (丙烯)  ;
+KALKOH = 1.1D-12  ;                    ! C3H8 代理  ;
+KARO1OH = 5.6D-12  ;                   ! 甲苯+OH (MCM)  ;
+KARO2OH = 1.3D-11  ;                   ! 二甲苯+OH  ;
+KKETOH = 2.2D-13  ;                    ! 丙酮+OH (MCM)  ;
+KPNAF = 1.4D-12  ;                     ! HO2+NO2+M (低温显著)  ;
+KOHPNA = 4.5D-12  ;                    ! PNA+OH 汇 (JPL ~4.5e-12 @298K)  ;
+KRONO2OH = 1.2D-12  ;                  ! RONO2+OH (集总烷基硝酸酯)  ;
+KOLENITOH = 1.2D-12  ;                 ! OLENIT+OH  ;
+KTERPOH = 1.2D-10  ;                   ! 单萜+OH (扩散控制级, pinene)  ;
+KTERPO3 = 8.0D-17  ;                   ! 单萜+O3 (高 OH 产率 ~0.8)  ;
+KTERPNO3 = 3.8D-12  ;                  ! 单萜+NO3 (夜间主要汇)  ;
+KPNAT = 1.3D+16*EXP(-10400/TEMP)  ;    ! PNA 热分解 (温度计)  ;
+
+* ;
+* Peroxy radicals.  ;
+* ;
+RO2 = CH3O2 CH3CO3 ISOPBO2 ISOPNO3 MVKO2 MACRO2  ;
+* ;
+* Reaction definitions.  ;
+* ;
+* ---- ① 无机核心: NOx 光稳态 + HOx + HONO 晨爆 ----  ;
+% J<4> : NO2 = NO + O  ;
+% J<1> : O3 = O1D  ;
+% J<2> : O3 = O  ;
+% J<3> : H2O2 = OH + OH  ;
+% J<8> : HNO3 = NO2 + OH  ;
+% J<7> : HONO = NO + OH  ;
+% 6.0D-34*(TEMP/300)@-2.6*M*O2 : O + O2 + M = O3  ;
+% KO3NO : O3 + NO = NO2  ;
+% KO3NO2NO3 : O3 + NO2 = NO3  ;
+% KONO2 : O + NO2 = NO  ;
+% KMT08 : NO2 + OH = HNO3  ;
+% KMT07 : NO + OH = HONO  ;
+% KHONOOH : HONO + OH = NO2  ;
+% KO1DH2O : O1D + H2O = OH + OH  ;
+% KO1DM : O1D + M = O  ;
+% KCOOH : CO + OH = HO2  ;
+% KHCHOOH : HCHO + OH = HO2 + CO  ;
+% J<11> : HCHO = HO2 + HO2 + CO  ;
+% J<12> : HCHO = CO  ;
+% KHO2NO : HO2 + NO = NO2 + OH  ;
+% KHO2HO2A : HO2 + HO2 = H2O2  ;
+% KHO2HO2B : HO2 + HO2 = H2O2  ;
+% KH2O2OH : H2O2 + OH = HO2  ;
+% 4.8D-11*EXP(250/TEMP) : OH + HO2 = O2  ;
+* ;
+* ---- ② NO3/N2O5 夜化学 ([MCM] 行逐字拷贝) ----  ;
+% J<5> : NO3 = NO  ;
+% J<6> : NO3 = NO2 + O  ;
+% KMT03 : NO2 + NO3 = N2O5  ;
+% KMT04 : N2O5 = NO2 + NO3  ;
+% 1.8D-11*EXP(110/TEMP) : NO + NO3 = NO2 + NO2  ;
+% 4.50D-14*EXP(-1260/TEMP) : NO2 + NO3 = NO + NO2  ;
+% 2.0D-11 : OH + NO3 = HO2 + NO2  ;
+% 4.0D-12 : HO2 + NO3 = OH + NO2  ;
+% 5.5D-16 : NO3 + HCHO = HNO3 + CO + HO2  ;
+% 4.0D-04 : N2O5 = HNO3 + HNO3  ;
+* ;
+* ---- ③ CH4 氧化链 + PAN 储库 ----  ;
+% KCH4OH : CH4 + OH = CH3O2  ;
+% KRO2NO : CH3O2 + NO = CH3O + NO2  ;
+% KRO2HO2 : CH3O2 + HO2 = CH3OOH  ;
+% 1.03D-13*EXP(365/TEMP) : CH3O2 + CH3O2 = HCHO + HCHO + HO2 + HO2  ;
+% J<41> : CH3OOH = CH3O + OH  ;
+% 5.3D-12 : CH3OOH + OH = HCHO + OH  ;
+% 7.3D-13*EXP(580/TEMP)*O2 : CH3O + O2 = HCHO + HO2  ;
+% KRO2NO3 : CH3O2 + NO3 = CH3O + NO2  ;
+% J<13> : CH3CHO = CH3O2 + CO + HO2  ;
+% 5.6D-12 : CH3CHO + OH = CH3CO3  ;
+% KNO3AL : CH3CHO + NO3 = HNO3 + CH3CO3  ;
+% KFPAN : CH3CO3 + NO2 = PAN  ;
+% KBPAN : PAN = CH3CO3 + NO2  ;
+% 2.0D-11 : CH3CO3 + NO = CH3O2 + CO2 + NO2  ;
+% 4.2D-13 : CH3CO3 + HO2 = CH3O2 + CO2 + OH  ;
+% 2.0D-12 : CH3CO3 + CH3O2 = HCHO + HO2 + CO2 + CH3O2  ;
+* ;
+* ---- ④ isoprene 完整二代链 ----  ;
+* 初级氧化 (OH 主通道白天 / NO3 夜通道; O3 通道省略见头部注)  ;
+% KISOPOH : ISOP + OH = ISOPBO2  ;
+% KISOPNO3 : ISOP + NO3 = ISOPNO3  ;
+% KISOPO3 : ISOP + O3 = 0.50 MVK + 0.50 MACR + 0.57 HCHO + 0.15 CH3CHO + 0.13 CO2 + 0.26 OH + 0.38 O2  ;
+% KISOPBO2NO : ISOPBO2 + NO = 0.90 ISOPBO + 0.90 NO2 + 0.10 ISOPNIT  ;
+% KRO2HO2 : ISOPBO2 + HO2 = ISOPOOH  ;
+% KRO2NO3 : ISOPBO2 + NO3 = ISOPBO + NO2  ;
+* 烷氧分解 → 一代羰基 (MVK/MACR 各半 + HCHO)  ;
+% 7.3D-13*EXP(580/TEMP)*O2 : ISOPBO + O2 = 0.50 MVK + 0.50 MACR + HCHO + HO2  ;
+* 氢过氧化物循环 (OH 回收 → 低 NOx 下 O3 生成效率维持)  ;
+% J<21> : ISOPOOH = ISOPBO + OH  ;
+% 1.9D-11 : ISOPOOH + OH = ISOPBO2  ;
+* NO3 加成支链: 过氧硝酸酯 (NOx 储库) + 断裂通道  ;
+% 4.0D-12 : ISOPNO3 + NO = MACR + HCHO + 2 NO2  ;
+% KRO2HO2 : ISOPNO3 + HO2 = ISOPDNT  ;
+* MVK 二代氧化 → CH3CO3 回灌  ;
+% KMVKOH : MVK + OH = MVKO2  ;
+% KRO2NO : MVKO2 + NO = MVKO + NO2  ;
+% KRO2HO2 : MVKO2 + HO2 = MVKOOH  ;
+% 1.9D-11 : MVKOOH + OH = MVKO2  ;
+% 7.3D-13*EXP(580/TEMP)*O2 : MVKO + O2 = CH3CO3 + HCHO + HCHO  ;
+* MACR 二代氧化 → MPAN (经典 isoprene-O3 关联) + MGLY  ;
+% KMACROH : MACR + OH = MACRO2  ;
+% KFPAN : MACRO2 + NO2 = MPAN  ;
+% KMPANTH : MPAN = MACRO2 + NO2  ;
+% 4.0D-12 : MACRO2 + NO = MACROO + NO2  ;
+% 7.3D-13*EXP(580/TEMP)*O2 : MACROO + O2 = MGLY + CO + OH  ;
+% KRO2HO2 : MACRO2 + HO2 = MACROOH  ;
+* MGLY 终局: 光解 + OH → CH3CO3 回灌 (闭环)  ;
+% J<22> : MGLY = CO + CH3CHO  ;
+% KMGLYOH : MGLY + OH = CH3CO3 + CO  ;
+* ;
+* ---- ⑤ 硫链 ----  ;
+% KSO2OH : SO2 + OH = SO3 + HO2  ;
+% KSO3HYD : SO3 = H2SO4  ;
+% KDMSOH : DMS + OH = MSA + CH3O2  ;
+% KDMSNO3 : DMS + NO3 = MSA + CO + NO2  ;
+* ;
+* ---- ⑥ 卤素催化 O3 损耗 + 储库 ----  ;
+% KCLO3 : Cl + O3 = ClO  ;
+% KCLONO : ClO + NO = Cl + NO2  ;
+% KCLONO2 : ClO + NO2 = ClONO2  ;
+% J<26> : ClONO2 = Cl + NO3  ;
+% KCLOHO2 : ClO + HO2 = HOCl  ;
+% J<28> : HOCl = Cl + OH  ;
+% KCLCH4 : Cl + CH4 = HCl + CH3O2  ;
+% KCLHCHO : Cl + HCHO = HCl + HO2 + CO  ;
+% KHCLOH : HCl + OH = Cl  ;
+% KBRO3 : Br + O3 = BrO  ;
+% KBRONO : BrO + NO = Br + NO2  ;
+% KBRONO2 : BrO + NO2 = BrONO2  ;
+% J<27> : BrONO2 = Br + NO3  ;
+% KBROHO2 : BrO + HO2 = HOBr  ;
+% J<29> : HOBr = Br + OH  ;
+% KBRHCHO : Br + HCHO = HBr + HO2 + CO  ;
+% KHBROH : HBr + OH = Br  ;
+% J<24> : ClO = Cl + O  ;
+% J<25> : BrO = Br + O  ;
+
+* ---- ⑦ V2.2: VOC 降解谱集总类 (烯烃/烷烃/芳烃/酮/二羰基) ----  ;
+% KOLEOH : OLE + OH = OLERO2 + O2  ;
+% KOLEO3 : OLE + O3 = 1.35 HCHO + 0.75 CH3CHO + 0.15 CO2 + 0.30 OH + 0.15 O2  ;
+% KOLENO3 : OLE + NO3 + H2O = OLERO2 + HNO3  ;
+% 0.97*KRO2NO : OLERO2 + NO = 0.50 HCHO + CH3CHO + 0.50 CO + HO2 + NO2 + 0.50 H2  ;
+% 0.03*KRO2NO : OLERO2 + NO = OLENIT  ;
+% KRO2HO2 : OLERO2 + HO2 = OLEOOH  ;
+% KALKOH : ALK + OH = ALKRO2 + H2O  ;
+% 0.85*KRO2NO : ALKRO2 + NO = CH3CHO + HCHO + HO2 + NO2  ;
+% 0.15*KRO2NO : ALKRO2 + NO = RONO2  ;
+% KRO2HO2 : ALKRO2 + HO2 = ALKOOH + O2  ;
+% KHCLOH : ALKOOH + OH = ALKRO2 + H2O  ;
+% KARO1OH : ARO1 + OH = ARO1O2 + O2  ;
+% KARO2OH : ARO2 + OH = ARO2O2 + O2  ;
+% KRO2NO : ARO1O2 + NO + O2 = GLY + MGLY + CH3CO3 + NO2  ;
+% KRO2NO : ARO2O2 + NO + 2.50 O2 = 0.50 GLY + MGLY + 2.00 CH3CO3 + NO2  ;
+% KKETOH : KET + OH = KETRO2 + H2O  ;
+% KRO2NO : KETRO2 + NO + O2 = CH3CO3 + HCHO + NO2  ;
+% J<15> : KET = CH3CO3 + CH3O2 + 0.50 O2  ;
+% J<16> : GLY = CO + CO + H2  ;
+* ---- ⑧ V2.2: 支撑化学补全 (PNA / N2O5 白天光解 / OH+HNO3) ----  ;
+% KPNAF : HO2 + NO2 = PNA  ;
+% KPNAT : PNA = HO2 + NO2  ;
+% KOHPNA : PNA + OH = NO2 + O2 + H2O  ;
+* ---- ⑨ V2.3: 烷基硝酸盐家族 (RONO2/OLENIT + ISOPNIT 去向) ----  ;
+% KRONO2OH : RONO2 + OH = HNO3 + KET + 0.5 H2O + 0.25 O2  ;
+% KOLENITOH : OLENIT + OH = HNO3 + OLERO2  ;
+% KRONO2OH : ISOPNIT + OH = HNO3 + ISOPBO  ;
+* ---- ⑩ V2.3: 单萜迷你链 (TERP: OH/O3/NO3 三入口, SOA 前体) ----  ;
+% KTERPOH : TERP + OH = TERPRO2 + H2O  ;
+% KTERPO3 : TERP + O3 = TERPCHO + 0.80 OH + 0.10 O2 + 0.60 H2  ;
+% KTERPNO3 : TERP + NO3 = TERPNIT  ;
+% KTERPOH : TERPRO2 + NO = TERPCHO + NO2 + 1.50 H2  ;
+% KRO2HO2 : TERPRO2 + HO2 = TERPOOH  ;
+% KRO2HO2 : TERPNIT + HO2 = TERPCHO + HNO3 + H2  ;
+
+* TERPCHO = SOA 代理终产物 (汇走 drydep.config; 不设气相 OH 汇)  ;
+% J<14> : N2O5 = NO2 + NO3  ;
+% KMT11 : HNO3 + OH = NO3 + H2O  ;
+% KRO2NO3 : ISOPBO2 + CH3O2 = ISOPBO + HCHO + HO2  ;
