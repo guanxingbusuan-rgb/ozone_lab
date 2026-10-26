@@ -98,7 +98,9 @@ facsimile_impl/gen/oz_mech.f90: mechanism/ozone.fac facsimile_impl/mechc.py
 
 
 # ---------- 测试 ----------
-smoke: all
+# runtime_v3.dat 是生成物（已 gitignore），全新克隆里不存在 →
+# smoke 必须显式依赖它，否则 fac_v3 报 "Cannot open ../runtime_v3.dat"
+smoke: all runtime_v3.dat
 	sh tests/smoke_test.sh
 
 functional: all smoke
