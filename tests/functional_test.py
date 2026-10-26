@@ -615,6 +615,15 @@ _no_sink = [s for s in _sp_list
 check("无「只产不耗且无物理汇」的死端物种", not _no_sink,
       f"死端={_no_sink}" if _no_sink else "全物种均有化学或物理去除")
 
+# FT-GIT: output/ 绝不允许被 git 跟踪（本地与远端）
+_out_tracked = _sp2.run(["git", "ls-files", "output/"], capture_output=True,
+                        text=True).stdout.strip()
+_out_ignored = _sp2.run(["git", "check-ignore", "-q", "output/"], capture_output=True)
+check("output/ 无任何文件被 git 跟踪（仅本地保留）",
+      not _out_tracked and _out_ignored.returncode == 0,
+      "0 个跟踪 + 已被 ignore" if not _out_tracked
+      else f"仍有 {len(_out_tracked.splitlines())} 个文件被跟踪")
+
 check("audit_reports/ 已删除（结论已并入 AUDIT_COMPLETE）",
       not os.path.exists("audit_reports")
       and os.path.exists("AUDIT_COMPLETE.md"),
