@@ -357,7 +357,7 @@ libquadmath.0.dylib
 | **`modules/runtime_dat_mod.f90`** | 364 | module | **输入消费端**：解析 `runtime_v3.dat`（SPECIES/IC/MET/BC/PHOT/EMIS/DRY/WET/DIL/SCEN/SERIES 12 段）+ `eval_met`（气象插值）+ `eval_env`（M/O₂/H₂O）+ `eval_J`（SZA→光解）+ `build_groups`（情景分组）+ `scen_build`。纯数据模块，无求解器依赖，双胞胎共享 |
 | **`modules/chem_phys_mod.f90`** | 107 | module | **物理四账唯一实现**（双胞胎共享）：排放 / 干湿沉降 / BC 松弛+稀释 / BLH 膨胀；`tune_atol_by_name`（ATOL 调优单源） |
 | `modules/rad_photol.f90` | 82 | module+demo | **在线辐射光解**（Beer-Lambert + 太阳天顶角），独立可执行 demo，未接入主链 |
-| **`facsimile_impl/oz_fac_v3.f90`** | 281 | program | **工程主线驱动**：读 runtime → CVODE fcmix BDF+DENSE → 53/74 物种全列 CSV + 131 IRR + 六账 IPR |
+| **`facsimile_impl/oz_fac_v3.f90`** | 281 | program | **工程主线驱动**：读 runtime → CVODE fcmix BDF+DENSE → 111 物种全列 CSV + 198 IRR + 六账 IPR |
 | **`facsimile_impl/fac_batch_omp.f90`** | 622 | program | **批量并行驱动**：网格扫描 + 预算表（NOy 17 物种/Q/L_NOx/OPE）+ 24 列指示因子 + OpenMP |
 | `facsimile_impl/cvode_c_mod.f90` | 108 | module | **CVODE C API 的 Fortran 绑定**：`CVodeCreate`/`CVode`/`N_VNew` 等 `bind(C)`，绕开 fcmix 的 COMMON 块限制（多线程必需） |
 | `mcm_city/mcm_driver.f90` | 263 | program | **MCM 对照案例**：29sp 子集 + 城市排放 + SPGMR |
@@ -393,7 +393,7 @@ libquadmath.0.dylib
 
 | 类型 | 文件 | 角色 |
 |---|---|---|
-| `.fac`（1 个在役） | `mechanism/mechanism_3_full_chain.fac` | **机制唯一事实源**（74sp/131rx） |
+| `.fac`（1 个在役） | `mechanism/mechanism_3_full_chain.fac` | **机制唯一事实源**（111sp/198rx，V2.4） |
 | `.fac`（1 个存档） | `mechanism/teaching/mechanism_1_ozone_tutorial.fac` | 15sp 教学档（无路线承载，存档参考） |
 | `.config`（9 个） | `input_v3/*.config` | 12 类配置中的生效部分（人类可读） |
 | `.template`（6 个） | `templates/*.template` | **格式合同**（程序零直读） |
@@ -498,7 +498,7 @@ cd /path/to/ozone_lab
 
 # ── ⑤ 构建 + 自检 ──
 make all
-make test        # 冒烟 1/1 → 功能 24/24 → 审计 131/131
+make test        # 冒烟 1/1 → 功能 35/35 → 审计 198/198
 ```
 
 ### 8.2 完整环境（含图集与全部实验）
@@ -615,4 +615,4 @@ flex      2.6.4 (/usr/bin)               [同上]
 | [EXPERIMENTS_GUIDE.md](EXPERIMENTS_GUIDE.md) | 实验操作（环境章节见 §1） |
 | [OPERATIONS_MANUAL.md](OPERATIONS_MANUAL.md) | 架构、速查、编译边界 |
 | [UNITS.md](UNITS.md) | 单位与换算参考 |
-| [templates/SPECIES_INPUT_MATRIX.md](templates/SPECIES_INPUT_MATRIX.md) | 74 物种 × 5 通道可输入矩阵 |
+| [templates/SPECIES_INPUT_MATRIX.md](templates/SPECIES_INPUT_MATRIX.md) | 111 物种 × 5 通道可输入矩阵 |

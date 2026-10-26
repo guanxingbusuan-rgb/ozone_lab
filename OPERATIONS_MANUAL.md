@@ -2,7 +2,7 @@
 
 > 手把手级实验详解（每实验 目的/命令/产物/解读/坑）见 [EXPERIMENTS_GUIDE.md](EXPERIMENTS_GUIDE.md)。
 
-> **适用版本**: 2026-10-26（mechanism_3 **74sp/131rx V2.3** · **3 可执行体** · IPR 精确累积版；
+> **适用版本**: 2026-10-26（mechanism_3 **111sp/198rx V2.4** · **3 可执行体** · IPR 精确累积版；
 >  历史口径"五路线"中 fac_run/kpp_run 已退役——见路线表与实验退役注记）
 > **前置**: `~/soft/atmenv/cvode`（CVODE 2.7.0）、`~/soft/src/KPP-3.2.0`、gfortran 13.2、
 > Python venv（numpy/matplotlib/netCDF4）。全部为第三方工具链，无 Day xx 依赖。
@@ -10,8 +10,8 @@
 >
 > | 可执行体 | 机制 | 求解内核 | 情景空间 |
 > |---|---|---|---|
-> | `fac_v3` | 74sp/131rx 工程 (V2.3) | CVODE-BDF+DENSE (fcmix) | runtime.dat 情景表 |
-> | `fac_batch_omp` | 74sp/131rx 工程 (V2.3) | CVODE-BDF+DENSE（C API 直连，OpenMP） | fnox×fvoc×jfac×ΔT 网格 |
+> | `fac_v3` | 111sp/198rx 工程 (V2.4) | CVODE-BDF+DENSE (fcmix) | runtime.dat 情景表 |
+> | `fac_batch_omp` | 111sp/198rx 工程 (V2.4) | CVODE-BDF+DENSE（C API 直连，OpenMP） | fnox×fvoc×jfac×ΔT 网格 |
 > | `mcm_run` | 29sp 真实 MCM CH₄ | CVODE-BDF+DENSE | 排放缩放 fnox×fvoc |
 >
 > **实验总目录**（详细操作见 §3–§13）:
@@ -58,7 +58,7 @@
 
 | 目录 | 角色 | 关键文件 → 功能 |
 |---|---|---|
-| **`mechanism/`** | **机制唯一事实源**（1 个文件） | `mechanism_3_full_chain.fac`：V2.3 **74sp/131rx**，六链条（①无机核心+HONO 晨爆 ②NO₃/N₂O₅ 夜化学 Troe ③CH₄+PAN 储库 ④ISOP 二代三分支 ⑤DMS 硫链 ⑥卤素闭环）+ V2.3 补链（臭氧化 OH 产率 0.30/0.26、RONO₂/OLENIT 硝酸酯家族、TERP 五物种迷你链、PNA+OH）；自带 FORMULA 段；**规格书见 mechanism/README.md**（逐反应速率/配平方法论/对比定位）|
+| **`mechanism/`** | **机制唯一事实源**（1 个文件） | `mechanism_3_full_chain.fac`：**V2.4 111sp/198rx**，十段链条（①无机核心+HONO 晨爆 ②NO₃/N₂O₅ 夜化学 Troe ③CH₄+PAN 储库 ④ISOP 二代三分支 ⑤DMS 硫链 ⑥卤素闭环）+ V2.3 补链（臭氧化 OH 产率 0.30/0.26、RONO₂/OLENIT 硝酸酯家族、TERP 五物种迷你链、PNA+OH）；自带 FORMULA 段；**规格书见 mechanism/README.md**（逐反应速率/配平方法论/对比定位）|
 | **`src/`** | **两个编译器**（Python，全部输入唯一入口） | `cfgbuild.py`：12 类 config+constraints → runtime_v3.dat，编译期校验（物种存在性/单位指令/单调性/≤128 点/情景表达式）；`mechc.py`：机制编译器（.fac → gen_v3 生成码）；`mechc_c.py`：C 后端（机制→C 速率函数，第二执行路径） |
 | **`modules/`** | **Fortran 共享模块层**（三路线共用） | `runtime_dat_mod.f90`：runtime.dat 唯一消费端（12 段解析+气象插值+SZA→J+BOX 日型+ser_interp+build_groups 组映射+scen_build）；`chem_phys_mod.f90`：**物理四账唯一实现**（排放①/干+湿沉②/BC 序列观测同化③/BLH 膨胀④）+ `tune_atol_by_name`（ATOL 单源）+ `eval_met_dt`/`eval_J_jf`；`rad_photol.f90`：B2 在线光解 demo |
 | **`facsimile_impl/`** | **工程主线**（两条活路线） | `gen_v3/`：生成码（oz_mech.f90 + oz.reac/prod 计量表，fac_v3/batch 共享）；`oz_fac_v3.f90`→`fac_v3`：单箱深度（情景名/观测同化/六账 IPR 逐时导出）；`fac_batch_omp.f90`+`cvode_c_mod.f90`→`fac_batch_omp`：批量广度（C-ABI 直连+OpenMP、NOy 17 物种权重表+运行期氮守恒不变量、24 列指示因子）；`oz_audit.c`：C 证人（NOx 望远镜闭合+O₃ 收支） |
@@ -67,7 +67,7 @@
 | **`experiments/`** | **实验层** | `run/`：**10 个实跑脚本**（A 情景/B 响应面/C 屋脊/D 过程/E 指标/F OSSE/G 逐时/H 敏感性/I 情景矩阵/M 气象序列），只落 CSV 不绘图；根下 `.py` 为旧版（含终端报告/绘图/反演） |
 | **`templates/`** | **六类外数据格式合同**（零代码直读，人工落位规范） | 地面 O₃/AQI/VOC 站点 ×3 → bc.config 张弛；排放清单 → emissions.config；卫星柱（**语义例外**：离线转表面 ppb）；**气象序列 → meteo.config** |
 | **`input_v3/`** | **工程生效配置**（12 类，唯一输入入口） | 12 config + constraints/(气象/BC 序列) → cfgbuild → runtime_v3.dat。旧 `input/` 已彻底删除（零消费者），15sp 教学机制档移入 `mechanism/teaching/` |
-| **`audit/`** | **机制质检** | `element_audit.py`：逐反应 C/H/N/O/S/Cl/Br 配平（131/131；储库方向限定防"非物理闭合掩盖真错"）；`oz_audit.c`：C 证人 |
+| **`audit/`** | **机制质检** | `element_audit.py`：逐反应 C/H/N/O/S/Cl/Br 配平（198/198；储库方向限定防"非物理闭合掩盖真错"）；`oz_audit.c`：C 证人 |
 | **`tests/`** | **回归防线** | functional_test.py：**FT0 生成码一致性（物种+反应双守卫）**+ 批量自检 + 4 金值哨兵；smoke_test.sh |
 | **`figures/`** | **表达层** | SCI 版 9 图（A-I，Times+宋体 330 DPI PNG+PDF）+ comic 漫画版 9 图（场景化图标）+ 工程图 2 张（response_surface_v3/indicators_vs_ridge）+ 2 绘图脚本 |
 | **`output/`** | 全部 CSV 产物 | batch 网格×2、expA 六情景、ridge5/scen5/osse/sens 子目录 |
@@ -77,7 +77,7 @@
 
 | 路线 | 机制 | 生成码 | 物理层 | 输入 | 排放可配 |
 |---|---|---|---|---|---|
-| ① fac_v3 | gen_v3 (74sp/131rx V2.3) | mechc.py | chem_phys_mod | runtime_v3.dat 全通路 | ✓ 67 物种任一（emissions.config） |
+| ① fac_v3 | gen_v3 (111sp/198rx V2.4) | mechc.py | chem_phys_mod | runtime_v3.dat 全通路 | ✓ 25 物种已配（任一可加） |
 | ② fac_batch_omp | gen_v3（**与①同源**） | mechc.py | chem_phys_mod | runtime_v3.dat（共享） | ✓ 同①基线 × 网格因子 |
 | ③ mcm_run | mcm_city/gen (29sp MCM 子集) | mechc.py（独立子树） | mcm_driver 内嵌（冻结） | CLI 四参 | ✗ 刻意冻结 |
 
@@ -97,7 +97,7 @@ fac_expanded · fac_spgmr · kpp_batch · `rate_sensitivity.py`/`species_constra
 ```bash
 make all          # 两个工程可执行体 (fac_v3/fac_batch_omp)
 make mcm          # MCM 对照路线 (mcm_run, 29sp 独立子树) — R15 补建
-make test         # 冒烟 1/1 → 功能 35/35 (含金值哨兵/R10-R13/PHOT/MP/DAYS) → 元素审计 131/131
+make test         # 冒烟 1/1 → 功能 35/35 (含金值哨兵/R10-R13/PHOT/MP/DAYS) → 元素审计 198/198
 make run DAYS=3 SCEN=SCEN_BAU PREF=../output/d3   # 单情景一步跑（天数控）
 make clean        # 删除二进制+生成码 (fac_v3/fac_batch_omp 自动重建)
 ```
@@ -106,7 +106,7 @@ make clean        # 删除二进制+生成码 (fac_v3/fac_batch_omp 自动重建
 实测收敛（末 24h O₃）：1 天 42.69 / 3 天 58.59 / 5 天 59.21 / 7 天 59.23 ppb
 → 建议 ≥3 天。详见 [GUIDE §3⑫-1](EXPERIMENTS_GUIDE.md)。
 
-`make test` 全绿是任何实验的**前置条件**。审计 131/131 由 `audit/element_audit.py`
+`make test` 全绿是任何实验的**前置条件**。审计 198/198 由 `audit/element_audit.py`
 执行（机制自带 FORMULA 段为配平事实源）。
 
 ## 0.5 路线分工与编译边界（工程实践三铁律）
@@ -121,9 +121,9 @@ make clean        # 删除二进制+生成码 (fac_v3/fac_batch_omp 自动重建
 
 | | ① fac_v3 = 显微镜 | ② fac_batch_omp = 望远镜 |
 |---|---|---|
-| 内核四样 | 全同：机制(gen_v3 74sp/131rx) · 物理(chem_phys_mod 四账) · 数值(CVODE-BDF+DENSE) · 输入基线(runtime_v3.dat) | 同左 |
+| 内核四样 | 全同：机制(gen_v3 111sp/198rx) · 物理(chem_phys_mod 四账) · 数值(CVODE-BDF+DENSE) · 输入基线(runtime_v3.dat) | 同左 |
 | 一次运行 | 1 个情景 | 81+ 个格点 |
-| 输出深度 | 全深度：逐时 74 物种 + 131 IRR + 六本账逐时 IPR | 压缩：24 列指示因子的末 24h 均值 |
+| 输出深度 | 全深度：逐时 111 物种 + 198 IRR + 六本账逐时 IPR | 压缩：24 列指示因子的末 24h 均值 |
 | 回答的问题 | **"为什么"**——打开机器看每个时刻每个过程 | **"在哪里转折"**——曲面上屋脊与体制翻转 |
 | 做不到的事 | 扫不出曲面（一次一情景，扫 81 个=调 81 次） | 过程分析（无逐时物种/反应账，只有均值） |
 
@@ -199,14 +199,14 @@ mechanism_3 扩链之后拉一下，确认无机块未被新链条带偏（§0.6
 > **不允许**写 `# unit:` 浓度换算行（`cfgbuild` 会拒绝），否则 298.15 K 会被静默
 > 乘成 7.33e12。
 
-> **模型维度澄清**：本程序是 **0-D 箱体**（状态向量 = 74 物种，无 x/y/z、无平流扩散）。
+> **模型维度澄清**：本程序是 **0-D 箱体**（状态向量 = 111 物种，无 x/y/z、无平流扩散）。
 > "四维"指**参数扫描空间**（排放/光解/温度缩放因子），不是空间网格；`fac_batch_omp`
 > 跑的是 **262,144 个互相独立的 0-D 箱**，不是"一个 4D 场"。详见 GUIDE §6.9 与
 > [ENVIRONMENT.md §6b.6b](ENVIRONMENT.md)。
 
 ## 1. 机制与输入两条事实源
 
-> **机制规格书**：[`mechanism/README.md`](mechanism/README.md) —— 74 物种分组表、
+> **机制规格书**：[`mechanism/README.md`](mechanism/README.md) —— 111 物种分组表、
 > 131 反应逐条速率、41 光解槽位方案、配平方法论（V2.3 三次审计迭代实录）、
 > 已知省略与 CB6R3/fullchem/MCM 对比定位。
 
@@ -227,7 +227,7 @@ input_v3/ (12 类配置) → cfgbuild → runtime_v3.dat → fac_v3 / fac_batch_
 12 类配置在 `input_v3/`；**外部数据**走 `templates/` 六类模板
 （详细格式说明内嵌于每个模板文件头）：
 
-> 📋 **全物种输入矩阵**：74 物种 × 5 通道完整清单 →
+> 📋 **全物种输入矩阵**：111 物种 × 5 通道完整清单 →
 > [templates/SPECIES_INPUT_MATRIX.md](templates/SPECIES_INPUT_MATRIX.md)
 
 | 模板 | 入口 | 物种/单位 | 物理语义 |
@@ -305,7 +305,7 @@ VOCs/卫星模板同路径（卫星先离线转换）；排放清单模板直接
 | `mcm_driver.f90:56-60` | E(iNO)=2.0e7 等 5 物种排放 | molec/cm³/s | 冻结（罐头案例） |
 | `mcm_driver.f90:179-181` | Y(iO₃)=3.0e11 等 IC | molec/cm³ | 冻结 |
 | `fac_batch_omp.f90:69+` | 网格 fs(i)=0.3×1.5^(i-1) | 无量纲因子 | 可改源码 |
-| `chem_phys_mod.tune_atol_by_name` | ATOL 按名表（74 物种） | molec/cm³ | **单源**（R9）；RTOL/ATOL 详解见 [GUIDE §3⑬](EXPERIMENTS_GUIDE.md) |
+| `chem_phys_mod.tune_atol_by_name` | ATOL 按名表（111 物种，未列名者用 model.parameters 第 4 行） | molec/cm³ | **单源**（R9）；RTOL/ATOL 详解见 [GUIDE §3⑬](EXPERIMENTS_GUIDE.md) |
 | `runtime_dat_mod.build_groups` | 物种→情景组映射 | — | 单源（含 TERP） |
 
 #### 表 D · 内部计算量（自动, 无用户单位接口）
@@ -330,7 +330,7 @@ cd facsimile_impl
 # 全情景清单: grep "^SCEN" ../runtime_v3.dat
 ```
 
-**输出**：`<pref>_conc.csv`（h + 74 物种全列，末 24h）、`<pref>_irr.csv`
+**输出**：`<pref>_conc.csv`（h + 111 物种全列，末 24h）、`<pref>_irr.csv`
 （h + 131 反应 IRR 快照）、`<pref>_ipr.csv`（h + 74×6 过程账，**ONE_STEP
 内步梯形精确积分**，行 h=k 覆盖窗口 (k−1,k]，单位 molec/cm³）。
 
@@ -420,7 +420,7 @@ make nc          # CSV → netCDF4 (默认 output/expA_BAU → .nc; 可 NC_SRC=/
                  # ⚠ 需 <prefix>_conc.csv + _irr.csv 配对 (fac_v3 格式); batch 网格汇总不可用
 make figures     # 两张响应面图 (从 output/batch_v3_indicators.csv 重生成)
                  # R12: batch 现直接写此 canonical 名 → make batch && make figures 数据链已闭合
-python3 audit/element_audit.py mechanism/mechanism_3_full_chain.fac   # 131/131
+python3 audit/element_audit.py mechanism/mechanism_3_full_chain.fac   # 198/198
 python3 experiments/ipr_closure_check.py <prefix>                     # 任意 fac_v3 输出
 ```
 
@@ -508,6 +508,9 @@ python3 experiments/scen5.py    # 8 情景 × 5 路线 O₃max 矩阵 (~1 min)
 - 排放缩放三路径一致性（情景表/config/网格）已验证 ≤0.1%。
 
 ## 13b. V2.3 全量重跑结果汇总（2026-10-26 实测，74sp/131rx + 三路线）
+
+> ⚠ **V2.3 历史快照**。机制已升级 V2.4（111sp/198rx），下表数值为当时口径。
+> V2.4 的屋脊位置、FNR 转折带与哨兵基线均已重标定（见 `mechanism/README.md` §2.1）。
 
 > 本轮为机制 V2.3（臭氧化 OH 产率/硝酸酯家族/TERP 链/PNA+OH 补链）+ 三路线
 > 收敛后的**第一次全量工程实验**；所有数字为实测，替换此前 53sp 时代口径。

@@ -77,6 +77,15 @@ contains
         call noy_add("RONO2", 1)    ! V2.3: ALK 烷基硝酸酯 (15% 分支)
         call noy_add("OLENIT", 1)   ! V2.3: OLE 硝酸酯 (3% 分支)
         call noy_add("TERPNIT", 1)  ! V2.3: 单萜硝酸酯 (NO3 加成)
+        ! V2.4: 新增加成/硝酸酯家族 (芳香-甲酚/烷烃/醚/酯/倍半萜/乙烯/内烯烃/PPAN)
+        call noy_add("CSLNIT", 1)
+        call noy_add("LALKNIT", 1)
+        call noy_add("MTBENIT", 1)
+        call noy_add("ESTERNIT", 1)
+        call noy_add("SESQNIT", 1)
+        call noy_add("ETHNIT", 1)
+        call noy_add("IOLENIT", 1)
+        call noy_add("PPAN", 1)
     end subroutine
 
     subroutine noy_add(nm, w)

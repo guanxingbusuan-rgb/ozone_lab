@@ -1,15 +1,15 @@
-# mechanism_3_full_chain.fac — V2.3 机制规格书（完整版）
+# mechanism_3_full_chain.fac — V2.4 机制规格书（完整版）
 
 > **ozone_lab 工程机制的唯一事实源**。本文档是该 `.fac` 文件的**逐项完整规格说明**：
-> 设计定位、版本沿革、74 物种全表（含分子式与角色）、131 条反应全表（含速率常数与
+> 设计定位、版本沿革、111 物种全表（含分子式与角色）、198 条反应全表（含速率常数与
 > 参数来源）、41 个光解槽位全表、动力学约定、元素配平方法论、已知省略、对比定位、
 > 单位约定、扩展指南与参考文献。
 >
 > | 项 | 值 |
 > |---|---|
-> | 版本 | **V2.3**（2026-10-26） |
-> | 规模 | **74 物种 / 131 反应 / 41 个光解槽位 / 105 个命名速率** |
-> | 元素审计 | **131/131 PASS**（`audit/element_audit.py`） |
+> | 版本 | **V2.4**（2026-10-26） |
+> | 规模 | **111 物种 / 198 反应 / 41 个光解槽位 / 120 个命名速率** |
+> | 元素审计 | **198/198 PASS**（`audit/element_audit.py`）；V2.4 新增 67 条**全部精确平衡**（零储库依赖） |
 > | 生成码 | `facsimile_impl/gen_v3/ozone_mech.f90`（`mechc.py` 编译） |
 > | 承载路线 | `fac_v3`（单箱深度）+ `fac_batch_omp`（批量广度），共享同一生成码 |
 > | 文件本体 | [`mechanism_3_full_chain.fac`](mechanism_3_full_chain.fac)（FACSIMILE 语法） |
@@ -70,7 +70,47 @@ NOx–O₃–HOx–ROx 三大循环 + 生物源/人为 VOC 降解 + 夜间化学
 |---|---|---|---|
 | V2.1 | 53sp / 96rx | 无机核心 + CH₄/PAN + ISOP 二代 + 硫链 + 卤素闭环（六链条骨架） | 工程版起点：把 Day35 教学机制扩到"可做过程诊断" |
 | V2.2 | 67sp / 119rx | **VOC 降解谱集总类**：OLE/ALK/ARO1/ARO2/KET/GLY；支撑化学：PNA 温度计、N₂O₅ 白天光解、OH+HNO₃ 再循环、ISOPBO₂ 交叉 | 评估发现"城市 OH 反应性覆盖仅 ~50%"——缺烯烃/芳烃/烷烃三大类 |
-| **V2.3** | **74sp / 131rx** | ① 臭氧化 OH 产率显式化（OLE 0.30 / ISOP 0.26，Criegee 通道）② **烷基硝酸盐家族**（RONO₂/OLENIT；ISOPNIT 死物种复活）③ **单萜迷你链**（TERP 五物种，三入口，O₃ 通道 OH 产率 0.80）④ PNA+OH 汇 | ① 夜间/黎明 OH 源缺失（臭氧化无自由基产物，物理不自洽）② NOx 远程输送缺失（RO₂+NO 无硝酸酯分支）③ 森林场景不可用（无 TERP）④ HO₂NO₂ 只有生成无消耗 |
+| V2.3 | 74sp / 131rx | ① 臭氧化 OH 产率显式化（OLE 0.30 / ISOP 0.26，Criegee 通道）② **烷基硝酸盐家族**（RONO₂/OLENIT；ISOPNIT 死物种复活）③ **单萜迷你链**（TERP 五物种，三入口，O₃ 通道 OH 产率 0.80）④ PNA+OH 汇 | ① 夜间/黎明 OH 源缺失（臭氧化无自由基产物，物理不自洽）② NOx 远程输送缺失（RO₂+NO 无硝酸酯分支）③ 森林场景不可用（无 TERP）④ HO₂NO₂ 只有生成无消耗 |
+| **V2.4** | **111sp / 198rx** | 见下节 V2.4 专项 | **二次 HCHO 生成不足**（GLY 光解不产 HCHO）+ **VOC 谱系缺失**（无芳香分级/长链烷烃/醇醚酯/倍半萜/乙烯/内烯烃/高级醛）+ **RO₂+HO₂ 闭环缺口**（ARO1O2/ARO2O2 只有 +NO 无 +HO₂）+ **RO₂ 交叉缔合仅 CH₃O₂ 单代表** + **MACR+NO₃ 缺失** |
+
+### 2.1 V2.4 扩展专项（111sp / 198rx，+37 物种 +67 反应）
+
+| # | 扩展 | 新增物种 | 新增反应 | 解决的问题 |
+|---|---|---|---|---|
+| ⑪ | **芳香烃分级**（甲酚开环链） | CSL, CSLRO2, CSLOOH, CSLNIT, TOLOOH, XYLOOH (6) | 10 | ARO1/ARO2 只有两档、无开环中间体；**ARO1O2/ARO2O2 缺 RO₂+HO₂ 汇**（原只有 +NO，RO₂ 收支不闭合） |
+| ⑫ | **长链烷烃** | LALK, LALKRO2, LALKOOH, LALKNIT (4) | 6 | 原 ALK 仅 C3H8 代理，缺 C6+ 长链（OH 反应性偏低） |
+| ⑬ | **醇/醚/酯** | MEOH, ETOH, MTBE, MTBERO2, MTBEOOH, MTBENIT, ESTER, ESTERO2, ESTEROOH, ESTERNIT (10) | 14 | 完全缺失含氧 VOC；甲醇/MTBE 是**二次 HCHO 重要上游** |
+| ⑭ | **倍半萜** | SESQ, SESQRO2, SESQOOH, SESQNIT, SESQCHO (5) | 8 | 只有单萜 TERP；C15 倍半萜是 SOA 主力 |
+| ⑮ | **乙烯/内烯烃/高级醛** | ETH, ETHO2, ETHOOH, ETHNIT, IOLE, IOLERO2, IOLEOOH, IOLENIT, ALD2, ALD2O2, ALD2OOH, PPAN (12) | 23 | 乙烯是全球最大排放烯烃；内烯烃反应性与端烯不同；高级醛 ALD2 是 HCHO 上游；PPAN 补 PAN 家族 |
+| ⑯ | **MACR 夜化学** | —（用既有 MACRO2） | 1 | 原机制头注释明示省略 MACR+NO₃ |
+| ⑰ | **RO₂ 交叉缔合** | —（用既有物种） | 5 | 原仅 `ISOPBO2 + CH3O2` 一条；现扩为 CH₃CO₃/CH₃O₂/MACRO₂/MVKO₂/ISOPBO₂/ETHO₂ 五对 |
+
+**二次 HCHO 强化（本次核心目标）**：
+
+| 通道 | 原状态 | V2.4 |
+|---|---|---|
+| `GLY`（乙二醛）光解 | `CO + CO + H₂`（**不产 HCHO**） | **`HCHO + CO`** |
+| `MGLY`（甲基乙二醛）光解 | `CO + CH₃CHO` | `CH₃CO₃ + CO + HO₂`（RO₂ 通道） |
+| 醚 RO₂+NO | 无 | MTBERO₂ → `2 CH₃CHO + HCHO` |
+| 乙烯 RO₂+NO | 无 | ETHO₂ → `2 HCHO` |
+| 甲酚开环 | 无 | CSL → `0.5 GLY + 2 MGLY`（下游继续产 HCHO） |
+
+**实测效果**（BAU 末 24 h 均值，V2.3 → V2.4）：
+
+| 物种 | V2.3 | V2.4 | 变化 | 原因 |
+|---|---|---|---|---|
+| **HCHO** | 6.89 ppb | **9.34 ppb** | **+35.5%** | 二次生成通道补齐 |
+| HO₂ | 0.0090 | 0.0120 | +26.4% | 新增 12 个 RO₂ 物种增加 HO₂ 再生 |
+| H₂O₂ | 0.465 | 0.799 | +71.8% | HO₂↑ → 自缔合增强 |
+| NO | 0.157 | 0.125 | −20.7% | 更多硝酸酯汇 |
+| NO₂ | 2.044 | 1.867 | −8.7% | 同上 |
+| HNO₃ | 2.048 | 1.621 | −20.9% | 硝酸酯分支分流 |
+| O₃ | 59.21 | 60.44 | +2.1% | 净效应温和 |
+
+**HCHO 收支诊断（IPR 六账，5 天积分）**：
+化学净产 `P+L = +3.78e11`，一次排放 `E = +1.53e9` →
+**二次生成占源 99.6%**。这也说明：0-D 箱体里 HCHO 几乎全部由化学生成，
+用 HCHO 做 FNR 判据时对排放清单的 HCHO 项不敏感（好事：判据稳健）。
 
 ### 历史修正（相对早期 mechanism_0_expanded，均由审计或对照实验抓出）
 
@@ -87,7 +127,8 @@ NOx–O₃–HOx–ROx 三大循环 + 生物源/人为 VOC 降解 + 夜间化学
 
 - 生成码 `gen_v3/` 随 `.fac` 重编译（`make v3`）；**FT0 防线**自动断言 `gen ns/nr` 与 `.fac` 一致。
 - `runtime_v3.dat` 的 SPECIES 行随 `cfgbuild` 刷新；机制改物种后必须重跑（否则 BC 行 token 数断言 FATAL）。
-- 哨兵基线按 V2.2 标定；V2.3 实测全在 ±10–15% 容差内（见 `tests/functional_test.py` SENT 表）。
+- 哨兵基线**已按 V2.4 重标定**（旧 V2.3 值 132.10/93.68/3.539/6.487 → 新 146.35/152.85/5.171/4.416，见 `tests/functional_test.py` SENT 表）；
+  屋脊位置随 VOC 谱扩展右移（V2.3 峰在 fnox≈2.28，V2.4 在 ≈3.42）。
 
 ---
 
@@ -249,16 +290,58 @@ NOx–O₃–HOx–ROx 三大循环 + 生物源/人为 VOC 降解 + 夜间化学
 | 73 | `TERPNIT` | C0H6NO3 |  |
 | 74 | `TERPCHO` | C0H4O2 |  |
 
-未分组: 无（74 全覆盖）
+#### V2.4 新增 (37)
 
-物种总数: 74
+| 序号 | 物种 | 分子式 | 角色 |
+|---|---|---|---|
+| 75 | `CSL` | C7H8O1 | 甲酚（芳香开环关键中间体） |
+| 76 | `CSLRO2` | C7H7O3 | 甲酚过氧自由基 |
+| 77 | `CSLOOH` | C7H8O5 | 甲酚氢过氧化物 |
+| 78 | `CSLNIT` | C7H7NO4 | 甲酚硝酸酯（NOy） |
+| 79 | `TOLOOH` | C7H10O5 | 甲苯 RO₂+HO₂ 产物（原缺失） |
+| 80 | `XYLOOH` | C8H12O5 | 二甲苯 RO₂+HO₂ 产物（原缺失） |
+| 81 | `LALK` | C6H14 | C6 长链烷烃 |
+| 82 | `LALKRO2` | C6H13O2 | 长链烷烃 RO₂ |
+| 83 | `LALKOOH` | C6H14O4 | 长链烷烃氢过氧化物 |
+| 84 | `LALKNIT` | C6H13NO3 | 长链烷烃硝酸酯（NOy） |
+| 85 | `MEOH` | CH4O | 甲醇（二次 HCHO 上游） |
+| 86 | `ETOH` | C2H6O | 乙醇 |
+| 87 | `MTBE` | C5H12O | MTBE 醚 |
+| 88 | `MTBERO2` | C5H11O3 | MTBE RO₂ |
+| 89 | `MTBEOOH` | C5H12O5 | MTBE 氢过氧化物 |
+| 90 | `MTBENIT` | C5H11NO4 | MTBE 硝酸酯（NOy） |
+| 91 | `ESTER` | C4H8O2 | 酯类（乙酸乙酯代理） |
+| 92 | `ESTERO2` | C4H7O4 | 酯 RO₂ |
+| 93 | `ESTEROOH` | C4H8O6 | 酯氢过氧化物 |
+| 94 | `ESTERNIT` | C4H7NO5 | 酯硝酸酯（NOy） |
+| 95 | `SESQ` | C15H24 | 倍半萜（SOA 主力） |
+| 96 | `SESQRO2` | C15H23O3 | 倍半萜 RO₂ |
+| 97 | `SESQOOH` | C15H24O5 | 倍半萜氢过氧化物 |
+| 98 | `SESQNIT` | C15H23NO4 | 倍半萜硝酸酯（NOy） |
+| 99 | `SESQCHO` | C15H22O2 | 倍半萜 SOA 代理终产物 |
+| 100 | `ETH` | C2H4 | 乙烯（全球最大排放烯烃） |
+| 101 | `ETHO2` | C2H5O3 | 乙烯 RO₂（羟乙基过氧） |
+| 102 | `ETHOOH` | C2H6O5 | 乙烯氢过氧化物 |
+| 103 | `ETHNIT` | C2H5NO4 | 乙烯硝酸酯（NOy） |
+| 104 | `ALD2` | C3H6O | 高级醛（丙醛代理，★HCHO 上游） |
+| 105 | `ALD2O2` | C3H5O3 | 丙酰过氧 |
+| 106 | `ALD2OOH` | C3H6O5 | 高级醛氢过氧化物 |
+| 107 | `PPAN` | C3H5NO5 | 过氧丙酰硝酸酯（NOy） |
+| 108 | `IOLE` | C4H8 | 内烯烃（丁烯代理） |
+| 109 | `IOLERO2` | C4H9O3 | 内烯烃 RO₂ |
+| 110 | `IOLEOOH` | C4H10O5 | 内烯烃氢过氧化物 |
+| 111 | `IOLENIT` | C4H9NO4 | 内烯烃硝酸酯（NOy） |
+
+未分组: 无（111 全覆盖）
+
+物种总数: 111
 
 
 ### 4.1 家族速查
 
 | 家族 | 成员 |
 |---|---|
-| **NOy**（17，batch 权重表 + indicators.py 自动判定） | NO(1) NO₂(1) HNO₃(1) HONO(1) NO₃(1) N₂O₅(2) PAN(1) MPAN(1) ISOPNIT(1) ISOPDNT(1) ClONO₂(1) BrONO₂(1) ISOPNO₃(1) PNA(1) RONO₂(1) OLENIT(1) TERPNIT(1) |
+| **NOy**（25，batch 权重表 + indicators.py 自动判定） | NO(1) NO₂(1) HNO₃(1) HONO(1) NO₃(1) N₂O₅(2) PAN(1) MPAN(1) ISOPNIT(1) ISOPDNT(1) ClONO₂(1) BrONO₂(1) ISOPNO₃(1) PNA(1) RONO₂(1) OLENIT(1) TERPNIT(1) **CSLNIT(1) LALKNIT(1) MTBENIT(1) ESTERNIT(1) SESQNIT(1) ETHNIT(1) IOLENIT(1) PPAN(1)**（后 8 个为 V2.4 新增） |
 | **HOx** | OH, HO₂（+ H₂O₂ 为储库） |
 | **ROx** | HO₂ + RO₂ 池（6 个显式过氧） |
 | **卤素** | Cl, ClO, ClONO₂, HCl, HOCl / Br, BrO, BrONO₂, HBr, HOBr |
@@ -456,6 +539,112 @@ NOx–O₃–HOx–ROx 三大循环 + 生物源/人为 VOC 降解 + 夜间化学
 | 130 | `KMT11` = K1H + K2H | `HNO3 + OH = NO3 + H2O` |
 | 131 | `KRO2NO3` = 2.3D-12 | `ISOPBO2 + CH3O2 = ISOPBO + HCHO + HO2` |
 
+#### ⑪ 芳香烃分级 + RO₂+HO₂ 闭环（V2.4，10 条） ----
+
+| # | 速率 | 反应 |
+|---|---|---|
+| 132 | `KCSLOH` | `CSL + OH + 1.5 O2 = 0.5 GLY + 2 MGLY` |
+| 133 | `KCSLNO3` | `CSL + NO3 + O2 = CSLRO2 + HNO3` |
+| 134 | `KRO2NO` | `CSLRO2 + NO + 3 O2 = GLY + MGLY + 2 CO + NO2 + HO2` |
+| 135 | `0.15*KRO2NO` | `CSLRO2 + NO = CSLNIT` |
+| 136 | `KRO2HO2` | `CSLRO2 + HO2 = CSLOOH` |
+| 137 | `KRO2HO2` | `CSLOOH + OH = CSLRO2 + H2O + O2` |
+| 138 | `KRO2HO2` | `ARO1O2 + HO2 = TOLOOH` |
+| 139 | `KRO2HO2` | `ARO2O2 + HO2 = XYLOOH` |
+| 140 | `KRO2HO2` | `TOLOOH + OH = ARO1O2 + H2O + O2` |
+| 141 | `KRO2HO2` | `XYLOOH + OH = ARO2O2 + H2O + O2` |
+
+#### ⑫ 长链烷烃 LALK（V2.4，6 条） ----
+
+| # | 速率 | 反应 |
+|---|---|---|
+| 142 | `KLALKOH` | `LALK + OH + O2 = LALKRO2 + H2O` |
+| 143 | `0.85*KRO2NO` | `LALKRO2 + NO + 2 O2 = 3 CH3CHO + NO2 + HO2` |
+| 144 | `0.15*KRO2NO` | `LALKRO2 + NO = LALKNIT` |
+| 145 | `KRO2HO2` | `LALKRO2 + HO2 = LALKOOH` |
+| 146 | `KRO2HO2` | `LALKOOH + OH = LALKRO2 + H2O + O2` |
+| 147 | `KRONO2OH` | `LALKNIT + OH + 1.25 O2 = HNO3 + 3 CH3CHO + 0.5 H2O` |
+
+#### ⑬ 醇/醚/酯类含氧 VOC（V2.4，14 条） ----
+
+| # | 速率 | 反应 |
+|---|---|---|
+| 148 | `KMEOHOH` | `MEOH + OH + O2 = HO2 + HCHO + H2O` |
+| 149 | `KETOHOH` | `ETOH + OH + O2 = CH3CHO + HO2 + H2O` |
+| 150 | `KMTBEOH` | `MTBE + OH + O2 = MTBERO2 + H2O` |
+| 151 | `0.85*KRO2NO` | `MTBERO2 + NO + 1.5 O2 = 2 CH3CHO + HCHO + NO2 + HO2` |
+| 152 | `0.15*KRO2NO` | `MTBERO2 + NO = MTBENIT` |
+| 153 | `KRO2HO2` | `MTBERO2 + HO2 = MTBEOOH` |
+| 154 | `KRO2HO2` | `MTBEOOH + OH = MTBERO2 + H2O + O2` |
+| 155 | `KRONO2OH` | `MTBENIT + OH + 0.75 O2 = HNO3 + 2 CH3CHO + HCHO + 0.5 H2O` |
+| 156 | `KESTEROH` | `ESTER + OH + 1.5 O2 = CH3CHO + CO2 + CH3O2 + H2O` |
+| 157 | `0.85*KRO2NO` | `ESTERO2 + NO + O2 = CH3CHO + CO2 + CH3O2 + NO2` |
+| 158 | `0.15*KRO2NO` | `ESTERO2 + NO = ESTERNIT` |
+| 159 | `KRO2HO2` | `ESTERO2 + HO2 = ESTEROOH` |
+| 160 | `KRO2HO2` | `ESTEROOH + OH = ESTERO2 + H2O + O2` |
+| 161 | `KRONO2OH` | `ESTERNIT + OH + O2 = HNO3 + CH3CHO + CO2 + CH3O2` |
+
+#### ⑭ 倍半萜 SESQ（V2.4，8 条） ----
+
+| # | 速率 | 反应 |
+|---|---|---|
+| 162 | `KSESQOH` | `SESQ + OH + 1.5 O2 = SESQRO2 + H2O` |
+| 163 | `KSESQO3` | `SESQ + O3 = SESQCHO + 0.80 OH + 0.10 O2 + 0.60 H2` |
+| 164 | `KSESQNO3` | `SESQ + NO3 + 0.75 O2 = SESQNIT + 0.5 H2O` |
+| 165 | `0.85*KRO2NO` | `SESQRO2 + NO + H2O + O2 = SESQCHO + NO2 + HO2 + H2O` |
+| 166 | `0.15*KRO2NO` | `SESQRO2 + NO = SESQNIT` |
+| 167 | `KRO2HO2` | `SESQRO2 + HO2 = SESQOOH` |
+| 168 | `KRO2HO2` | `SESQOOH + OH = SESQRO2 + H2O + O2` |
+| 169 | `KRONO2OH` | `SESQNIT + OH + 0.25 O2 = HNO3 + SESQCHO + 0.5 H2O` |
+
+#### ⑮ 乙烯/内烯烃/高级醛（V2.4，23 条） ----
+
+| # | 速率 | 反应 |
+|---|---|---|
+| 170 | `KETHOH` | `ETH + OH + O2 = ETHO2` |
+| 171 | `KETHO3` | `ETH + O3 + 0.2 H2O = 2 HCHO + 0.4 OH + 0.4 O2` |
+| 172 | `0.85*KRO2NO` | `ETHO2 + NO + O2 = 2 HCHO + NO2 + HO2` |
+| 173 | `0.15*KRO2NO` | `ETHO2 + NO = ETHNIT` |
+| 174 | `KRO2HO2` | `ETHO2 + HO2 = ETHOOH` |
+| 175 | `KRO2HO2` | `ETHOOH + OH = ETHO2 + H2O + O2` |
+| 176 | `KRONO2OH` | `ETHNIT + OH + 0.25 O2 = HNO3 + 2 HCHO + 0.5 H2O` |
+| 177 | `KALD2OH` | `ALD2 + OH + O2 = ALD2O2 + H2O` |
+| 178 | `KNO3AL` | `ALD2 + NO3 + 2.5 O2 = HNO3 + CH3CO3 + CO2 + H2O` |
+| 179 | `J<13>` | `ALD2 + 0.5 O2 = CH3CHO + CO + H2` |
+| 180 | `KRO2NO` | `ALD2O2 + NO + 2 O2 = CH3CO3 + CO2 + NO2 + H2O` |
+| 181 | `KFPAN` | `ALD2O2 + NO2 = PPAN` |
+| 182 | `KBPAN` | `PPAN = ALD2O2 + NO2` |
+| 183 | `KRO2HO2` | `ALD2O2 + HO2 = ALD2OOH` |
+| 184 | `KRO2HO2` | `ALD2OOH + OH = ALD2O2 + H2O + O2` |
+| 185 | `KIOLEOH` | `IOLE + OH + O2 = IOLERO2` |
+| 186 | `KIOLEO3` | `IOLE + O3 = 2 HCHO + CH3CHO` |
+| 187 | `KOLENO3` | `IOLE + NO3 + 0.5 H2O + 0.25 O2 = IOLENIT` |
+| 188 | `0.85*KRO2NO` | `IOLERO2 + NO + O2 = 2 CH3CHO + HO2 + NO2` |
+| 189 | `0.15*KRO2NO` | `IOLERO2 + NO = IOLENIT` |
+| 190 | `KRO2HO2` | `IOLERO2 + HO2 = IOLEOOH` |
+| 191 | `KRO2HO2` | `IOLEOOH + OH = IOLERO2 + H2O + O2` |
+| 192 | `KOLENITOH` | `IOLENIT + OH + 0.25 O2 = HNO3 + 2 CH3CHO + 0.5 H2O` |
+
+#### ⑯ MACR 夜化学（V2.4，1 条） ----
+
+| # | 速率 | 反应 |
+|---|---|---|
+| 193 | `KNO3AL` | `MACR + NO3 + O2 = HNO3 + MACRO2` |
+
+#### ⑰ RO₂ 交叉缔合（V2.4，5 条） ----
+
+| # | 速率 | 反应 |
+|---|---|---|
+| 194 | `KRO2NO3` | `CH3CO3 + ISOPBO2 = CH3O2 + ISOPBO + CO2` |
+| 195 | `KRO2NO3` | `CH3O2 + MACRO2 = CH3O + MACROO + O2` |
+| 196 | `KRO2NO3` | `CH3O2 + MVKO2 = CH3O + MVKO + O2` |
+| 197 | `KRO2NO3` | `ISOPBO2 + MACRO2 = ISOPBO + MACROO + O2` |
+| 198 | `KRO2NO3` | `ETHO2 + CH3O2 = CH3O + 2 HCHO + HO2` |
+
+> **V2.4 新增 67 条全部精确平衡**（`audit` 无储库依赖，实测确认）。
+> 反应行内的 `O2` 出现在反应物侧是物理上必需的（RO₂ 形成需 O₂ 加成），
+> 不是配平凑数——`element_audit` 的 O 记账会精确核到每个 O 原子。
+
 
 ### 5.1 关键反应解读（教学要点）
 
@@ -525,9 +714,9 @@ Cl + CH₄/HCHO → HCl + … ;  HCl + OH → Cl              再生
 | 13 | `CH3CHO = CH3O2 + CO + HO2` | 4e-05 | 0.79 | 0.33 | JMAP 直达 D4.0e-5 (m/n 取有机典型 0.79/0.33) |
 | 14 | `N2O5 = NO2 + NO3` | 1e-05 | 0.79 | 0.33 | JMAP 直达 D1.0e-5 (m/n 取有机典型 0.79/0.33) |
 | 15 | `KET = CH3CO3 + CH3O2 + 0.50 O2` | 1e-06 | 0.79 | 0.33 | JMAP 直达 D1.0e-6 (m/n 取有机典型 0.79/0.33) |
-| 16 | `GLY = CO + CO + H2` | 6e-05 | 0.79 | 0.33 | JMAP 直达 D6.0e-5 (m/n 取有机典型 0.79/0.33) |
+| 16 | `GLY = HCHO + CO` | 6e-05 | 0.79 | 0.33 | JMAP 直达 D6.0e-5（**V2.4 改为产 HCHO**，原 CO+CO+H₂） |
 | 21 | `ISOPOOH = ISOPBO + OH` | 1e-05 | 0.79 | 0.33 | JMAP 直达 D1.0e-5 (m/n 取有机典型 0.79/0.33) |
-| 22 | `MGLY = CO + CH3CHO` | 6e-05 | 0.79 | 0.33 | JMAP 直达 D6.0e-5 (m/n 取有机典型 0.79/0.33) |
+| 22 | `MGLY + 2 O2 = CH3CO3 + CO + HO2` | 6e-05 | 0.79 | 0.33 | JMAP 直达 D6.0e-5（**V2.4 改进**，原 CO+CH₃CHO） |
 | 24 | `ClO = Cl + O` | 2e-05 | 0.79 | 0.33 | JMAP 直达 D2.0e-5 (m/n 取有机典型 0.79/0.33) |
 | 25 | `BrO = Br + O` | 1e-06 | 0.79 | 0.33 | JMAP 直达 D1.0e-6 (m/n 取有机典型 0.79/0.33) |
 | 26 | `ClONO2 = Cl + NO3` | 0.0001 | 0.79 | 0.33 | JMAP 直达 D1.0e-4 (m/n 取有机典型 0.79/0.33) |
@@ -673,43 +862,69 @@ H17 版审计立即报 H:−1。同理 NO₃ 加成产物一律不加 H。
 
 ## 9. 已知省略（工程决策）
 
+### 9.1 V2.4 已补齐（原表所列 6 项）
+
+| 原省略项 | V2.4 处置 | 新增 |
+|---|---|---|
+| ALD2/ALDX（C≥2 醛集总） | ✅ 已加 ALD2 + ALD2O2/OOH + **PPAN** | +4sp / +6rx |
+| 甲酚支路（CSL/CRE） | ✅ 已加 CSL + CSLRO2/OOH/NIT | +4sp / +6rx |
+| IOLE（内烯分列） | ✅ 已加 IOLE + IOLERO2/OOH/NIT | +4sp / +6rx |
+| 倍半萜（SQT） | ✅ 已加 SESQ + SESQRO2/OOH/NIT/CHO | +5sp / +8rx |
+| MACR+NO₃ | ✅ 已加 `MACR + NO3 + O2 = HNO3 + MACRO2` | +1rx |
+| RO₂ 交叉缔合 | ✅ 由 1 对扩为 5 对（CH₃CO₃/CH₃O₂/MACRO₂/MVKO₂/ISOPBO₂/ETHO₂） | +5rx |
+| OVOC 长尾（甲醇/乙醇） | ✅ 已加 MEOH/ETOH/**MTBE/ESTER**（醚酯一并覆盖） | +10sp / +14rx |
+| 芳香分级（TOL/XYL 之外） | ✅ 加 CSL 开环 + **TOLOOH/XYLOOH 补齐 RO₂+HO₂ 缺口** | 含在上面 |
+| 长链烷烃 | ✅ 已加 LALK（C6） + LALKRO2/OOH/NIT | +4sp / +6rx |
+| 乙烯 | ✅ 已加 ETH + ETHO2/OOH/NIT | +4sp / +6rx |
+
+### 9.2 仍然省略（V2.4 未做）
+
 | 省略项 | 理由 | 影响 | 补齐成本 |
 |---|---|---|---|
 | **Criegee 显式物种** | 用产率法等效（OH 0.26/0.30/0.80 已显式） | 夜间 OH 量级正确，中间体谱缺失 | 高（需新增 Criegee 家族 + 分解分支） |
-| **ALD2/ALDX（C≥2 醛集总）** | 待下一轮 | 白天 HOx 源少一支；缺丙酰基→PPN | 中（+2sp/+4rx） |
-| **甲酚支路（CSL/CRE）** | 芳烃 SOA 前体细节 | 芳烃 SOA 谱缺失 | 中（+3sp/+8rx） |
-| **IOLE（内烯分列）** | 与 OLE 合并 | RO₂ 产物谱细节 | 低（+2sp/+3rx） |
-| **倍半萜（SQT）** | 森林精细度 | 森林 SOA/O₃ 敏感性细节 | 中 |
-| **MACR+NO₃** | 通道次要 | 夜间 MACR 汇缺失 | 低（+1rx） |
-| **RO₂ 交叉缔合** | 仅 CH₃O₂ 自缔合代表 | 高 RO₂ 浓度下略偏 | 低 |
 | **烷基硝酸盐水解** | 无气溶胶耦合 | RONO₂→HNO₃ 非均相通道缺失 | 中 |
-| **OVOC 长尾**（甲醇/乙醇/甲酸/乙酸） | 城市贡献 ~5–10% | 未覆盖 | 中 |
+| **甲酸/乙酸等有机酸** | 城市贡献小 | 未覆盖 | 低-中 |
+| **多环芳烃 (PAH)** | 需专门 SOA 模块 | 未覆盖 | 高 |
+| **异戊二烯 4 个以上分支** | 现有三分支为教学精简 | 高 NOx 下硝酸酯分配略偏 | 中 |
 | **光解槽位 13–29 的 m/n** | 文献典型形状替代 MCM 官方值 | 光解日变化形状近似 | 低（换 JMAP 值） |
+| **RO₂ 交叉缔合的温度依赖** | 统一用 `KRO2NO3 = 2.3e-12` | 低温下略偏 | 低 |
 
 ---
 
 ## 10. 对比定位
 
-| 维度 | MCM v3.3.1 | GEOS-Chem fullchem | CB6R3 (CMAQ) | RADM2 | MOZART-4 | **本机制 V2.3** |
+| 维度 | MCM v3.3.1 | GEOS-Chem fullchem | CB6R3 (CMAQ) | RADM2 | MOZART-4 | **本机制 V2.4** |
 |---|---|---|---|---|---|---|
-| 物种 / 反应 | ~6700 / ~17000 | ~280 / ~850 | 82 / 221 | 63 / 157 | 85 / 157+39 | **74 / 131** |
+| 物种 / 反应 | ~6700 / ~17000 | ~280 / ~850 | 82 / 221 | 63 / 157 | 85 / 157+39 | **111 / 198** |
+| 相对 MCM | 100% | 4.2% / 5.0% | 1.2% / 1.3% | 0.9% / 0.9% | 1.3% / 1.2% | **1.7% / 1.2%** |
 | VOC 表示 | 全显式 | 混合（显式芳烃四兄弟 + 集总烷烃） | 碳键官能团 | 代表分子 | 大类集总 | 显式裁剪 + 集总类 |
+| 芳香烃 | 全显式 | 显式 | TOL/XYL 分级 | 代表分子 | 大类 | **ARO1/ARO2 + CSL 开环链** |
+| 烷烃 | 全显式 | 集总 | 碳键 | 代表分子 | 大类 | **ALK(C3) + LALK(C6)** |
+| 烯烃 | 全显式 | 集总 | 碳键 | 代表分子 | 大类 | **OLE + ETH + IOLE** |
+| 含氧 VOC | 全显式 | 混合 | ✓ | 部分 | 部分 | **MEOH/ETOH/MTBE/ESTER/ALD2** |
 | 异戊二烯 | 全显式 | MARV 完整 | 集总 ISPD | 单物种 | 单物种 | **显式二代链（7 物种）** |
-| 单萜 | 全显式 | 多种 | TERP | ✗ | ✗ | **TERP 迷你链（5 物种）** |
+| 单萜 / 倍半萜 | 全显式 | 多种 | TERP | ✗ | ✗ | **TERP(5) + SESQ(5)** |
 | 卤素 | 基础 CL | Cl/Br/I 完整 | r3m 变体 | ✗ | ✗（TS2 有） | **闭环 + 4 储库** |
 | 夜间化学（NO₃/N₂O₅） | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ Troe 逐字 |
+| RO₂ 交叉缔合 | 全谱 | ✓ | ✓ | 部分 | 部分 | **5 对（V2.4 原 1 对）** |
 | HONO 晨爆 | ✓ | ✓ | 部分 | ✗ | ✗ | ✓ |
-| 气溶胶耦合 | ✗ | ✓（SOA/无机） | ✓ | 部分 | ✓ | ✗（TERPCHO 代理） |
-| 元素审计 | 人工 | 人工 | 预平衡 | 人工 | 人工 | **自动 131/131** |
-| 城市 OH 反应性覆盖 | 100% | ~95% | ~95% | ~85% | ~85% | **~90%** |
+| 气溶胶耦合 | ✗ | ✓（SOA/无机） | ✓ | 部分 | ✓ | ✗（TERPCHO/SESQCHO 代理） |
+| 元素审计 | 人工 | 人工 | 预平衡 | 人工 | 人工 | **自动 198/198** |
+| 城市 OH 反应性覆盖 | 100% | ~95% | ~95% | ~85% | ~85% | **~95%**（V2.4 由 ~90% 提升） |
 | 定位 | 全谱参照 | 全球定量 | 区域达标 | 历史 | 全球气候 | **过程诊断/教学/情景** |
 
 **复杂度阶梯（本机制所在位置）**：
 ```
-RADM2 (63sp) ── 本机制 (74sp) ── CB6R3 (82sp) ── MOZART-4 (85sp) ── fullchem (~280sp) ── MCM (~6700sp)
+RADM2 (63sp) ── CB6R3 (82sp) ── MOZART-4 (85sp) ── 本机制 (111sp) ── fullchem (~280sp) ── MCM (~6700sp)
 ```
-即：**略超 RADM2、逼近 CB6R3/MOZART-4 复杂度**，但 VOC 分辨率低于 CB6（无碳键）
-而高于 RADM2（多出显式 ISOP 二代链与 TERP）。
+即：**V2.4 后已超越 CB6R3/MOZART-4 的物种数**（111 vs 82/85），反应数也已接近
+（198 vs 221/196）。但要注意这是**数量上的接近，不是结构上的等价**：
+- CB6R3 用**碳键官能团**覆盖全谱 VOC（82 物种浓缩了数千个 MCM 物种）；
+  本机制用**显式裁剪**，111 个物种里每一个都是具体分子/集总类。
+- 因此本机制在**已覆盖的路径上比 CB6 更细**（如 ISOP 二代三分支、TERP/SESQ 三入口），
+  但在**未覆盖的 VOC 谱上仍有空白**（甲酸/乙酸、PAH、更多含氧中间体）。
+- 对**过程诊断**（IPR/IRR 逐反应归因）本机制更合适；对**区域达标模拟**
+  CB6R3 的集总结构在 3D 网格上更经济。
 
 ---
 

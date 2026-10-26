@@ -344,7 +344,10 @@ contains
             case ("NO", "NO2")
                 grpnox(i) = 1
             case ("HCHO", "CH3CHO", "ISOP", "DMS", "MVK", "MACR", "MSA", "SO2", &
-                  "ALK", "OLE", "ARO1", "ARO2", "KET", "TERP")
+                  "ALK", "OLE", "ARO1", "ARO2", "KET", "TERP", &
+                  ! V2.4 新增排放类: 芳香(甲酚前体)/长链烷烃/醇/醚/酯/倍半萜/乙烯/内烯烃/高级醛
+                  "CSL", "LALK", "MEOH", "ETOH", "MTBE", "ESTER", &
+                  "SESQ", "ETH", "IOLE", "ALD2")
                 grpvoc(i) = 1
             case ("CO")
                 grpco(i) = 1

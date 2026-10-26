@@ -219,7 +219,7 @@ fac_v3 / fac_batch_omp                 (两个二进制)
 | # | 检查 | 期望输出 |
 |---|---|---|
 | 1 | `make smoke` | `[PASS] FAC-V3 冒烟 (conc 26 行, O3末=…)` + `1/1 PASS` |
-| 2 | `python tests/functional_test.py` | `functional_test: 27/27 PASS`（含 4 金值哨兵 + 7 条 R10-R13 防线 + sat2surf 5 项 + 2 条负向守卫） |
+| 2 | `python tests/functional_test.py` | `functional_test: 35/35 PASS`（含 4 金值哨兵 + 7 条 R10-R13 防线 + sat2surf 5 项 + 负向守卫 + FT-PHOT/FT-MP/FT-DAYS） |
 | 3 | `python audit/element_audit.py mechanism/mechanism_3_full_chain.fac` | `全部 131 反应元素守恒 PASS` |
 | 4 | `ls facsimile_impl/fac_v3 facsimile_impl/fac_batch_omp` | 两个二进制存在 |
 
@@ -229,7 +229,7 @@ fac_v3 / fac_batch_omp                 (两个二进制)
 
 | 目录/文件 | 职责 | 你会不会改它 |
 |---|---|---|
-| `mechanism/` | 机制唯一事实源（.fac）；`teaching/` 存 15sp 教学存档档 | 扩机制时改 |
+| `mechanism/` | 机制唯一事实源（.fac，V2.4 111sp/198rx）；`teaching/` 存 15sp 教学存档档 | 扩机制时改 |
 | `input_v3/` | **12 类生效配置** + `constraints/` 序列 | **最常改这里** |
 | `templates/` | 5 类数据落位模板（人读格式合同） | 只读（照它落位） |
 | `runtime_v3.dat` | cfgbuild 产物（Fortran 唯一输入） | 不手改（自动生成） |
@@ -761,7 +761,7 @@ OH/HO₂/NO₂ 也一致到 **0.001% 以内**（最大是 HO₂ 的 0.0009%）�
 直到 ATOL 放到 1e9（比默认松 100 万倍）才出现 0.05% 偏差。
 
 **为什么这么稳**：
-- 74 物种**全显式**，没有强刚性耦合瓶颈（相比含气溶胶/云微物理的模型）
+- 111 物种**全显式**，没有强刚性耦合瓶颈（相比含气溶胶/云微物理的模型）
 - 主量浓度高（1e10–1e13 molec/cm³），`RTOL×y` 项本身就远大于 ATOL，
   即误差判据实际由 RTOL 主导、且 1e-6 相对误差对 3 位有效数字的输出毫无影响
 - 化学特征时间（O₃ 数天、NOx 数小时、自由基数秒）跨度适中，CVODE 步长
@@ -880,7 +880,7 @@ E=2.157e7 → SS ≈ 1.7e9 ≈ **70 ppb**，与城市量级吻合 ✓。
 | 内核 | fcmix CVODE-BDF+DENSE | **C-ABI 直连 CVODE + OpenMP** | fcmix CVODE-BDF+DENSE |
 | 输入 | runtime.dat 全通路 + 观测同化 | 同左 + 网格参数 | CLI 四参（days/pref/fnox/fvoc） |
 | 一次运行 | 1 情景 | 81+ 格点 | 1 案例 |
-| 输出 | 逐时 74 物种 + 131 IRR + 六账 | 24 列指示因子（末 24h 均值） | 29 物种 + 71 IRR + 六账 |
+| 输出 | 逐时 111 物种 + 198 IRR + 六账 | 24 列指示因子（末 24h 均值） | 29 物种 + 71 IRR + 六账 |
 | 生产角色 | ✓ 主力 | ✓ 批量 | ✗ 对照 |
 
 ### 4.2 决策树
@@ -1665,7 +1665,7 @@ batch:   LNNOX −47.4✓  HVOC +8.0✓  ISOPX −34.1✓
 
 | 账本 | 名称 | 粒度 | 内容 | 输出 |
 |---|---|---|---|---|
-| **IPR** | Integrated Process Rate（过程速率积分） | **过程级**（6 类） | ①机制P ②机制L ③排放 ④干+湿沉 ⑤BC+稀释 ⑥BLH膨胀 | `<pref>_ipr.csv`（74 物种 × 6 账） |
+| **IPR** | Integrated Process Rate（过程速率积分） | **过程级**（6 类） | ①机制P ②机制L ③排放 ④干+湿沉 ⑤BC+稀释 ⑥BLH膨胀 | `<pref>_ipr.csv`（111 物种 × 6 账） |
 | **IRR** | Integrated Reaction Rate（反应速率积分） | **反应级**（131 条） | 逐反应速率的小时窗精确积分 | `<pref>_irr.csv`（r1..r131） |
 
 **关键设计：IPR 是"小时窗精确积分"，不是快照**
@@ -1692,7 +1692,7 @@ batch:   LNNOX −47.4✓  HVOC +8.0✓  ISOPX −34.1✓
 |---|---|---|
 | **`hourly_pa.py`** | ①逐小时六账占比（柱状/堆叠）②O₃ 逐小时反应级 top-4 预算 ③IPR↔IRR 一致性检验 | 看"什么过程在什么时候主导" |
 | **`ipr_irr5.py`** | 多路线（fac_v3/mcm/batch）IPR 六账占比横向对比 | 看"不同数值路线是否给同一过程结论" |
-| **`diagnostics.ipr_from_fac()`** | 任意前缀的 74 物种 × 6 账积分 | 编程式自定义分析 |
+| **`diagnostics.ipr_from_fac()`** | 任意前缀的 111 物种 × 6 账积分 | 编程式自定义分析 |
 
 **典型产出示例**（O₃ 的六账）：
 ```

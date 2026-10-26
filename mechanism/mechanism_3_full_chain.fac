@@ -1,6 +1,6 @@
 **********************************************************************  ;
 * ozone_lab 机制 v3 (V2.3) —— 完整机制链条 (工程版)                    ;
-* 74 物种 131 反应 · 每条反应 C/H/N/O/S/Cl/Br 元素精确配平             ;
+* 111 物种 198 反应 · 每条反应 C/H/N/O/S/Cl/Br 元素精确配平            ;
 *   (audit/element_audit.py 全量审计 131/131, 储库 H2O/O2/CO2/H2/M/N2   ;
 *    自动推断但方向限定: CO2/H2 只许产物侧, O2 反应物侧 ≤2.5)           ;
 *                                                                      ;
@@ -9,7 +9,14 @@
 *   V2.2 (67sp/119rx): +VOC 降解谱集总类 OLE/ALK/ARO1/ARO2/KET/GLY      ;
 *     (烯烃/烷烃/芳烃两档/酮, 产物回灌既有池) + 支撑化学 (PNA 温度计/   ;
 *     N2O5 白天光解/OH+HNO3 再循环/ISOPBO2 交叉)                        ;
-*   V2.3 (74sp/131rx, 本版):                                           ;
+*   V2.3 (74sp/131rx): 臭氧化 OH 产率 + 烷基硝酸盐 + 单萜 + PNA          ;
+*   V2.4 (111sp/198rx, 本版):                                          ;
+*     + 芳香烃分级: 甲酚 CSL 开环链 + RO2+HO2 闭环补齐 (TOLOOH/XYLOOH)   ;
+*     + 长链烷烃 LALK(C6) / 醇 MeOH.EtOH / 醚 MTBE / 酯 ESTER            ;
+*     + 倍半萜 SESQ(C15, SOA 主力) 三入口链                              ;
+*     + 乙烯 ETH / 内烯烃 IOLE / 高级醛 ALD2 + PPAN 储库                  ;
+*     + 二次 HCHO 强化: GLY 光解产 HCHO, 醚/乙烯/交叉缔合均产 HCHO       ;
+*     + MACR+NO3 夜化学; RO2 交叉缔合由 1 条扩为 5 条                     ;
 *     + 臭氧化 OH 产率显式化 (OLE+O3→0.30OH, ISOP+O3→0.26OH —           ;
 *       Criegee 夜间/黎明 OH 源, Atkinson 产率)                         ;
 *     + 烷基硝酸盐家族 (ALK 15%/OLE 3% RO2+NO 分支 → RONO2/OLENIT,      ;
@@ -34,17 +41,26 @@
 **********************************************************************  ;
 * ;
 VARIABLE
-NO NO2 O3 O1D O OH HO2 H2O2 CO HCHO HNO3 HONO NO3 N2O5
-CH4 CH3O2 CH3OOH CH3O
-CH3CHO CH3CO3 PAN
-ISOP ISOPBO2 ISOPBO ISOPNO3 ISOPNIT ISOPDNT ISOPOOH
-MVK MVKO2 MVKO MVKOOH MACR MACRO2 MACROO MACROOH MPAN MGLY
-SO2 SO3 H2SO4 DMS MSA
-Cl ClO ClONO2 Br BrO BrONO2 HCl HBr HOCl HOBr
-OLE OLERO2 OLEOOH ALK ALKRO2 ALKOOH
-ARO1 ARO1O2 ARO2 ARO2O2 KET KETRO2 GLY PNA
-RONO2 OLENIT
-TERP TERPRO2 TERPOOH TERPNIT TERPCHO  ;
+  NO        NO2       O3        O1D       O         OH       
+  HO2       H2O2      CO        HCHO      HNO3      HONO     
+  NO3       N2O5      CH4       CH3O2     CH3OOH    CH3O     
+  CH3CHO    CH3CO3    PAN       ISOP      ISOPBO2   ISOPBO   
+  ISOPNO3   ISOPNIT   ISOPDNT   ISOPOOH   MVK       MVKO2    
+  MVKO      MVKOOH    MACR      MACRO2    MACROO    MACROOH  
+  MPAN      MGLY      SO2       SO3       H2SO4     DMS      
+  MSA       Cl        ClO       ClONO2    Br        BrO      
+  BrONO2    HCl       HBr       HOCl      HOBr      OLE      
+  OLERO2    OLEOOH    ALK       ALKRO2    ALKOOH    ARO1     
+  ARO1O2    ARO2      ARO2O2    KET       KETRO2    GLY      
+  PNA       RONO2     OLENIT    TERP      TERPRO2   TERPOOH  
+  TERPNIT   TERPCHO   CSL       CSLRO2    CSLOOH    CSLNIT   
+  TOLOOH    XYLOOH    LALK      LALKRO2   LALKOOH   LALKNIT  
+  MEOH      ETOH      MTBE      MTBERO2   MTBEOOH   MTBENIT  
+  ESTER     ESTERO2   ESTEROOH  ESTERNIT  SESQ      SESQRO2  
+  SESQOOH   SESQNIT   SESQCHO   ETH       ETHO2     ETHOOH   
+  ETHNIT    ALD2      ALD2O2    ALD2OOH   PPAN      IOLE     
+  IOLERO2   IOLEOOH   IOLENIT  
+  ;
 FORMULA
 NO       N1 O1
 NO2      N1 O2
@@ -119,7 +135,44 @@ TERPRO2  C10 H17 O3
 TERPOOH  C10 H18 O5
 TERPNIT  C10 H16 N1 O3
 TERPCHO  C10 H14 O2
-HOBr     H1 O1 Br1 ;
+HOBr     H1 O1 Br1 
+CSL      C7 H8 O1
+CSLRO2   C7 H7 O3
+CSLOOH   C7 H8 O5
+CSLNIT   C7 H7 N1 O4
+TOLOOH   C7 H10 O5
+XYLOOH   C8 H12 O5
+LALK     C6 H14
+LALKRO2  C6 H13 O2
+LALKOOH  C6 H14 O4
+LALKNIT  C6 H13 N1 O3
+MEOH     C1 H4 O1
+ETOH     C2 H6 O1
+MTBE     C5 H12 O1
+MTBERO2  C5 H11 O3
+MTBEOOH  C5 H12 O5
+MTBENIT  C5 H11 N1 O4
+ESTER    C4 H8 O2
+ESTERO2  C4 H7 O4
+ESTEROOH C4 H8 O6
+ESTERNIT C4 H7 N1 O5
+SESQ     C15 H24
+SESQRO2  C15 H23 O3
+SESQOOH  C15 H24 O5
+SESQNIT  C15 H23 N1 O4
+SESQCHO  C15 H22 O2
+ETH      C2 H4
+ETHO2    C2 H5 O3
+ETHOOH   C2 H6 O5
+ETHNIT   C2 H5 N1 O4
+ALD2     C3 H6 O1
+ALD2O2   C3 H5 O3
+ALD2OOH  C3 H6 O5
+PPAN     C3 H5 N1 O5
+IOLE     C4 H8
+IOLERO2  C4 H9 O3
+IOLEOOH  C4 H10 O5
+IOLENIT  C4 H9 N1 O4 ;
 * ;
 * ---- 通用速率常数 (MCM v3.3.1 逐字拷贝部分注明 [MCM]) ----  ;
 * ;
@@ -249,6 +302,23 @@ KPNAT = 1.3D+16*EXP(-10400/TEMP)  ;    ! PNA 热分解 (温度计)  ;
 * ;
 RO2 = CH3O2 CH3CO3 ISOPBO2 ISOPNO3 MVKO2 MACRO2  ;
 * ;
+* ---- V2.4 新增速率 (JPL/MCM 量级) ---- ;
+KCSLOH = 1.4D-11  ;
+KCSLNO3 = 1.4D-11  ;
+KMEOHOH = 9.0D-13  ;
+KETOHOH = 3.2D-12*EXP(70/TEMP)  ;
+KLALKOH = 5.2D-12*EXP(405/TEMP)  ;
+KMTBEOH = 2.3D-12  ;
+KESTEROH = 1.7D-12  ;
+KSESQOH = 1.9D-10  ;
+KSESQO3 = 1.2D-16  ;
+KSESQNO3 = 4.0D-11  ;
+KETHOH = 8.5D-12*EXP(70/TEMP)  ;
+KETHO3 = 1.6D-18  ;
+KALD2OH = 1.9D-11  ;
+KIOLEOH = 6.4D-11  ;
+KIOLEO3 = 6.0D-18  ;
+* ;
 * Reaction definitions.  ;
 * ;
 * ---- ① 无机核心: NOx 光稳态 + HOx + HONO 晨爆 ----  ;
@@ -337,7 +407,7 @@ RO2 = CH3O2 CH3CO3 ISOPBO2 ISOPNO3 MVKO2 MACRO2  ;
 % 7.3D-13*EXP(580/TEMP)*O2 : MACROO + O2 = MGLY + CO + OH  ;
 % KRO2HO2 : MACRO2 + HO2 = MACROOH  ;
 * MGLY 终局: 光解 + OH → CH3CO3 回灌 (闭环)  ;
-% J<22> : MGLY = CO + CH3CHO  ;
+% J<22> : MGLY + 2 O2 = CH3CO3 + CO + HO2  ;
 % KMGLYOH : MGLY + OH = CH3CO3 + CO  ;
 * ;
 * ---- ⑤ 硫链 ----  ;
@@ -386,7 +456,7 @@ RO2 = CH3O2 CH3CO3 ISOPBO2 ISOPNO3 MVKO2 MACRO2  ;
 % KKETOH : KET + OH = KETRO2 + H2O  ;
 % KRO2NO : KETRO2 + NO + O2 = CH3CO3 + HCHO + NO2  ;
 % J<15> : KET = CH3CO3 + CH3O2 + 0.50 O2  ;
-% J<16> : GLY = CO + CO + H2  ;
+% J<16> : GLY = HCHO + CO  ;
 * ---- ⑧ V2.2: 支撑化学补全 (PNA / N2O5 白天光解 / OH+HNO3) ----  ;
 % KPNAF : HO2 + NO2 = PNA  ;
 % KPNAT : PNA = HO2 + NO2  ;
@@ -407,3 +477,78 @@ RO2 = CH3O2 CH3CO3 ISOPBO2 ISOPNO3 MVKO2 MACRO2  ;
 % J<14> : N2O5 = NO2 + NO3  ;
 % KMT11 : HNO3 + OH = NO3 + H2O  ;
 % KRO2NO3 : ISOPBO2 + CH3O2 = ISOPBO + HCHO + HO2  ;
+* ;
+* ---- (11) V2.4 芳香烃分级 CSL + RO2+HO2 闭环补齐 ----  ;
+% KCSLOH : CSL + OH + 1.5 O2 = 0.5 GLY + 2 MGLY  ;
+% KCSLNO3 : CSL + NO3 + O2 = CSLRO2 + HNO3  ;
+% KRO2NO : CSLRO2 + NO + 3 O2 = GLY + MGLY + 2 CO + NO2 + HO2  ;
+% 0.15*KRO2NO : CSLRO2 + NO = CSLNIT  ;
+% KRO2HO2 : CSLRO2 + HO2 = CSLOOH  ;
+% KRO2HO2 : CSLOOH + OH = CSLRO2 + H2O + O2  ;
+% KRO2HO2 : ARO1O2 + HO2 = TOLOOH  ;
+% KRO2HO2 : ARO2O2 + HO2 = XYLOOH  ;
+% KRO2HO2 : TOLOOH + OH = ARO1O2 + H2O + O2  ;
+% KRO2HO2 : XYLOOH + OH = ARO2O2 + H2O + O2  ;
+* ---- (12) V2.4 长链烷烃 LALK ----  ;
+% KLALKOH : LALK + OH + O2 = LALKRO2 + H2O  ;
+% 0.85*KRO2NO : LALKRO2 + NO + 2 O2 = 3 CH3CHO + NO2 + HO2  ;
+% 0.15*KRO2NO : LALKRO2 + NO = LALKNIT  ;
+% KRO2HO2 : LALKRO2 + HO2 = LALKOOH  ;
+% KRO2HO2 : LALKOOH + OH = LALKRO2 + H2O + O2  ;
+% KRONO2OH : LALKNIT + OH + 1.25 O2 = HNO3 + 3 CH3CHO + 0.5 H2O  ;
+* ---- (13) V2.4 醇/醚/酯类含氧 VOC ----  ;
+% KMEOHOH : MEOH + OH + O2 = HO2 + HCHO + H2O  ;
+% KETOHOH : ETOH + OH + O2 = CH3CHO + HO2 + H2O  ;
+% KMTBEOH : MTBE + OH + O2 = MTBERO2 + H2O  ;
+% 0.85*KRO2NO : MTBERO2 + NO + 1.5 O2 = 2 CH3CHO + HCHO + NO2 + HO2  ;
+% 0.15*KRO2NO : MTBERO2 + NO = MTBENIT  ;
+% KRO2HO2 : MTBERO2 + HO2 = MTBEOOH  ;
+% KRO2HO2 : MTBEOOH + OH = MTBERO2 + H2O + O2  ;
+% KRONO2OH : MTBENIT + OH + 0.75 O2 = HNO3 + 2 CH3CHO + HCHO + 0.5 H2O  ;
+% KESTEROH : ESTER + OH + 1.5 O2 = CH3CHO + CO2 + CH3O2 + H2O  ;
+% 0.85*KRO2NO : ESTERO2 + NO + O2 = CH3CHO + CO2 + CH3O2 + NO2  ;
+% 0.15*KRO2NO : ESTERO2 + NO = ESTERNIT  ;
+% KRO2HO2 : ESTERO2 + HO2 = ESTEROOH  ;
+% KRO2HO2 : ESTEROOH + OH = ESTERO2 + H2O + O2  ;
+% KRONO2OH : ESTERNIT + OH + O2 = HNO3 + CH3CHO + CO2 + CH3O2  ;
+* ---- (14) V2.4 倍半萜 SESQ ----  ;
+% KSESQOH : SESQ + OH + 1.5 O2 = SESQRO2 + H2O  ;
+% KSESQO3 : SESQ + O3 = SESQCHO + 0.80 OH + 0.10 O2 + 0.60 H2  ;
+% KSESQNO3 : SESQ + NO3 + 0.75 O2 = SESQNIT + 0.5 H2O  ;
+% 0.85*KRO2NO : SESQRO2 + NO + H2O + O2 = SESQCHO + NO2 + HO2 + H2O  ;
+% 0.15*KRO2NO : SESQRO2 + NO = SESQNIT  ;
+% KRO2HO2 : SESQRO2 + HO2 = SESQOOH  ;
+% KRO2HO2 : SESQOOH + OH = SESQRO2 + H2O + O2  ;
+% KRONO2OH : SESQNIT + OH + 0.25 O2 = HNO3 + SESQCHO + 0.5 H2O  ;
+* ---- (15) V2.4 乙烯 ETH + 内烯烃 IOLE + 高级醛 ALD2 ----  ;
+% KETHOH : ETH + OH + O2 = ETHO2  ;
+% KETHO3 : ETH + O3 + 0.2 H2O = 2 HCHO + 0.4 OH + 0.4 O2  ;
+% 0.85*KRO2NO : ETHO2 + NO + O2 = 2 HCHO + NO2 + HO2  ;
+% 0.15*KRO2NO : ETHO2 + NO = ETHNIT  ;
+% KRO2HO2 : ETHO2 + HO2 = ETHOOH  ;
+% KRO2HO2 : ETHOOH + OH = ETHO2 + H2O + O2  ;
+% KRONO2OH : ETHNIT + OH + 0.25 O2 = HNO3 + 2 HCHO + 0.5 H2O  ;
+% KALD2OH : ALD2 + OH + O2 = ALD2O2 + H2O  ;
+% KNO3AL : ALD2 + NO3 + 2.5 O2 = HNO3 + CH3CO3 + CO2 + H2O  ;
+% J<13> : ALD2 + 0.5 O2 = CH3CHO + CO + H2  ;
+% KRO2NO : ALD2O2 + NO + 2 O2 = CH3CO3 + CO2 + NO2 + H2O  ;
+% KFPAN : ALD2O2 + NO2 = PPAN  ;
+% KBPAN : PPAN = ALD2O2 + NO2  ;
+% KRO2HO2 : ALD2O2 + HO2 = ALD2OOH  ;
+% KRO2HO2 : ALD2OOH + OH = ALD2O2 + H2O + O2  ;
+% KIOLEOH : IOLE + OH + O2 = IOLERO2  ;
+% KIOLEO3 : IOLE + O3 = 2 HCHO + CH3CHO  ;
+% KOLENO3 : IOLE + NO3 + 0.5 H2O + 0.25 O2 = IOLENIT  ;
+% 0.85*KRO2NO : IOLERO2 + NO + O2 = 2 CH3CHO + HO2 + NO2  ;
+% 0.15*KRO2NO : IOLERO2 + NO = IOLENIT  ;
+% KRO2HO2 : IOLERO2 + HO2 = IOLEOOH  ;
+% KRO2HO2 : IOLEOOH + OH = IOLERO2 + H2O + O2  ;
+% KOLENITOH : IOLENIT + OH + 0.25 O2 = HNO3 + 2 CH3CHO + 0.5 H2O  ;
+* ---- (16) V2.4 MACR 夜化学 ----  ;
+% KNO3AL : MACR + NO3 + O2 = HNO3 + MACRO2  ;
+* ---- (17) V2.4 RO2 交叉缔合 ----  ;
+% KRO2NO3 : CH3CO3 + ISOPBO2 = CH3O2 + ISOPBO + CO2  ;
+% KRO2NO3 : CH3O2 + MACRO2 = CH3O + MACROO + O2  ;
+% KRO2NO3 : CH3O2 + MVKO2 = CH3O + MVKO + O2  ;
+% KRO2NO3 : ISOPBO2 + MACRO2 = ISOPBO + MACROO + O2  ;
+% KRO2NO3 : ETHO2 + CH3O2 = CH3O + 2 HCHO + HO2  ;

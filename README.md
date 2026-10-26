@@ -1,7 +1,7 @@
 # ozone_lab —— 对流层臭氧光化学程序族
 
 > **定位**：独立程序系列目录（非 Day xx）——多求解器 × 全谱诊断 × 完备输入系统。
-> 两档在役机制（**工程版 mechanism_3 V2.3：74 物种 131 反应** 六链条，含 V2.2 集总类
+> 两档在役机制（**工程版 mechanism_3 V2.4：111 物种 198 反应** 十段链条，含 V2.2 集总类
 > ALK/OLE/ARO1/ARO2/KET/GLY/PNA + V2.3 臭氧化 OH 产率/硝酸酯家族/TERP 迷你链/PNA+OH；
 > 真实 MCM CH₄ 子集 29 物种 71 反应；15sp 核心教学档仅存 .fac 参考），
 > **CVODE 双内核**（fcmix / C-ABI+OpenMP）路线，**双库诊断**（indicators.py 指标引擎 +
@@ -10,7 +10,7 @@
 > fac_run、kpp_run、kpp_batch、EBI、fac_expanded、fac_spgmr 已退役（详见 §1.1）。
 >
 > **七大分析能力**：①观测约束（nudging 同化）· ②响应面（4D 参数扫描，最高 262,144 案例）
-> · ③情景分析（6 政策情景）· ④过程分析（IPR 六账 + IRR 131 反应）
+> · ③情景分析（6 政策情景）· ④过程分析（IPR 六账 + IRR 198 反应）
 > · ⑤敏感性 OAT · ⑥反演（⚠ 非真伴随，FD+SVD）
 > · ⑦气象序列驱动（6 变量逐时观测）——索引见
 > [OPERATIONS_MANUAL §0.7](OPERATIONS_MANUAL.md)，详解见
@@ -27,7 +27,7 @@
 >
 > **一键复现**（计数为 2026-10-26 实跑值）：
 > ```bash
-> make test   # 构建 → 冒烟 1/1 → 功能 24/24 → 元素审计 131/131 → 81 案例响应面 + 批量自检
+> make test   # 构建 → 冒烟 1/1 → 功能 35/35 → 元素审计 198/198 → 81 案例响应面 + 批量自检
 > make v3 && make batch   # 工程版: fac_v3 情景 + fac_batch_omp OpenMP 响应面
 > make mcm                # MCM 对照路线 (29sp 独立子树, 可 clean 后重建)
 > make figures            # response_surface_v3.png + indicators_vs_ridge.png
@@ -77,7 +77,7 @@
 # ① 构建 + 全测试链
 make test
 
-# ② 工程版单箱情景模拟 (74 物种 131 反应 V2.2, 六情景任选)
+# ② 工程版单箱情景模拟 (111 物种 198 反应 V2.4, 六情景任选)
 make v3
 cd facsimile_impl && ./fac_v3 SCEN_BAU ../output/base_v3 ../runtime_v3.dat
 
@@ -119,7 +119,7 @@ make figures
 | 机制版本 | 唯一事实源 (.fac) | 消费路线 |
 |---|---|---|
 | ~~15sp / 25rx~~ 教学核心（**退役**，.fac 移至 `mechanism/teaching/` 存档） | `mechanism/teaching/mechanism_1_ozone_tutorial.fac` | 无（fac_run/kpp_run 已退役） |
-| **74sp / 131rx** 工程 V2.3 全链条 | `mechanism/mechanism_3_full_chain.fac` | `fac_v3` + `fac_batch_omp`（共享 `gen_v3/`） |
+| **111sp / 198rx** 工程 V2.4 全链条 | `mechanism/mechanism_3_full_chain.fac` | `fac_v3` + `fac_batch_omp`（共享 `gen_v3/`） |
 | **29sp / 71rx** 真实 MCM CH₄ | `mcm_city/input/mechanism_mcm_ch4.fac` | `mcm_run` |
 
 > **机制规格书（逐反应速率/配平方法论/对比定位）**：见 [`mechanism/README.md`](mechanism/README.md)
@@ -148,7 +148,7 @@ make figures
 
 - **源码**：`oz_fac_v3.f90`（256 行）+ `modules/runtime_dat_mod.f90`（318 行）+ `gen_v3/`
 - **CLI**：`fac_v3 [SCEN_NAME|序号] [out_pref] [runtime.dat]`（缺省 `output/facv3`、`runtime_v3.dat`）
-- **机制**：`mechanism/mechanism_3_full_chain.fac` → **74sp/131rx V2.2 六链条**（V2.2 集总类 ALK/OLE/ARO1/ARO2/KET + GLY/PNA；V2.3 烷基硝酸盐+单萜 TERP）
+- **机制**：`mechanism/mechanism_3_full_chain.fac` → **111sp/198rx V2.4 十段链条**（V2.2 集总类；V2.3 烷基硝酸盐+单萜；V2.4 芳香分级/长链烷烃/醇醚酯/倍半萜/乙烯/内烯烃/高级醛 + 二次 HCHO 强化）
 - **实读确认的物理链**（`facv3_mod.resid_ipr`）：
   ```
   ydot = Σ(机制反应计量 × peff)                     ← 机制 P/L（peff 用原始 y, 不夹 max(y,0)）
@@ -163,8 +163,8 @@ make figures
     （**RTOL/ATOL 含义、实测敏感性与"何时该动"见 [GUIDE §3⑬](EXPERIMENTS_GUIDE.md)**）
   - DENSE（74×74；无预条件 SPGMR 黎明崩塌——10b #12）；`MAX_STEP=100 s`，重启后 10 s
   - 输出目录自动 `mkdir -p`；情景名匹配 → 序号解析 → 失败回落情景 1（`ios` 显式置 0）
-- **输出**：`<pref>_conc.csv`（表头 `h,<74 物种名动态生成>`，**末 24 h**）+
-  `<pref>_irr.csv`（`h,r1..r131`）+ `<pref>_ipr.csv`（`h` + 74×6 账）
+- **输出**：`<pref>_conc.csv`（表头 `h,<111 物种名动态生成>`，**末 24 h**）+
+  `<pref>_irr.csv`（`h,r1..r198`）+ `<pref>_ipr.csv`（`h` + 111×6 账）
   + stdout（`FAC-V3 ok (…s, nst=…, O3max=… ppb)`）
 
 ### ② `facsimile_impl/fac_batch_omp` —— OpenMP 批量响应面
@@ -213,7 +213,7 @@ mechc.py → gen*/、fac2kpp.py → KPP 三件套、cfgbuild --mech → runtime_
 
 | # | 文件 | 实读确认的功能 | 用法 / 实测 |
 |---|---|---|---|
-| 1 | `audit/element_audit.py` | 逐反应 C/H/N/O/S/Cl/Br 平衡；储库（H₂O/O₂/CO₂/H₂）自动推断但**限定物理方向**（CO₂/H₂ 只许产物侧、O₂ 反应物侧≤2.5）；74 物种元素表内嵌（机制自带 FORMULA 块覆盖） | `python audit/element_audit.py mechanism/mechanism_3_full_chain.fac` → **131/131**（旧 expanded → 7 FAIL；V2.3 后 131 反应） |
+| 1 | `audit/element_audit.py` | 逐反应 C/H/N/O/S/Cl/Br 平衡；储库（H₂O/O₂/CO₂/H₂）自动推断但**限定物理方向**（CO₂/H₂ 只许产物侧、O₂ 反应物侧≤2.5）；111 物种元素表内嵌（机制自带 FORMULA 块覆盖） | `python audit/element_audit.py mechanism/mechanism_3_full_chain.fac` → **198/198** |
 | 2 | `audit/oz_audit.c` | C 证人（Kahan）：`nox_budget`（NOx 家族望远镜闭合=初值+排放−沉降−末期≈0）+ `o3_budget`（ΔO₃=∫(P−L)dt） | liboz_audit.dylib |
 | 3 | `audit/cfg_audit.c` | runtime.dat SERIES 段审计（单调/覆盖≥模拟时长/值域有限） | libcfg_audit.dylib |
 | 4 | `tests/smoke_test.sh` | **3 项**（源码 34/35/38 行）：FACSIMILE + KPP（`smoke()`：非空/≥24 行/O₃ 列 awk 健全）+ FAC-V3（log 含 ok + O₃ 末列非零）。**EBI 不在冒烟内**。实跑 **3/3** | `make smoke` |
@@ -224,7 +224,7 @@ mechc.py → gen*/、fac2kpp.py → KPP 三件套、cfgbuild --mech → runtime_
 | 文件 | 规模 | 编译去向 | 实读要点 |
 |---|---|---|---|
 | ~~`mechanism/ozone.fac`~~（已随 fac_run 退役删除） | 15sp/25rx | — | 15sp 核心教学机制存档于 `mechanism/teaching/mechanism_1_ozone_tutorial.fac` |
-| `mechanism/mechanism_3_full_chain.fac` | **74sp/131rx V2.2** | fac_v3 / fac_batch_omp `gen_v3/` | 六链条（①无机核心+HONO 晨爆 ②NO₃-N₂O₅ 夜化学 MCM KMT03/04 Troe 逐字 ③CH₄+PAN 储库 ④**isoprene 完整二代链** ISOPBO₂→MVK+MACR→MVKO₂/MACRO₂→MPAN/MGLY→CH₃CO₃ 回灌，0.1 硝酸酯支路 ⑤DMS→MSA ⑥卤素+ClONO₂/BrONO₂/HOCl/HOBr 储库）；O1D 速率已并入 H₂O/M（Day35 潜伏 bug 修复版）；每反应 C/H/N/O/S/Cl/Br 精确配平 |
+| `mechanism/mechanism_3_full_chain.fac` | **111sp/198rx V2.4** | fac_v3 / fac_batch_omp `gen_v3/` | 六链条（①无机核心+HONO 晨爆 ②NO₃-N₂O₅ 夜化学 MCM KMT03/04 Troe 逐字 ③CH₄+PAN 储库 ④**isoprene 完整二代链** ISOPBO₂→MVK+MACR→MVKO₂/MACRO₂→MPAN/MGLY→CH₃CO₃ 回灌，0.1 硝酸酯支路 ⑤DMS→MSA ⑥卤素+ClONO₂/BrONO₂/HOCl/HOBr 储库）；O1D 速率已并入 H₂O/M（Day35 潜伏 bug 修复版）；每反应 C/H/N/O/S/Cl/Br 精确配平 |
 | `mcm_city/input/mechanism_mcm_ch4.fac` | 29sp/71rx | mcm_city `gen/` | AtChem2 自带 MCM v3.3.1 CH₄ 子集；完整无机组（NO₃/N₂O₅/HO₂NO₂/HONO）+ Troe（KMT01-03/KBPAN/KFPAN）+ HSO₃/SO₃ 硫链 + CL |
 | ~~`kpp_impl/ozone_kpp.{spc,eqn,def}`~~（已随 KPP 路线退役删除） | — | — | `src/fac2kpp.py` 转换脚本保留 |
 | （已删）`input_v3/mechanism_3_full_chain.fac` | — | — | 旧副本已删除；cfgbuild 经 `--mech mechanism/mechanism_3_full_chain.fac` 直引真源 |
@@ -263,9 +263,9 @@ f_CO → CO              f_CH4 → CH4        另: jfac 乘 J 通道, dt 加 TEM
 |---|---|---|
 | ~~fac_run conc~~（退役） | 曾为 `h,O3,...,CH3O2` 10 列；现由 fac_v3 67 列契约取代 | dg.load 需按列名适配 |
 | fac_run irr | `h,r1..r25`（末 24 h 快照） | `dg.irr_integrate` |
-| fac_v3 conc | `h` + **74 物种** = **75 列**（末 24 h 逐时，molec/cm³） | `diagnostics.load` / 自定义分析 |
-| fac_v3 irr | `h` + **131 反应** = **132 列**（**小时窗积分**，非速率） | `dg.irr_integrate` |
-| fac_v3 ipr | `h` + **74×6 账** = **445 列**（`P L E D B X`，小时窗积分） | `run_D_process` / 过程归因 |
+| fac_v3 conc | `h` + **111 物种** = **112 列**（末 24 h 逐时，molec/cm³） | `diagnostics.load` / 自定义分析 |
+| fac_v3 irr | `h` + **198 反应** = **199 列**（**小时窗积分**，非速率） | `dg.irr_integrate` |
+| fac_v3 ipr | `h` + **111×6 账** = **667 列**（`P L E D B X`，小时窗积分） | `run_D_process` / 过程归因 |
 | batch CSV | `fnox,fvoc,O3max,O3mean,HCHOmax,NO2mean,FNR_mean,H2O2HNO3,O3NOy,HCHONOy,O3NOz,NOy_ppb,LnOxQ,PH2O2PHNO3,OPE,nst`（24 列） | figures 两脚本 |
 | output/scan/s* | 81 案例逐时浓度 | scan_suite.py |
 | mcm_city_* | 29 物种 + 71 反应 | 自定义分析 |
@@ -285,9 +285,9 @@ f_CO → CO              f_CH4 → CH4        另: jfac 乘 J 通道, dt 加 TEM
 
 ### A1. 工程版基线 5 天模拟（BAU）
 
-- **目的**：74 物种全链条基线——滴定建立期 → 准稳态、OH/HONO 晨爆、夜化学。
+- **目的**：111 物种全链条基线——滴定建立期 → 准稳态、OH/HONO 晨爆、夜化学。
 - **命令**：`make v3 && cd facsimile_impl && ./fac_v3 SCEN_BAU ../output/base_v3 ../runtime_v3.dat`
-- **产物**：`base_v3_conc.csv`（75 列 = h+74 物种）+ `_irr.csv`（131 反应）+ stdout O3max
+- **产物**：`base_v3_conc.csv`（112 列 = h+111 物种）+ `_irr.csv`（198 反应）+ stdout O3max
 - **解读**：实测 0.19 s / 4965 步 / 零重启；末 24h O₃ 28.7 ppb。CSV 只含末 24 h
   （§1.6）——要看建立期改 `oz_fac_v3.f90` 的 `step >= nsteps-24`。
 
@@ -412,7 +412,7 @@ f_CO → CO              f_CH4 → CH4        另: jfac 乘 J 通道, dt 加 TEM
 
 ### E1. 元素守恒审计（机制质检）
 
-- **命令**：`python audit/element_audit.py mechanism/mechanism_3_full_chain.fac`（131/131）
+- **命令**：`python audit/element_audit.py mechanism/mechanism_3_full_chain.fac`（198/198）
   对照 `… input/mechanism_0_expanded.fac`（7 FAIL）
 - **解读**：旧机制 7 处历史 bug 标本（10a.1 全表）——**机制开发审计流程活教材**。
 
@@ -423,8 +423,8 @@ f_CO → CO              f_CH4 → CH4        另: jfac 乘 J 通道, dt 加 TEM
 
 ### E3. 机制三档切换（复杂度-成本标度）
 
-- **命令**：`mcm_run`（29sp MCM 子集）→ `fac_v3`（74sp V2.3）
-- **解读**：fac_v3 74 物种 0.19 s——RHS 光滑性修复的实证（10b #11）；
+- **命令**：`mcm_run`（29sp MCM 子集）→ `fac_v3`（111sp V2.4）
+- **解读**：fac_v3 111 物种 0.9 s——RHS 光滑性修复的实证（10b #11）；
   15sp 教学档与 30sp 旧扩展档均已退役（15sp .fac 存于 `mechanism/teaching/`）。
 
 ### E4. MCM 真实机制城市案例
@@ -644,7 +644,7 @@ RO2 = CH3O2 ;                       ← 过氧池 (可选)
 facsimile_impl/
 ├── mechc.py            FACSIMILE→Fortran 编译器
 ├── oz_fac_core.f90     fac_run 求解核 (IRR/IPR 钩子)
-├── oz_fac_v3.f90       工程版驱动 (74sp + runtime_v3 全通路 + 六本账)
+├── oz_fac_v3.f90       工程版驱动 (111sp + runtime_v3 全通路 + 六本账)
 ├── fac_batch_omp.f90 + cvode_c_mod.f90   OpenMP 批量 (C-ABI)
 ├── gen/ gen_expanded/ gen_v3/   生成的 oz_mech.f90 + oz.reac/oz.prod
 └── fac_run fac_v3 fac_batch_omp
@@ -735,7 +735,7 @@ OPE 谷 13.35——机制/求解器改动造成的数值漂移被 make test 直�
 
 ### 7.3 `make test` 全链
 
-`functional(24/24) → element_audit(mechanism_3, 131/131) → scan_suite.py（81 案例 + 指示因子批量自检）`
+`functional(35/35) → element_audit(mechanism_3, 198/198) → scan_suite.py（81 案例 + 指示因子批量自检）`
 
 ---
 
@@ -754,7 +754,7 @@ OPE 谷 13.35——机制/求解器改动造成的数值漂移被 make test 直�
 | **IPR↔IRR 一致** | O₃ 逐小时最大相对差 0.000% | hourly_pa |
 | **OSSE 技能（实验 F）** | 地面同化 HCHO RMSE +27%；卫星反演 E_NOx×1.34 → NO₂ RMSE +74% | obs_osse |
 | **跨求解器双胞胎** | fac_v3 vs batch 六账占比逐项一致；IPR↔IRR 0.000% | ipr_irr5 |
-| fac_v3 性能 | 0.39 s / 5227 步 / 零重启（5 天 74 物种） | 实验 A |
+| fac_v3 性能 | 0.90 s / 5083 步 / 零重启（5 天 111 物种 V2.4） | 实验 A |
 | 屋脊 | fnox≈1.5 处 29→12.6 ppb | batch_v3 |
 | 指示因子-屋脊一致 | FNR 穿 1–2 带≈屋脊位；L_NOx/Q 穿 0.5≈fnox 1.0；OPE 谷 13.4 | indicators_vs_ridge |
 | ~~fac_v3 性能~~（V2.1 历史值） | 0.19 s / 4965 步 / 零重启（5 天 **53 物种**，已被上上行 74 物种取代） | 10a.3 |
@@ -788,7 +788,7 @@ OPE 谷 13.35——机制/求解器改动造成的数值漂移被 make test 直�
 
 | 拓展 | 状态 | 说明 |
 |---|---|---|
-| A1 PAN / A2 ISOP / A3 SO₄ / A4 卤素 | **已落地** | 扩展机制 30sp/51rx + mechanism_3 74sp/131rx（isoprene 完整二代链 + V2.3 补链） |
+| A1 PAN / A2 ISOP / A3 SO₄ / A4 卤素 | **已落地** | 扩展机制 30sp/51rx + mechanism_3 111sp/198rx（isoprene 完整二代链 + V2.3/V2.4 补链） |
 | B2 在线光解 | **已落地**（v3 SZA 参数化） | Fast-J 级需接 Day 26 辐射柱 |
 | B5 响应面并行 | **已落地** | fac_batch_omp |
 | B1 垂直多层 | 未做 | 3-5 层箱 + 层间扩散 |
@@ -802,7 +802,7 @@ OPE 谷 13.35——机制/求解器改动造成的数值漂移被 make test 直�
 
 ### 10a.1 mechanism_3 六链条与元素审计
 
-74 物种 131 反应（C/H/N/O/S/Cl/Br 精确配平）。六链条见 §1.4。旧机制 7 处科学错误
+111 物种 198 反应（C/H/N/O/S/Cl/Br 精确配平）。十段链条见 §1.4。旧机制 7 处科学错误
 由元素审计器抓出并修正：
 
 | 错误 | 影响 | 修正 |
@@ -854,7 +854,7 @@ SetArrayPointer 不清 own_data）见 `cvode_c_mod.f90` 注释。
    均被编译警告/越界垃圾当场暴露；教训：字符串替换后必查自赋值）。
 3. **回归哨兵**：4 个金值格点 ±10–15%（屋脊峰 29.0 / 饱和区 12.55 / FNR 转折 2.109 /
    OPE 谷 13.35——双计 bug 教训位）。
-4. `make figures` 可复现闭环。诚实边界：SPGMR+预条件对 74 物种仍不值得（DENSE 每步
+4. `make figures` 可复现闭环。诚实边界：SPGMR+预条件对 111 物种仍不值得（DENSE 每步
    LU ~4e5 flops 可忽略，实测 SPGMR 黎明崩塌）；全文件金值 CSV 刻意不用（脆断）；
    负载下 wall-time 不作性能结论。
 
@@ -885,7 +885,7 @@ fvoc=1 切面经典 **O₃–NOx 屋脊**：29 ppb（fnox≈1.5）→12.6；FNR 
 - **F3 序列 BC 接线**：bc.config `file:` 序列经 chem_phys_mod 生效（bc_s 优先于常量）。
 - **F5 午后口径**：batch 新增 6 个 `*_pm` 列（12–18h 窗口，Sillman 1995 原文口径）。
 - **F4**：`make nc`（CSV→netCDF4 打包）；**P1**：scan_suite 换 batch 引擎
-  （74sp+指示因子，输出体制诊断表：屋脊/FNR 过渡/L_NOx-Q 穿越/OPE 谷）。
+  （111sp+指示因子，输出体制诊断表：屋脊/FNR 过渡/L_NOx-Q 穿越/OPE 谷）。
 
 ### 机制
 - **M1 15sp 速率承载修复**（与 mechanism_3 同源三处：O1D+H2O/M、CH3O+O2 并入
@@ -925,7 +925,7 @@ NOy 物种自动判定）后处理——batch 之外的路线零 Fortran 改动�
 
 | 路线 | 情景空间 | O₃屋脊 fnox* | 最一致指示因子 (偏差) |
 |---|---|---|---|
-| batch 74sp 排放 | 排放 | 2.28→1.52 | **FNR 过渡贴屋脊（历史 V2.2 口径 12%）** ✓ |
+| batch 排放 | 排放 | 3.42→2.28 | **FNR 过渡贴屋脊（V2.4 口径）** ✓ |
 | mcm_run 29sp MCM 排放 | 排放 | 0.14 | **L_NOx/Q (0%)** — Kleinman 判据精确命中 |
 | fac_run 15sp 排放 | 排放 | 1.64 | 无 (<0.5 穿越不存在；浓度比过渡在 0.07，偏离 96%) |
 | kpp_run 15sp IC (EKMA) | 初始浓度 | >31.6 (边界*) | 无 (纯化学无汇 → 单调) |
