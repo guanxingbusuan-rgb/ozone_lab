@@ -305,7 +305,7 @@ VOCs/卫星模板同路径（卫星先离线转换）；排放清单模板直接
 | `mcm_driver.f90:56-60` | E(iNO)=2.0e7 等 5 物种排放 | molec/cm³/s | 冻结（罐头案例） |
 | `mcm_driver.f90:179-181` | Y(iO₃)=3.0e11 等 IC | molec/cm³ | 冻结 |
 | `fac_batch_omp.f90:69+` | 网格 fs(i)=0.3×1.5^(i-1) | 无量纲因子 | 可改源码 |
-| `chem_phys_mod.tune_atol_by_name` | ATOL 按名表（74 物种） | molec/cm³ | **单源**（R9） |
+| `chem_phys_mod.tune_atol_by_name` | ATOL 按名表（74 物种） | molec/cm³ | **单源**（R9）；RTOL/ATOL 详解见 [GUIDE §3⑬](EXPERIMENTS_GUIDE.md) |
 | `runtime_dat_mod.build_groups` | 物种→情景组映射 | — | 单源（含 TERP） |
 
 #### 表 D · 内部计算量（自动, 无用户单位接口）

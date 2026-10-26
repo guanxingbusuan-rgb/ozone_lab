@@ -160,10 +160,12 @@ make figures
   **六本账 IPR 列**（源码注释逐字）：`1 机制P | 2 机制L | 3 排放 | 4 干+湿沉 | 5 BC松弛+稀释 | 6 BLH膨胀`
 - **数值细节**：
   - ATOL 按名调优表：CH₄ 1e10 / CO 1e9 / O₃ 1e8 / HCHO·PAN·MPAN·ISOP·SO₂·CH₃CHO·MVK·MACR·MGLY 1e7 / DMS·MSA 1e6
-  - DENSE（53×53；无预条件 SPGMR 黎明崩塌——10b #12）；`MAX_STEP=100 s`，重启后 10 s
+    （**RTOL/ATOL 含义、实测敏感性与"何时该动"见 [GUIDE §3⑬](EXPERIMENTS_GUIDE.md)**）
+  - DENSE（74×74；无预条件 SPGMR 黎明崩塌——10b #12）；`MAX_STEP=100 s`，重启后 10 s
   - 输出目录自动 `mkdir -p`；情景名匹配 → 序号解析 → 失败回落情景 1（`ios` 显式置 0）
 - **输出**：`<pref>_conc.csv`（表头 `h,<74 物种名动态生成>`，**末 24 h**）+
-  `<pref>_irr.csv`（`h,r1..r97`）+ stdout（`FAC-V3 ok (…s, nst=…, O3max=… ppb)`）
+  `<pref>_irr.csv`（`h,r1..r131`）+ `<pref>_ipr.csv`（`h` + 74×6 账）
+  + stdout（`FAC-V3 ok (…s, nst=…, O3max=… ppb)`）
 
 ### ② `facsimile_impl/fac_batch_omp` —— OpenMP 批量响应面
 
@@ -261,8 +263,9 @@ f_CO → CO              f_CH4 → CH4        另: jfac 乘 J 通道, dt 加 TEM
 |---|---|---|
 | ~~fac_run conc~~（退役） | 曾为 `h,O3,...,CH3O2` 10 列；现由 fac_v3 67 列契约取代 | dg.load 需按列名适配 |
 | fac_run irr | `h,r1..r25`（末 24 h 快照） | `dg.irr_integrate` |
-| fac_v3 conc | `h,<53 物种名动态表头>`（末 24 h） | 自定义分析 |
-| fac_v3 irr | `h,r1..r97`（末 24 h） | 自定义分析 |
+| fac_v3 conc | `h` + **74 物种** = **75 列**（末 24 h 逐时，molec/cm³） | `diagnostics.load` / 自定义分析 |
+| fac_v3 irr | `h` + **131 反应** = **132 列**（**小时窗积分**，非速率） | `dg.irr_integrate` |
+| fac_v3 ipr | `h` + **74×6 账** = **445 列**（`P L E D B X`，小时窗积分） | `run_D_process` / 过程归因 |
 | batch CSV | `fnox,fvoc,O3max,O3mean,HCHOmax,NO2mean,FNR_mean,H2O2HNO3,O3NOy,HCHONOy,O3NOz,NOy_ppb,LnOxQ,PH2O2PHNO3,OPE,nst`（24 列） | figures 两脚本 |
 | output/scan/s* | 81 案例逐时浓度 | scan_suite.py |
 | mcm_city_* | 29 物种 + 71 反应 | 自定义分析 |
@@ -282,7 +285,7 @@ f_CO → CO              f_CH4 → CH4        另: jfac 乘 J 通道, dt 加 TEM
 
 ### A1. 工程版基线 5 天模拟（BAU）
 
-- **目的**：53 物种全链条基线——滴定建立期 → 准稳态、OH/HONO 晨爆、夜化学。
+- **目的**：74 物种全链条基线——滴定建立期 → 准稳态、OH/HONO 晨爆、夜化学。
 - **命令**：`make v3 && cd facsimile_impl && ./fac_v3 SCEN_BAU ../output/base_v3 ../runtime_v3.dat`
 - **产物**：`base_v3_conc.csv`（75 列 = h+74 物种）+ `_irr.csv`（131 反应）+ stdout O3max
 - **解读**：实测 0.19 s / 4965 步 / 零重启；末 24h O₃ 28.7 ppb。CSV 只含末 24 h
@@ -754,7 +757,7 @@ OPE 谷 13.35——机制/求解器改动造成的数值漂移被 make test 直�
 | fac_v3 性能 | 0.39 s / 5227 步 / 零重启（5 天 74 物种） | 实验 A |
 | 屋脊 | fnox≈1.5 处 29→12.6 ppb | batch_v3 |
 | 指示因子-屋脊一致 | FNR 穿 1–2 带≈屋脊位；L_NOx/Q 穿 0.5≈fnox 1.0；OPE 谷 13.4 | indicators_vs_ridge |
-| fac_v3 性能 | 0.19 s / 4965 步 / 零重启（5 天 53 物种） | 10a.3 |
+| ~~fac_v3 性能~~（V2.1 历史值） | 0.19 s / 4965 步 / 零重启（5 天 **53 物种**，已被上上行 74 物种取代） | 10a.3 |
 
 ---
 
@@ -851,8 +854,9 @@ SetArrayPointer 不清 own_data）见 `cvode_c_mod.f90` 注释。
    均被编译警告/越界垃圾当场暴露；教训：字符串替换后必查自赋值）。
 3. **回归哨兵**：4 个金值格点 ±10–15%（屋脊峰 29.0 / 饱和区 12.55 / FNR 转折 2.109 /
    OPE 谷 13.35——双计 bug 教训位）。
-4. `make figures` 可复现闭环。诚实边界：SPGMR+预条件对 53 物种不值得（DENSE 每步
-   LU ~5e4 flops 可忽略）；全文件金值 CSV 刻意不用（脆断）；负载下 wall-time 不作性能结论。
+4. `make figures` 可复现闭环。诚实边界：SPGMR+预条件对 74 物种仍不值得（DENSE 每步
+   LU ~4e5 flops 可忽略，实测 SPGMR 黎明崩塌）；全文件金值 CSV 刻意不用（脆断）；
+   负载下 wall-time 不作性能结论。
 
 ### 10a.6 指示因子全家族 × 屋脊交叉验证
 
