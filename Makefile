@@ -63,7 +63,13 @@ NC_OUT ?= output/expA_BAU.nc
 nc:
 	$(PY) modules/nc_output.py $(NC_SRC) $(NC_OUT)
 
+# 注: figures/ 整个目录不入库（.gitignore）。新克隆后该目标会提示自备脚本。
 figures: output/batch_v3_indicators.csv
+	@test -f figures/fig_indicators_ridge.py || { \
+	  echo "[figures] 缺少 figures/ 目录（该目录不入库，仅本地保留）"; \
+	  echo "          需要本地自备: fig_indicators_ridge.py / fig_response_v3.py /"; \
+	  echo "                        gen_all.py / gen_cartoon.py"; \
+	  exit 1; }
 	cd figures && $(PY) fig_indicators_ridge.py ../output/batch_v3_indicators.csv indicators_vs_ridge.png
 	cd figures && $(PY) fig_response_v3.py ../output/batch_v3_indicators.csv response_surface_v3.png
 

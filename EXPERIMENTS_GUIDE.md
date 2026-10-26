@@ -7,7 +7,7 @@
 > **四份文档分工**：
 > [README.md](README.md)（项目是什么）· [OPERATIONS_MANUAL.md](OPERATIONS_MANUAL.md)
 > （架构与速查）· **本文（实验怎么做，手把手）** ·
-> [figures/README.md](figures/README.md)（机制图集与七机制对比）。
+> `figures/README.md`（机制图集与七机制对比；该目录**不入库**，本地自备）。
 >
 > **适用版本**：2026-10-26 · mechanism_3 **V2.3（74sp/131rx/41 光解）** ·
 > 现役三路线（fac_v3 / fac_batch_omp / mcm_run）·
@@ -3267,4 +3267,4 @@ make runtime_v3.dat
 | [README.md](README.md) | 项目是什么、路线清单、机制对比、限制与勘误 |
 | [OPERATIONS_MANUAL.md](OPERATIONS_MANUAL.md) | 架构地图、路线速查、编译边界、实验 A–I 速览、自纠自查记录 |
 | **本文** | **实验怎么做（手把手八段式）+ 数据接入 + 指标解读 + 排错** |
-| [figures/README.md](figures/README.md) | 9 张机制图逐图讲解 + 七机制链对比 |
+| `figures/README.md`（本地，不入库） | 9 张机制图逐图讲解 + 七机制链对比 |

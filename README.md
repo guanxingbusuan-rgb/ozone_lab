@@ -467,8 +467,9 @@ f_CO → CO              f_CH4 → CH4        另: jfac 乘 J 通道, dt 加 TEM
 - **命令**：`python figures/gen_all.py`
 - **产物**：9 版机制图（A 城市全天 / B 日间 / C 夜间 / D 乡村 / E 海洋 / F 城乡 /
   G 城海 / H 机制链条 / I FNR），Times New Roman Bold，330 DPI，PNG+PDF
-- **配套**：[figures/README.md](figures/README.md)（逐图逐箭头教学手册 +
+- **配套**：`figures/README.md`（本地文件，逐图逐箭头教学手册 +
   **七机制链对比**：AtChem2/GEOS-Chem/CB6R3/MOZART/RADM2/FNR/ozone_lab）
+  —— 注意 `figures/` 整个目录不入库（23 MB 二进制图），需在本地保留或按上述命令重生成
 - **工程图**：`make figures` → response_surface_v3.png + indicators_vs_ridge.png
 
 ---
@@ -1181,4 +1182,4 @@ ipr_irr5 3 路线/sens_adj 3 节）。
 - **实验运行脚本（类 run.cctm.csh，只跑模拟+CSV）**: [experiments/run/README.md](experiments/run/README.md) —— 九个实验 A–I，`run_all.py` 一键全跑
 - **可输入物种全表（74 物种 × 5 通道）**: [templates/SPECIES_INPUT_MATRIX.md](templates/SPECIES_INPUT_MATRIX.md)
 - **运行环境与依赖清单 + 混合语言分工**: [ENVIRONMENT.md](ENVIRONMENT.md)（Python/conda、编译器、CVODE、依赖分层、从零复现、`check_env.sh`；**§6b 每语言实现哪些模块/文件/职责**）
-- **机制图集与七机制对比**: [figures/README.md](figures/README.md)
+- **机制图集与七机制对比**: `figures/README.md`（**本地文件，不入库**；图由 `figures/gen_all.py` 与 `gen_cartoon.py` 重生成）

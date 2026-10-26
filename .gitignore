@@ -45,11 +45,14 @@ audit_reports/
 outp_*.csv
 *.nc
 
-# ── 机制图 ──
-# 说明: 18 张机制图（PNG 330dpi + PDF 矢量）是教学交付物，全部入库（~24MB）。
-#       如需重生成: python figures/gen_all.py && python figures/gen_cartoon.py
-#       仅排除临时验证图（非交付物）:
-figures/*.tmp.png
+# ── 机制图与绘图脚本（整个目录不入库）──
+# 该目录含 40 张图（PNG 330dpi + PDF 矢量，约 23 MB）+ 4 个生成脚本
+# + 1 份逐图教学手册。体积以二进制图为主，故整体排除，本地保留。
+# 需要时本地重生成:
+#   python figures/gen_all.py      # 9 张 SCI 版机制图 A–I
+#   python figures/gen_cartoon.py  # 9 张漫画场景版 comic_A–I
+#   make figures                   # 2 张工程图（读 output/batch_v3_indicators.csv）
+figures/
 
 # ── 系统/编辑器杂物 ──
 .DS_Store
