@@ -21,7 +21,7 @@ CVODELIB ?= $(HOME)/soft/atmenv/cvode/lib
 FFLAGS := -Wall -O2 -ffree-line-length-none
 export PATH := $(CONDA_ENV)/bin:$(PATH)
 
-.PHONY: all smoke functional test v3 batch figures nc clean FORCE
+.PHONY: all mcm smoke functional test v3 batch figures nc clean clean-build clean-output FORCE
 
 all: facsimile_impl/fac_v3 facsimile_impl/fac_batch_omp
 
@@ -81,6 +81,8 @@ mcm: mcm_city/mcm_run
 batch: v3 runtime_v3.dat
 	cd facsimile_impl && ./fac_batch_omp 9 ../output/batch_v3_indicators.csv ../runtime_v3.dat
 
+# 注: make all 不含 mcm_run（它是独立子树），需要时显式 make mcm
+
 # ---------- FACSIMILE ----------
 
 facsimile_impl/gen/oz_mech.f90: mechanism/ozone.fac facsimile_impl/mechc.py
@@ -99,6 +101,22 @@ functional: all smoke
 test: functional
 	$(PY) audit/element_audit.py mechanism/mechanism_3_full_chain.fac
 	$(PY) scan_suite.py
+
+# ── 安全清理变体（做实验期间用这两个，别用 make clean）──
+# clean-build: 只删编译产物与生成码，保留 output/ 里所有实验结果
+clean-build:
+	cd facsimile_impl && rm -f *.o *.mod fac_v3 fac_batch_omp \
+	  gen/oz_mech.* gen_v3/oz_mech.* gen_v3/oz.reac gen_v3/oz.prod gen_v3/*.mod
+	rm -f modules/rad_photol_demo modules/*.mod audit/*.dylib perf/*.dylib
+	cd mcm_city && rm -f *.o *.mod mcm_run gen/*.mod gen/oz_mech.f90 \
+	  gen/oz.reac gen/oz.prod
+	find . -name __pycache__ -type d -exec rm -rf {} + 2>/dev/null || true
+	@echo "[clean-build] 已删二进制与生成码；output/ 中的实验结果保留"
+
+# clean-output: 只删实验结果（保留二进制），需要显式确认
+clean-output:
+	@printf "将删除 output/ 下所有实验产物，确认? [y/N] " && read ans && [ "$$ans" = "y" ] && \
+	  rm -rf output && echo "[clean-output] 已删除 output/" || echo "[clean-output] 已取消"
 
 clean:
 	cd facsimile_impl && rm -f *.o *.mod fac_v3 fac_batch_omp \

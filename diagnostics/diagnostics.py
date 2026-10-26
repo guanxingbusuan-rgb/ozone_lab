@@ -39,12 +39,21 @@ def load(prefix):
 IPR_PROC = ["P", "L", "E", "D", "B", "X"]   # 机制产/耗/排放/干湿沉/BC+稀释/BLH膨胀
 
 def ipr_from_fac(prefix):
-    """读 <prefix>_ipr.csv (任意路线, 变长 ns×6) → 逐物种六账积分 [molec/cm3]
-    返回 (species, {sp: {proc: value}})"""
+    """读 <prefix>_ipr.csv → 逐物种六账总积分 [molec/cm3]
+
+    契约: fac_v3/batch 的 _ipr.csv 每行**已是该小时窗口的精确积分**
+          (源码: ipr_int - ipr_w = 本小时窗积分)。因此总积分 = **逐行求和**,
+          绝不能再做 np.trapz(那样是二次积分 —— 曾有的 bug)。
+
+    返回 (species, {sp: {proc: value}})，value = Σ_窗口 该过程积分
+
+    注: 用总积分做"闭合校验"会被大项对消放大误差(P/L 各~1e13 抵消到~1e10,
+        1.5% 的逐窗偏差可致总和符号翻转)。闭合校验请用**逐窗口比值中位**,
+        见 experiments/ipr_closure_check.py 与 run_D_process.py。
+    """
     rows = list(csv.reader(open(f"{prefix}_ipr.csv")))
     hdr = [h.strip().split("_")[0] for h in rows[0]]
     data = np.array([[float(_fix_fortran_exp(x)) for x in r] for r in rows[1:] if r])
-    t_h = data[:, 0]
     species, out = [], {}
     j = 1
     while j < len(hdr) and hdr[j] != "fnox":
@@ -52,7 +61,7 @@ def ipr_from_fac(prefix):
         species.append(sp)
         out[sp] = {}
         for pi, proc in enumerate(IPR_PROC):
-            out[sp][proc] = float(np.trapz(data[:, j + pi], t_h))
+            out[sp][proc] = float(np.sum(data[:, j + pi]))
         j += 6
     return species, out
 

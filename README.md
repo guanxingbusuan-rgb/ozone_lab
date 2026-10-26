@@ -1174,6 +1174,7 @@ ipr_irr5 3 路线/sens_adj 3 节）。
 - **IPR/IRR**: https://cmaq.readthedocs.io
 - **课程内**: Day 20/24/26/28/34/35/36
 - **实验操作指南（手把手级）**: [EXPERIMENTS_GUIDE.md](EXPERIMENTS_GUIDE.md)
+- **实验运行脚本（类 run.cctm.csh，只跑模拟+CSV）**: [experiments/run/README.md](experiments/run/README.md) —— 九个实验 A–I，`run_all.py` 一键全跑
 - **可输入物种全表（74 物种 × 5 通道）**: [templates/SPECIES_INPUT_MATRIX.md](templates/SPECIES_INPUT_MATRIX.md)
 - **运行环境与依赖清单 + 混合语言分工**: [ENVIRONMENT.md](ENVIRONMENT.md)（Python/conda、编译器、CVODE、依赖分层、从零复现、`check_env.sh`；**§6b 每语言实现哪些模块/文件/职责**）
 - **机制图集与七机制对比**: [figures/README.md](figures/README.md)

@@ -155,8 +155,8 @@ program mcm_run
     real(8) :: t_end, dt_out, wall0, wall1
     integer(8) :: NEQ8, IOUT(25), IPAR
     integer :: IER, step, nsteps, u1, u2, mxsteps
-    character(len=64) :: arg
-    character(len=128) :: out_pref = "mcm_city"
+    character(len=512) :: arg
+    character(len=512) :: out_pref = "mcm_city"   ! 长绝对路径需 >256 (旧 128+arg 64 会截断)
     real(8) :: fnox = 1.0d0, fvoc = 1.0d0, days = 5.0d0
     integer :: u3, k, i, islash
 

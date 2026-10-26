@@ -46,6 +46,75 @@
 
 ---
 
+## 0. 实验运行脚本（experiments/run/ —— 先读这一节）
+
+> **新增**：`experiments/run/` 是"**只跑模拟 + 落 CSV**"的运行脚本集，
+> 类比 CMAQ 的 `run.cctm.csh`（只跑输运写输出，绘图另用 NCL）。
+> 它把 9 个实验封装成一条命令，输出统一落到 `output/run_*/`。
+
+### 0.1 output/ 与 figures/ 的准确关系（常见误解）
+
+| 目录 | 是什么 | 会不会被删 |
+|---|---|---|
+| **`output/`** | **实验产出的 CSV 数据**（每个实验一个 `run_X/` 子目录） | 只有 `make clean` 会删；`run_*.py` 只写自己的子目录 |
+| **`figures/gen_all.py` / `gen_cartoon.py`** | **机制示意图**（教学图，纯手绘，**不读任何模拟结果**） | — |
+| **`figures/fig_response_v3.py` / `fig_indicators_ridge.py`** | **工程图**（**读 `output/` 的 CSV** 才画） | — |
+
+**所以你的理解是对的**：`figures/` 里的**工程图确实是通过输出文件可视化的**；
+但 `figures/` 里还有一类**机制示意图**，它们与模拟结果无关。
+
+### 0.2 输出会不会被自动删除？——不会（除 make clean）
+
+```bash
+make clean           # ⚠ 会 rm -rf output（唯一危险命令）
+make clean-build     # ✓ 新增：只删二进制+生成码，保留所有实验结果
+make clean-output    # ✓ 新增：只删 output/（需输入 y 确认）
+```
+
+做实验期间请用 `clean-build`。也可把结果放仓库外：
+```bash
+OZONE_OUT=$HOME/ozone_results python experiments/run/run_all.py
+```
+
+### 0.3 九个运行脚本（A–I，**不含伴随反演**）
+
+| 脚本 | 实验 | 产物 | 耗时 |
+|---|---|---|---|
+| `run_A_scenarios.py` | 六情景政策沙盘 | `run_A/<SCEN>_{conc,irr,ipr}.csv` + `summary.csv` | ~3 s |
+| `run_B_surface.py` | 响应面（4D） | `run_B/batch.csv` + **17 个 `indicator_matrix_*.csv`** + `slices.csv` | ~15 s |
+| `run_C_ridge.py` | 屋脊跨路线对比 | `run_C/ridge_{batch,mcm,compare}.csv` | ~16 s |
+| `run_D_process.py` | IPR 六账 + IRR 反应级 | `run_D/ipr_ledger.csv`（74×6）`closure.csv` `irr_top.csv` | ~1 s |
+| `run_E_indicators.py` | 12 指标工具箱 | `run_E/<tag>_indicators.csv` `_timeseries.csv` `compare.csv` | <1 s |
+| `run_F_osse.py` | OSSE 同化技能 | `run_F/obs_samples.csv` `skill_rmse.csv` `skill_delta.csv` | ~4 s |
+| `run_G_hourlyPA.py` | 逐小时过程 + IPR↔IRR | `run_G/hourly_{ledger,share,rxn_top}.csv` `consistency.csv` | ~1 s |
+| `run_H_sensitivity.py` | OAT 敏感性（±10%） | `run_H/jacobian.csv` `sensitivity.csv` `oat_runs.csv` | ~11 s |
+| `run_I_scenario_matrix.py` | 情景 × 路线矩阵 | `run_I/matrix_{o3max,delta}.csv` `direction.csv` | ~4 s |
+
+**总驱动**：`run_all.py`（顺序 A→B→D→G→E→F→H→I→C，全跑 **53 s**）
+
+```bash
+make all && make runtime_v3.dat                  # 前置
+python experiments/run/run_all.py                # 全跑九个
+python experiments/run/run_all.py A D            # 只跑指定
+python experiments/run/run_all.py --list         # 列出清单
+```
+
+### 0.4 输入假设（与你的要求一致）
+
+> 所有 `run_*.py` **假设 `runtime_v3.dat` 已由 cfgbuild 编译完成**——
+> 只做**前置检查**（存在性/大小），不自动编译。需要改数据时先手工：
+> `make runtime_v3.dat`（或 `python src/cfgbuild.py input_v3 ...`）。
+
+例外：`run_F_osse.py`（需为每个 τ 生成变体）、`run_H_sensitivity.py`（需为每个 ±扰动生成
+变体）会在**自己输出目录内**建 `in_*/` 并调 cfgbuild —— 但它们不触碰仓库里的 `input_v3/`。
+
+### 0.5 详细说明
+
+完整用法、输出契约、mcm 前置构建、与旧脚本的对应关系：
+**[experiments/run/README.md](experiments/run/README.md)**
+
+---
+
 ## 1. 环境与首次构建
 
 ### 1.1 依赖清单
