@@ -120,7 +120,7 @@ make figures
 |---|---|---|
 | ~~15sp / 25rx~~ 教学核心（**已删除**） | —（`mechanism/teaching/` 已于 V2.4+ 冻结时移除） | 无（fac_run/kpp_run 已退役） |
 | **111sp / 198rx** 工程 V2.4 全链条 | `mechanism/mechanism_3_full_chain.fac` | `fac_v3` + `fac_batch_omp`（共享 `gen_v3/`） |
-| **29sp / 71rx** 真实 MCM CH₄ | `mcm_city/input/mechanism_mcm_ch4.fac` | `mcm_run` |
+| **29sp / 71rx** 真实 MCM CH₄（**独立子树**） | `mcm_city/input/mechanism_mcm_ch4.fac` | `mcm_run`（`make mcm`，见 [mcm_city/README.md](mcm_city/README.md)） |
 
 > **机制规格书（逐反应速率/配平方法论/对比定位）**：见 [`mechanism/README.md`](mechanism/README.md)
 

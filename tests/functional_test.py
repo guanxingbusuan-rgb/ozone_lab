@@ -554,6 +554,10 @@ check("冻结版: V25_PLAN 已删除（避免与评估冲突）",
       not os.path.exists("mechanism/V25_PLAN.md"), "预备方案已移除")
 check("冻结版: teaching/ 已删除（无死代码）",
       not os.path.exists("mechanism/teaching"), "目录已移除")
+check("mcm_city 有定位说明文档（标明与核心零耦合）",
+      os.path.exists("mcm_city/README.md")
+      and "零代码耦合" in open("mcm_city/README.md").read(),
+      "已标注独立子树定位")
 
 # ================= FT-SYNC: 扩物种 8 处同步守卫 =================
 print("== FT-SYNC 物种同步完整性（防止扩机制时漏配）==")

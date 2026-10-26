@@ -62,7 +62,7 @@
 | **`src/`** | **两个编译器**（Python，全部输入唯一入口） | `cfgbuild.py`：12 类 config+constraints → runtime_v3.dat，编译期校验（物种存在性/单位指令/单调性/≤128 点/情景表达式）；`mechc.py`：机制编译器（.fac → gen_v3 生成码）；`mechc_c.py`：C 后端（机制→C 速率函数，第二执行路径） |
 | **`modules/`** | **Fortran 共享模块层**（三路线共用） | `runtime_dat_mod.f90`：runtime.dat 唯一消费端（12 段解析+气象插值+SZA→J+BOX 日型+ser_interp+build_groups 组映射+scen_build）；`chem_phys_mod.f90`：**物理四账唯一实现**（排放①/干+湿沉②/BC 序列观测同化③/BLH 膨胀④）+ `tune_atol_by_name`（ATOL 单源）+ `eval_met_dt`/`eval_J_jf`；`rad_photol.f90`：B2 在线光解 demo |
 | **`facsimile_impl/`** | **工程主线**（两条活路线） | `gen_v3/`：生成码（oz_mech.f90 + oz.reac/prod 计量表，fac_v3/batch 共享）；`oz_fac_v3.f90`→`fac_v3`：单箱深度（情景名/观测同化/六账 IPR 逐时导出）；`fac_batch_omp.f90`+`cvode_c_mod.f90`→`fac_batch_omp`：批量广度（C-ABI 直连+OpenMP、NOy 17 物种权重表+运行期氮守恒不变量、24 列指示因子）；`oz_audit.c`：C 证人（NOx 望远镜闭合+O₃ 收支） |
-| **`mcm_city/`** | **真实机制对照**（刻意冻结，游离 make 主链外） | `mcm_driver.f90`→`mcm_run`：MCM v3.3.1 CH₄ 子集 29sp/71rx 城市模拟（CLI: days/pref/fnox/fvoc）；`gen/` 独立生成码；`input/` MCM .fac |
+| **`mcm_city/`** | **真实机制对照**（刻意冻结，游离 make 主链外，**零代码耦合**） | `mcm_driver.f90`→`mcm_run`：MCM v3.3.1 CH₄ 子集 29sp/71rx 城市模拟（CLI: days/pref/fnox/fvoc，排放/IC/沉降全硬编码）；`gen/` 独立生成码。**详见 [mcm_city/README.md](mcm_city/README.md)** |
 | **`diagnostics/`** | **诊断层**（路线无关） | `indicators.py`：route_indicators/route_timeseries——从任意 conc/irr CSV+机制 FORMULA 计算 12 指标（NOy 自动判定，新 N 物种零改动接入）；`diagnostics.py`：经典库（load/indicators/irr_integrate/families/chem_ledger/report） |
 | **`experiments/`** | **实验层** | `run/`：**10 个实跑脚本**（A 情景/B 响应面/C 屋脊/D 过程/E 指标/F OSSE/G 逐时/H 敏感性/I 情景矩阵/M 气象序列），只落 CSV 不绘图；根下 `.py` 为旧版（含终端报告/绘图/反演） |
 | **`templates/`** | **六类外数据格式合同**（零代码直读，人工落位规范） | 地面 O₃/AQI/VOC 站点 ×3 → bc.config 张弛；排放清单 → emissions.config；卫星柱（**语义例外**：离线转表面 ppb）；**气象序列 → meteo.config** |
