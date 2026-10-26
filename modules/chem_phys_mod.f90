@@ -60,18 +60,39 @@ contains
 
     ! ---- ATOL 按名调优 (单源: fac_v3/batch 双胞胎共用, 防 A1/A2 漂移) ----
     subroutine tune_atol_by_name(a)
+        ! ATOL 按物种量级分档 (单源: fac_v3 与 fac_batch_omp 共享)
+        ! 原则: 取该物种典型浓度的 ~1e-3 ~ 1e-4 倍; 未列名者沿用 model.parameters 第 4 行
+        ! V2.4: 补齐新增 37 物种中实测峰值 >1e9 (约 40 ppb) 者
         real(8), intent(inout) :: a(ns)
         integer :: i
         do i = 1, ns
             select case (trim(sp_name(i)))
+            ! ---- 极大浓度 (>1e12) ----
             case ("CH4"); a(i) = 1.0d10
             case ("CO");  a(i) = 1.0d9
-            case ("O3");  a(i) = 1.0d8
+            ! ---- 主量 (>1e11) ----
+            case ("O3", "CH3OOH", "ALK", "ARO1", "GLY")
+                a(i) = 1.0d8
+            ! ---- 次主量 (1e10 级) ----
+            case ("NO2", "H2O2", "HNO3", "OLE", "OLEOOH", "ALKOOH", "ARO2", &
+                  "KET", "LALK")
+                a(i) = 1.0d8
+            ! ---- 中等 (1e9 级) ----
             case ("HCHO", "PAN", "MPAN", "ISOP", "SO2", "CH3CHO", "MVK", "MACR", &
-                  "MGLY", "RONO2", "OLENIT", "TERPNIT", "TERPOOH")
+                  "MGLY", "RONO2", "OLENIT", "TERPNIT", "TERPOOH", &
+                  ! V2.4 新增
+                  "NO", "NO3", "N2O5", "ISOPNIT", "ISOPDNT", "ISOPOOH", &
+                  "CSL", "CSLOOH", "CSLNIT", "TOLOOH", "XYLOOH", &
+                  "LALKOOH", "LALKNIT", "MEOH", "ETH", "IOLE", "IOLENIT", &
+                  "PPAN")
                 a(i) = 1.0d7
-            case ("DMS", "MSA", "TERP"); a(i) = 1.0d6
-            case ("TERPCHO"); a(i) = 1.0d8
+            ! ---- 小量 (1e8 级) ----
+            case ("ETOH", "MTBE", "ESTER", "ETHOOH", "ETHNIT", "ALD2", "IOLEOOH")
+                a(i) = 1.0d6
+            ! ---- 稀疏/痕量 ----
+            case ("DMS", "MSA", "TERP", "SESQ", "SESQOOH", "SESQNIT")
+                a(i) = 1.0d6
+            case ("TERPCHO", "SESQCHO"); a(i) = 1.0d8
             end select
         end do
     end subroutine tune_atol_by_name

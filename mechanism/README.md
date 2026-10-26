@@ -73,6 +73,50 @@ NOx–O₃–HOx–ROx 三大循环 + 生物源/人为 VOC 降解 + 夜间化学
 | V2.3 | 74sp / 131rx | ① 臭氧化 OH 产率显式化（OLE 0.30 / ISOP 0.26，Criegee 通道）② **烷基硝酸盐家族**（RONO₂/OLENIT；ISOPNIT 死物种复活）③ **单萜迷你链**（TERP 五物种，三入口，O₃ 通道 OH 产率 0.80）④ PNA+OH 汇 | ① 夜间/黎明 OH 源缺失（臭氧化无自由基产物，物理不自洽）② NOx 远程输送缺失（RO₂+NO 无硝酸酯分支）③ 森林场景不可用（无 TERP）④ HO₂NO₂ 只有生成无消耗 |
 | **V2.4** | **111sp / 198rx** | 见下节 V2.4 专项 | **二次 HCHO 生成不足**（GLY 光解不产 HCHO）+ **VOC 谱系缺失**（无芳香分级/长链烷烃/醇醚酯/倍半萜/乙烯/内烯烃/高级醛）+ **RO₂+HO₂ 闭环缺口**（ARO1O2/ARO2O2 只有 +NO 无 +HO₂）+ **RO₂ 交叉缔合仅 CH₃O₂ 单代表** + **MACR+NO₃ 缺失** |
 
+### 2.1a 扩物种必须同步的 8 处（V2.4 实踩清单）
+
+> 加一个物种不是"只改 .fac"。以下 8 处任一漏掉，都会产生**静默错误**
+> （不报错、但结果错）。V2.4 扩展时逐项验证过，实测漏掉第 2 项时
+> 新物种全为 0（链条空转）、漏掉第 4 项时 HVOC 情景不缩放。
+
+| # | 位置 | 做什么 | 漏掉的后果 | 本项目实测 |
+|---|---|---|---|---|
+| 1 | `mechanism/*.fac` | `VARIABLE` 加物种、`FORMULA` 加分子式、写反应 | 编译失败或 ns 错位 | ✓ 111/198 |
+| 2 | `input_v3/emissions.config` | 若有**一次排放**，加基线+日型 | **新物种恒为 0**，链条空转 | ✓ 15→25 物种 |
+| 3 | `input_v3/drydep.config` | 若无**气相化学汇**，必须给 vd | **无界累积**（死端） | ✓ +29（含 CSLNIT/SESQCHO 两个真死端） |
+| 4 | `modules/runtime_dat_mod.f90` `build_groups()` | 若属 NOx/VOC/CO/CH₄ 排放组 | 情景缩放不生效（HVOC 白做） | ✓ +10 物种 |
+| 5 | `facsimile_impl/fac_batch_omp.f90` `noy_add()` | 若含氮（NOy 家族） | 氮守恒不变量算错、NOy 指标偏低 | ✓ 17→25 |
+| 6 | `modules/chem_phys_mod.f90` `tune_atol_by_name()` | 若浓度 >1e9（约 40 ppb） | 步数爆炸（精度过剩） | ✓ 19→52 |
+| 7 | `tests/functional_test.py` `SENT` | 机制改动必然改变金值 | 测试红（或更糟：假绿） | ✓ 4 值重标定 |
+| 8 | 文档与模板表 | `SPECIES_INPUT_MATRIX` / README 计数 | 文档与实际不符 | ✓ 74→111 行 |
+
+**两个"不需要改"的地方**（V2.4 实测确认）：
+- `diagnostics/indicators.py` 的 NOy 定义**自动**从 FORMULA 段读含 N 物种
+  （实测识别 25 个，与 batch 硬编码表逐项一致）→ 这是 M3 单一事实源的收益。
+- `input_v3/initialConcentrations.config` 与 `bc.config` **不需要**加新物种：
+  二次产物从 0 起步是正确的；背景空气里不该有这些一次 VOC 的边界浓度。
+
+**自动检测死端的脚本**（扩物种后建议跑一次）：
+
+```bash
+python3 - <<'EOF'
+import re
+t = open("mechanism/mechanism_3_full_chain.fac").read()
+sp = re.search(r"(?m)^VARIABLE\s*\n(.*?);", t, re.S).group(1).replace(";", " ").split()
+gen = "facsimile_impl/gen_v3"
+lost = set()
+for row in open(gen + "/oz.reac"):
+    lost |= {int(x) for x in row.split()[1:]}
+em = {sp.index(l.split()[0]) + 1 for l in open("input_v3/emissions.config")
+      if l.split("#")[0].split() and l.split()[0] in sp}
+dry = {sp.index(l.split()[0]) + 1 for l in open("input_v3/drydep.config")
+       if len(l.split("#")[0].split()) >= 3 and l.split()[2] == "on"
+       and l.split()[0] in sp}
+dead = [sp[i-1] for i in range(1, len(sp)+1) if i not in lost and i not in em and i not in dry]
+print("零汇且无排放无干沉:", dead or "无")
+EOF
+```
+
 ### 2.1 V2.4 扩展专项（111sp / 198rx，+37 物种 +67 反应）
 
 | # | 扩展 | 新增物种 | 新增反应 | 解决的问题 |

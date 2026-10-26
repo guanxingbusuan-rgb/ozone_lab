@@ -521,6 +521,70 @@ try:
 finally:
     shutil.rmtree(_mp_tmp, ignore_errors=True)
 
+# ================= FT-SYNC: 扩物种 8 处同步守卫 =================
+print("== FT-SYNC 物种同步完整性（防止扩机制时漏配）==")
+_sync_tmp = tempfile.mkdtemp()
+try:
+    _mech = open("mechanism/mechanism_3_full_chain.fac").read()
+    _sp = re.search(r"(?m)^VARIABLE\s*\n(.*?);", _mech, re.S).group(1).replace(";", " ").split()
+
+    # ① 死端: 无化学汇 + 无排放 + 无干沉 → 必然无界累积
+    _lost = set()
+    for _row in open("facsimile_impl/gen_v3/oz.reac"):
+        _lost |= {int(x) for x in _row.split()[1:]}
+    _em = {_sp.index(_l.split()[0]) + 1 for _l in open("input_v3/emissions.config")
+           if _l.split("#")[0].split() and _l.split()[0] in _sp}
+    _dry = {_sp.index(_l.split()[0]) + 1 for _l in open("input_v3/drydep.config")
+            if len(_l.split("#")[0].split()) >= 3 and _l.split()[2] == "on"
+            and _l.split()[0] in _sp}
+    _dead = [_sp[i-1] for i in range(1, len(_sp)+1)
+             if i not in _lost and i not in _em and i not in _dry]
+    check("无死端物种 (有汇 或 有排放 或 有干沉)", not _dead,
+          f"死端={_dead}" if _dead else f"{len(_sp)} 物种全有去向")
+
+    # ② NOy: batch 硬编码表 与 indicators 自动判定 必须一致
+    _batch_src = open("facsimile_impl/fac_batch_omp.f90").read()
+    _batch_noy = set(re.findall(r'noy_add\("([^"]+)"', _batch_src))
+    sys.path.insert(0, "diagnostics")
+    from indicators import _parse_fac as _pf
+    _, _auto_noy, _ = _pf("mechanism/mechanism_3_full_chain.fac")
+    _auto = set(_auto_noy)
+    check("NOy 表: batch 硬编码 == indicators 自动判定",
+          _batch_noy == _auto,
+          f"{len(_batch_noy)} 个一致" if _batch_noy == _auto
+          else f"batch多={_batch_noy-_auto} auto多={_auto-_batch_noy}")
+
+    # ③ build_groups: 所有 emissions.config 里的排放物种必须被分到某个组
+    #    (否则 HVOC 等情景不缩放它)
+    _rt = os.path.join(_sync_tmp, "rt.dat")
+    _rr = subprocess.run([sys.executable, "src/cfgbuild.py", "input_v3", _rt,
+                          "--mech", "mechanism/mechanism_3_full_chain.fac"],
+                         capture_output=True, text=True)
+    _groups = {"NO", "NO2"}
+    _src2 = open("modules/runtime_dat_mod.f90").read()
+    # 定位 build_groups 里 grpvoc 赋值前的最近 case 块, 抽出全部物种名
+    _bg = _src2[_src2.index("subroutine build_groups"):]
+    _bg = _bg[:_bg.index("end subroutine build_groups")]
+    _seg = _bg[:_bg.index("grpvoc(i) = 1")]
+    _blk = _seg[_seg.rindex("case ("):]
+    for _t in re.findall('"([A-Za-z0-9_]+)"', _blk):
+        _groups.add(_t)
+    _groups |= {"CO", "CH4"}
+    _emis_sp = {_l.split()[0] for _l in open("input_v3/emissions.config")
+                if _l.split("#")[0].split() and _l.split()[0] in _sp}
+    _ungrouped = sorted(_emis_sp - _groups)
+    check("所有排放物种都在 build_groups 中 (情景缩放可达)", not _ungrouped,
+          f"未分组={_ungrouped}" if _ungrouped else f"{len(_emis_sp)} 个全已分组")
+
+    # ④ ATOL: 峰值 >1e9 的物种应进 tune_atol_by_name (否则步数浪费)
+    _cmod = open("modules/chem_phys_mod.f90").read()
+    _atol_names = set(re.findall(r'"([A-Za-z0-9_]+)"',
+                        _cmod[_cmod.index("subroutine tune_atol_by_name"):]))
+    check("ATOL 表覆盖主要物种 (≥40 个)", len(_atol_names) >= 40,
+          f"{len(_atol_names)} 个物种有专属 ATOL")
+finally:
+    shutil.rmtree(_sync_tmp, ignore_errors=True)
+
 # ================= FT-DAYS: --days 覆盖生效且不修改文件 =================
 print("== FT-DAYS cfgbuild --days 天数覆盖 ==")
 _days_tmp = tempfile.mkdtemp()

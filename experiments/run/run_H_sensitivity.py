@@ -27,7 +27,18 @@ from _common import (ROOT, require_prereq, out_dir, run_fac_v3, clone_input,
                      read_table, col, write_csv, manifest, summary_table, log)
 
 # OAT 扰动的排放物种（覆盖主要源类）
-EMIT = ["NO", "NO2", "CO", "HCHO", "ISOP", "ALK", "OLE", "ARO1", "ARO2"]
+# V2.4: 原 9 个 + 新增 10 个排放类（长链烷烃/乙烯/内烯烃/高级醛/甲酚/倍半萜/醇/醚/酯）
+# 分组含义见 input_v3/emissions.config 与 templates/SPECIES_INPUT_MATRIX.md
+EMIT = [
+    # 无机 + 一次醛
+    "NO", "NO2", "CO", "HCHO",
+    # 生物源
+    "ISOP", "TERP", "SESQ",
+    # V2.2 集总类
+    "ALK", "OLE", "ARO1", "ARO2", "KET",
+    # V2.4 新增类
+    "LALK", "ETH", "IOLE", "ALD2", "CSL", "MEOH", "ETOH", "MTBE", "ESTER",
+]
 OBS_SPECIES = ["O3", "HCHO", "NO2", "CO"]
 OBS_TIMES_H = list(range(96, 120))
 

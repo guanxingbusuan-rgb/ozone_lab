@@ -301,4 +301,6 @@ SO₂ · HCHO · CH₃CHO · 氢过氧化物 · 有机硝酸盐 · PAN · N₂O�
 | 填了 ✗ 的通道会报错吗？ | **不会**——cfgbuild 只查物种是否在 `VARIABLE` 段 |
 | 那为什么还要区分？ | 填 ✗ 项得到**物理无意义**结果（如给 O¹D 设排放 → 立即被机制吃掉，白费算力） |
 | 新增物种后怎么更新本表？ | 重新跑本表的生成脚本（`VARIABLE`+`FORMULA` 程序化提取，见 §0 数据来源） |
-| 加物种时必须同步哪几处？ | **三张表**：`emissions.config`（若有源）· `drydep.config`（若无化学汇）· `build_groups()`（若参与情景缩放）；含氮还要进 `noy_add`；高浓度还要进 ATOL 调优表 |
+| 加物种时必须同步哪几处？ | **8 处**（详见 [mechanism/README.md §2.1a](../mechanism/README.md)）：①`.fac` 三件套 ②`emissions.config` ③`drydep.config` ④`build_groups()` ⑤`noy_add()` ⑥`tune_atol_by_name()` ⑦`functional_test` 哨兵 ⑧本文档表 |
+| 哪些是自动的？ | `indicators.py` 的 NOy 定义**自动**读 FORMULA 段（实测识别 25 个，与 batch 表一致）；IC/BC 通常不需要加新物种（二次产物从 0 起步） |
+| 怎么自动查死端？ | 见 mechanism/README §2.1a 末尾的死端检测脚本（V2.4 实测：零汇且无排放无干沉 = 无） |
