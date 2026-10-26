@@ -12,6 +12,7 @@ from mechc import parse_fac, to_f, RESERVED
 
 def to_c(expr, m, jn=()):
     """FACSIMILE → C: @→pow, D→E, EXP→exp, 命名速率→q[i], J<n>→J[n-1]"""
+    expr = expr.split("!", 1)[0].strip()   # 剥离行内 ! 注释
     rate_names = [n for n, _ in m.rates]
     def repl(mm):
         tok = mm.group(0)
@@ -26,17 +27,58 @@ def to_c(expr, m, jn=()):
         return tok
     # 先处理 J<n>
     e = re.sub(r"J<([0-9]+)>", lambda g: "J[" + str(int(g.group(1))-1) + "]", expr)
+    # FACSIMILE 的 10@x 是"10 的 x 次方", 必须先于 @→** 统一转成 pow(10,x)
+    # (否则会变成 10**(x), C 的 ** 不是运算符 → 编译失败; 主机制 Troe 全用此写法)
+    e = re.sub(r"10@\(([^)]*)\)", r"pow(10,(\1))", e)
     # @ → ** 再转 pow
     e = e.replace("@", "**")
-    # D 记法 → E
-    e = re.sub(r"(\d)D([+-]\d)", r"\1E\2", e)
+    # D 记法 → E (含无符号指数: 1.90D17 → 1.90E17)
+    e = re.sub(r"(\d)[Dd]([+-]?\d)", r"\1E\2", e)
     # 标识符替换
     e = re.sub(r"[A-Za-z_][A-Za-z0-9_]*", repl, e)
-    # **2 → x*x (最常见)
-    e = re.sub(r"(\w+)\*\*2\b", r"\1*\1", e)
-    # **n → pow(x,n)
-    e = re.sub(r"(\w+)\*\*([\d.]+)", r"pow(\1,\2)", e)
-    e = re.sub(r"(\w+)\*\*(\w+)", r"pow(\1,\2)", e)
+    return _pow_to_c(e)
+
+
+def _pow_to_c(e):
+    r"""把 Python 风格 a**b 转成 C 的 pow(a,b)。
+
+    必须做"平衡括号反向扫描"而不是正则 —— 因为左操作数可能是
+    `(...)` 形式（Troe 的 `(log10(q[3])/(1+(...)**2))`），
+    正则 `\w+\*\*` 只能吃掉标识符，漏掉 `)**2` 导致生成非法 C。
+    """
+    while "**" in e:
+        i = e.index("**")
+        # 反向扫描左操作数
+        j = i
+        depth = 0
+        while j > 0:
+            ch = e[j - 1]
+            if ch == ")":
+                depth += 1
+            elif ch == "(":
+                if depth == 0:
+                    break
+                depth -= 1
+            elif depth == 0 and not (ch.isalnum() or ch in "._[]"):
+                break
+            j -= 1
+        left = e[j:i]
+        # 正向扫描右操作数
+        k = i + 2
+        depth = 0
+        while k < len(e):
+            ch = e[k]
+            if ch == "(":
+                depth += 1
+            elif ch == ")":
+                if depth == 0:
+                    break
+                depth -= 1
+            elif depth == 0 and not (ch.isalnum() or ch in "._[]+-"):
+                break
+            k += 1
+        right = e[i + 2:k]
+        e = e[:j] + f"pow({left},{right})" + e[k:]
     return e
 
 def gen_c(fac_path, out_c):
@@ -97,7 +139,7 @@ def gen_c(fac_path, out_c):
     return 0
 
 if __name__ == "__main__":
-    fac = sys.argv[1] if len(sys.argv) > 1 else "mechanism/teaching/mechanism_1_ozone_tutorial.fac"
+    fac = sys.argv[1] if len(sys.argv) > 1 else "mechanism/mechanism_3_full_chain.fac"
     out = sys.argv[2] if len(sys.argv) > 2 else "output/mech_rates.c"
     os.makedirs(os.path.dirname(out), exist_ok=True)
     gen_c(fac, out)

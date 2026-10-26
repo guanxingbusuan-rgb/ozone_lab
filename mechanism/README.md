@@ -1,4 +1,4 @@
-# mechanism_3_full_chain.fac — V2.4 机制规格书（完整版）
+# mechanism_3_full_chain.fac — V2.4+ 机制规格书（冻结版）
 
 > **ozone_lab 工程机制的唯一事实源**。本文档是该 `.fac` 文件的**逐项完整规格说明**：
 > 设计定位、版本沿革、111 物种全表（含分子式与角色）、198 条反应全表（含速率常数与
@@ -7,13 +7,15 @@
 >
 > | 项 | 值 |
 > |---|---|
-> | 版本 | **V2.4**（2026-10-26） |
-> | 规模 | **111 物种 / 198 反应 / 41 个光解槽位 / 120 个命名速率** |
+> | 版本 | **V2.4+ 冻结版**（2026-10-26，不再迭代） |
+> | 规模 | **111 物种 / 198 反应 / 41 个光解槽位 / 124 个命名速率** |
 > | 元素审计 | **198/198 PASS**（`audit/element_audit.py`）；V2.4 新增 67 条**全部精确平衡**（零储库依赖） |
-| MCM 一致性 | **最大偏差 6.2%**（`audit/mcm_compare.py`，32 条纯无机可比对，阈值 10%） |
+> | MCM 一致性 | **48 条可比对，最大偏差 8.9%**（32 无机 + 16 集总映射；34 条产物一致者偏差 0.0%） |
 > | 生成码 | `facsimile_impl/gen_v3/ozone_mech.f90`（`mechc.py` 编译） |
 > | 承载路线 | `fac_v3`（单箱深度）+ `fac_batch_omp`（批量广度），共享同一生成码 |
 > | 文件本体 | [`mechanism_3_full_chain.fac`](mechanism_3_full_chain.fac)（FACSIMILE 语法） |
+> | 冻结状态 | ✅ **已冻结**（2026-10-26）——升级评估见 [V25_ASSESSMENT.md](V25_ASSESSMENT.md)，
+> 结论：11 项候选中仅 P1-4 有升级价值，当前定位下不实施 |
 
 ---
 
@@ -479,7 +481,7 @@ EOF
 | 20 | `KHO2NO` = 3.45D-12*EXP(270/TEMP)*EXP(270/TEMP) | `HO2 + NO = NO2 + OH` |
 | 21 | `KHO2HO2A` = 2.20D-13*KMT06*EXP(600/TEMP) | `HO2 + HO2 = H2O2` |
 | 22 | `KHO2HO2B` = 1.90D-33*M*KMT06*EXP(980/TEMP) | `HO2 + HO2 = H2O2` |
-| 23 | `KH2O2OH` = 1.8D-12 | `H2O2 + OH = HO2` |
+| 23 | `KH2O2OH` = 2.9D-12*EXP(-160/TEMP) | `H2O2 + OH = HO2` |
 | 24 | 4.8D-11*EXP(250/TEMP) | `OH + HO2 = O2` |
 
 #### ② NO₃/N₂O₅ 夜化学（MCM Troe 逐字）（10 条）
@@ -501,7 +503,7 @@ EOF
 
 | # | 速率 | 反应 |
 |---|---|---|
-| 35 | `KCH4OH` = 2.45D-12*EXP(-1775/TEMP) | `CH4 + OH = CH3O2` |
+| 35 | `KCH4OH` = 1.85D-12*EXP(-1690/TEMP) | `CH4 + OH = CH3O2` |
 | 36 | `KRO2NO` = 2.7D-12*EXP(360/TEMP) | `CH3O2 + NO = CH3O + NO2` |
 | 37 | `KRO2HO2` = 2.91D-13*EXP(1300/TEMP) | `CH3O2 + HO2 = CH3OOH` |
 | 38 | 1.03D-13*EXP(365/TEMP) | `CH3O2 + CH3O2 = HCHO + HCHO + HO2 + HO2` |

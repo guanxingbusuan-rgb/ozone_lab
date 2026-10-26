@@ -229,7 +229,7 @@ fac_v3 / fac_batch_omp                 (两个二进制)
 
 | 目录/文件 | 职责 | 你会不会改它 |
 |---|---|---|
-| `mechanism/` | 机制唯一事实源（.fac，V2.4 111sp/198rx）；`teaching/` 存 15sp 教学存档档 | 扩机制时改 |
+| `mechanism/` | 机制唯一事实源（**V2.4+ 冻结版** 111sp/198rx）+ `reference/` MCM 官方导出 | 冻结，不再改 |
 | `input_v3/` | **12 类生效配置** + `constraints/` 序列 | **最常改这里** |
 | `templates/` | 5 类数据落位模板（人读格式合同） | 只读（照它落位） |
 | `runtime_v3.dat` | cfgbuild 产物（Fortran 唯一输入） | 不手改（自动生成） |

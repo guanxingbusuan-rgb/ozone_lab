@@ -96,7 +96,8 @@ def _side(s):
 RESERVED = {"TEMP", "M", "O2", "EXP", "LOG10", "H2O", "N2"}
 
 def to_f(expr, m, jn):
-    e = expr.replace("@", "**")
+    e = expr.split("!", 1)[0].strip()      # 剥离行内 ! 注释 (Fortran 端合法, 但会污染表达式)
+    e = e.replace("@", "**")
     e = re.sub(r"\*\*-(\d+\.?\d*)", r"**(-\1)", e)
     e = re.sub(r"J<(\d+)>", r"JARR(\1)", e)      # FACSIMILE 光解索引 → JARR 元素
     def repl(mm):

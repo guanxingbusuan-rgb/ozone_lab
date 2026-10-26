@@ -522,6 +522,39 @@ try:
 finally:
     shutil.rmtree(_mp_tmp, ignore_errors=True)
 
+# ================= FT-FREEZE: 冻结版规格守卫 =================
+print("== FT-FREEZE 冻结版规格一致性 ==")
+_mech_txt = open("mechanism/mechanism_3_full_chain.fac").read()
+_readme_txt = open("mechanism/README.md").read()
+_n_sp = len(re.search(r"(?m)^VARIABLE\s*\n(.*?);", _mech_txt, re.S)
+             .group(1).replace(";", " ").split())
+_n_rx = len([l for l in _mech_txt.splitlines()
+             if l.strip().startswith("%") and "=" in l])
+sys.path.insert(0, "facsimile_impl")
+import mechc as _mc
+_n_rate = len(_mc.parse_fac("mechanism/mechanism_3_full_chain.fac").rates)
+
+check("冻结版: .fac 头声明 111 物种 198 反应",
+      "111 物种" in _mech_txt and "198 反应" in _mech_txt,
+      f"实际 {_n_sp}sp/{_n_rx}rx")
+check("冻结版: .fac 实物计数与声明一致",
+      (_n_sp, _n_rx) == (111, 198), f"{_n_sp}sp/{_n_rx}rx")
+check("冻结版: README 规格表与实物一致",
+      f"{_n_sp} 物种" in _readme_txt and f"{_n_rx} 反应" in _readme_txt
+      and f"{_n_rate} 个命名速率" in _readme_txt,
+      f"{_n_sp}sp/{_n_rx}rx/{_n_rate}rate")
+check("冻结版: .fac 含冻结声明", "冻结声明" in _mech_txt, "头部已标注")
+check("冻结版: README 标注冻结状态", "冻结版" in _readme_txt and "已冻结" in _readme_txt,
+      "规格书已标注")
+check("冻结版: V25_ASSESSMENT 存在且提及 P1-4",
+      os.path.exists("mechanism/V25_ASSESSMENT.md")
+      and "P1-4" in open("mechanism/V25_ASSESSMENT.md").read(),
+      "评估报告已归档")
+check("冻结版: V25_PLAN 已删除（避免与评估冲突）",
+      not os.path.exists("mechanism/V25_PLAN.md"), "预备方案已移除")
+check("冻结版: teaching/ 已删除（无死代码）",
+      not os.path.exists("mechanism/teaching"), "目录已移除")
+
 # ================= FT-SYNC: 扩物种 8 处同步守卫 =================
 print("== FT-SYNC 物种同步完整性（防止扩机制时漏配）==")
 _sync_tmp = tempfile.mkdtemp()

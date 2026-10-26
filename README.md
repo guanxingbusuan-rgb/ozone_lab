@@ -118,7 +118,7 @@ make figures
 
 | 机制版本 | 唯一事实源 (.fac) | 消费路线 |
 |---|---|---|
-| ~~15sp / 25rx~~ 教学核心（**退役**，.fac 移至 `mechanism/teaching/` 存档） | `mechanism/teaching/mechanism_1_ozone_tutorial.fac` | 无（fac_run/kpp_run 已退役） |
+| ~~15sp / 25rx~~ 教学核心（**已删除**） | —（`mechanism/teaching/` 已于 V2.4+ 冻结时移除） | 无（fac_run/kpp_run 已退役） |
 | **111sp / 198rx** 工程 V2.4 全链条 | `mechanism/mechanism_3_full_chain.fac` | `fac_v3` + `fac_batch_omp`（共享 `gen_v3/`） |
 | **29sp / 71rx** 真实 MCM CH₄ | `mcm_city/input/mechanism_mcm_ch4.fac` | `mcm_run` |
 
@@ -130,7 +130,7 @@ make figures
 ### [退役] ~~`facsimile_impl/fac_run`~~ —— 旧教学主力（2026-10 退役；单箱/全物理能力由 fac_v3 全面接管）
 
 - **源码**：`oz_fac_core.f90` + `gen/oz_mech.f90`（mechc.py 编译自 `mechanism/ozone.fac`，
-  与 `mechanism/teaching/mechanism_1_ozone_tutorial.fac` 逐字相同）
+  内容已随 `mechanism/teaching/` 一并删除）
 - **CLI**：`fac_run f_NOx f_VOC out_pref`（三参必选，`fac_run 1 1 ../output/base` 为基线）
 - **机制**：核心 15sp/25rx（NO NO2 O3 O1D O OH HO2 H2O2 CO HCHO CH4 CH3O2 CH3OOH CH3O HNO3）
 - **实读确认**：
@@ -223,7 +223,7 @@ mechc.py → gen*/、fac2kpp.py → KPP 三件套、cfgbuild --mech → runtime_
 
 | 文件 | 规模 | 编译去向 | 实读要点 |
 |---|---|---|---|
-| ~~`mechanism/ozone.fac`~~（已随 fac_run 退役删除） | 15sp/25rx | — | 15sp 核心教学机制存档于 `mechanism/teaching/mechanism_1_ozone_tutorial.fac` |
+| ~~`mechanism/ozone.fac`~~（已随 fac_run 退役删除） | 15sp/25rx | — | 15sp 核心教学机制已删除（原 `mechanism/teaching/`） |
 | `mechanism/mechanism_3_full_chain.fac` | **111sp/198rx V2.4** | fac_v3 / fac_batch_omp `gen_v3/` | 六链条（①无机核心+HONO 晨爆 ②NO₃-N₂O₅ 夜化学 MCM KMT03/04 Troe 逐字 ③CH₄+PAN 储库 ④**isoprene 完整二代链** ISOPBO₂→MVK+MACR→MVKO₂/MACRO₂→MPAN/MGLY→CH₃CO₃ 回灌，0.1 硝酸酯支路 ⑤DMS→MSA ⑥卤素+ClONO₂/BrONO₂/HOCl/HOBr 储库）；O1D 速率已并入 H₂O/M（Day35 潜伏 bug 修复版）；每反应 C/H/N/O/S/Cl/Br 精确配平 |
 | `mcm_city/input/mechanism_mcm_ch4.fac` | 29sp/71rx | mcm_city `gen/` | AtChem2 自带 MCM v3.3.1 CH₄ 子集；完整无机组（NO₃/N₂O₅/HO₂NO₂/HONO）+ Troe（KMT01-03/KBPAN/KFPAN）+ HSO₃/SO₃ 硫链 + CL |
 | ~~`kpp_impl/ozone_kpp.{spc,eqn,def}`~~（已随 KPP 路线退役删除） | — | — | `src/fac2kpp.py` 转换脚本保留 |
@@ -233,7 +233,7 @@ mechc.py → gen*/、fac2kpp.py → KPP 三件套、cfgbuild --mech → runtime_
 
 **唯一工程输入目录是 `input_v3/`**（12 类配置，文件名沿用 AtChem2 约定）。
 旧的 `input/`（15sp 教学同构份）已于 2026-10 彻底删除——它零消费者且易被误
-当工程入口；其中唯一的 15sp 教学机制档已移入 `mechanism/teaching/` 存档。
+当工程入口；15sp 教学机制档亦已删除（不再保留死代码）。
 解析端（`runtime_dat_mod.read_runtime`）逐段实读确认的 12 段：
 
 ```
@@ -425,7 +425,7 @@ f_CO → CO              f_CH4 → CH4        另: jfac 乘 J 通道, dt 加 TEM
 
 - **命令**：`mcm_run`（29sp MCM 子集）→ `fac_v3`（111sp V2.4）
 - **解读**：fac_v3 111 物种 0.9 s——RHS 光滑性修复的实证（10b #11）；
-  15sp 教学档与 30sp 旧扩展档均已退役（15sp .fac 存于 `mechanism/teaching/`）。
+  15sp 教学档与 30sp 旧扩展档均已删除。
 
 ### E4. MCM 真实机制城市案例
 
@@ -435,7 +435,7 @@ f_CO → CO              f_CH4 → CH4        另: jfac 乘 J 通道, dt 加 TEM
 
 ### E5. 机制→C 跨语言编译
 
-- **命令**：`python src/mechc_c.py mechanism/teaching/mechanism_1_ozone_tutorial.fac output/mech_rates.c --compile`
+- **命令**：`python src/mechc_c.py mechanism/mechanism_3_full_chain.fac output/mech_rates.c --compile`
 - **解读**：同一 .fac 两条后端（Fortran/C），绕过 f2py 构建链。
 
 ## F 类：数值方法教学实验（10b 坑实录精选 8 个）

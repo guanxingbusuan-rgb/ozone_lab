@@ -394,7 +394,8 @@ libquadmath.0.dylib
 | 类型 | 文件 | 角色 |
 |---|---|---|
 | `.fac`（1 个在役） | `mechanism/mechanism_3_full_chain.fac` | **机制唯一事实源**（111sp/198rx，V2.4） |
-| `.fac`（1 个存档） | `mechanism/teaching/mechanism_1_ozone_tutorial.fac` | 15sp 教学档（无路线承载，存档参考） |
+| `.fac`（1 个在役） | `mechanism/mechanism_3_full_chain.fac` | **V2.4+ 冻结版**（111sp/198rx） |
+| `.fac`（1 个参考） | `mechanism/reference/mcm_v3.3.1_export.fac` | MCM v3.3.1 官方导出（5832sp/17224rx，系数比对基准） |
 | `.config`（9 个） | `input_v3/*.config` | 12 类配置中的生效部分（人类可读） |
 | `.template`（6 个） | `templates/*.template` | **格式合同**（程序零直读） |
 | `.txt`（序列） | `input_v3/constraints/*.txt` | 观测/气象时间序列（`met_*_demo.txt` 6 条气象样例 + `bc_*_demo.txt` 3 条约束样例） |

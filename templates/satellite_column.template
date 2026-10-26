@@ -56,7 +56,7 @@
 #        NO2  = file:constraints/sat_NO2_surf.txt
 #   4. make runtime_v3.dat
 #
-# 【全物种输入矩阵】74 物种 × 5 通道的完整可输入清单见
+# 【全物种输入矩阵】111 物种 × 5 通道的完整可输入清单见
 #                     templates/SPECIES_INPUT_MATRIX.md
 # 【物种映射】S5P TROPOMI 产品 → mechanism_3 可接入物种:
 #   HCHO_tropo → HCHO  ✓ (FNR 分子; 机制内有排放+光解, 建议中等 τ)

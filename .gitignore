@@ -55,7 +55,9 @@ outp_*.csv
 figures/
 
 # ── 系统/编辑器杂物 ──
+# .DS_Store 无斜杠前缀 → 匹配任意层级（含 mechanism/.DS_Store）
 .DS_Store
+**/.DS_Store
 *.swp
 *~
 .idea/
