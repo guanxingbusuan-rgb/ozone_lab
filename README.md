@@ -301,8 +301,8 @@ f_CO → CO              f_CH4 → CH4        另: jfac 乘 J 通道, dt 加 TEM
 > 该数字实为 `scen_build` **漏缩 6 个排放物种**（SO2/ALK/OLE/ARO1/ARO2/KET/TERP）的
 > 假象——VOC 根本没加。修复后 HVOC = +9.5%（与 batch 的 +8.0% 一致）。
 > **结论（NOx-limited）本身不变**（由屋脊位置独立证明），但论据已换。
-> 详见 [`AUDIT_COMPLETE.md`](AUDIT_COMPLETE.md) §10（`audit_reports/AUDIT_R*.md`
-> 的原始过程报告已移出仓库并加入 .gitignore——结论均已提炼进本文档）。
+> 详见 [`AUDIT_COMPLETE.md`](AUDIT_COMPLETE.md) §10（历次分轮审计的原始过程报告
+> 已于 2026-10-26 整体删除，结论已全部合并进 AUDIT_COMPLETE.md）。
 
 - **目的**：回答"减谁、减多少、O₃ 怎么变"（情景=排放组缩放×JFAC×ΔT 组合）。
 - **命令**：循环 `./fac_v3 SCEN_X ../output/x_v3 ../runtime_v3.dat`

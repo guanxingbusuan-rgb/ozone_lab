@@ -572,6 +572,11 @@ check("modules/ 有职责说明文档（含核心/预留区分）",
       and "预留钩子" in open("modules/README.md").read(),
       "已标注 2 核心 + 1 工具 + 1 预留")
 
+check("audit_reports/ 已删除（结论已并入 AUDIT_COMPLETE）",
+      not os.path.exists("audit_reports")
+      and os.path.exists("AUDIT_COMPLETE.md"),
+      "目录已移除，R1–R16 记录合并于 AUDIT_COMPLETE.md")
+
 check("mechc_c.py 已删除（零消费者，避免误用）",
       not os.path.exists("src/mechc_c.py"), "已移除")
 

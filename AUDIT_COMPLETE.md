@@ -1099,8 +1099,9 @@ R13 csvfloat 四种指数形态解析              4 组 ✓
 
 ### 14b.1 🟡 P2：README 断链
 
-`README.md:284` 仍指向已归档的 `AUDIT_R10.md`（实际在 `audit_reports/`）。
-**修复**：改指 `AUDIT_COMPLETE.md §10` + `audit_reports/AUDIT_R10.md`。
+`README.md:284` 仍指向已归档的 `AUDIT_R10.md`（当时存于 `audit_reports/`）。
+**修复**：改指 `AUDIT_COMPLETE.md §10`。
+**后续（2026-10-26）**：`audit_reports/` 目录已整体删除（见附录说明）。
 **复验**：全库 46 处相对链接，**断链 0** ✓
 
 ### 14b.2 🟡 P2：`make clean` 未覆盖 `mcm_city/`
@@ -1356,12 +1357,18 @@ P0-1（scen_build）之所以被发现，是因为 fac_v3 与 batch 对同一 HV
 
 ---
 
-## 附录：分轮审计报告索引
+## 附录：分轮审计报告索引（**原始报告已删除**）
 
-| 文件 | 内容 |
+⚠ **2026-10-26 变更**：`audit_reports/` 目录已整体删除（5 份报告、1197 行）。
+原因：全部为 V2.3 时代（74sp/131rx）的过程记录，与当前 V2.4+（111sp/198rx）脱节；
+经逐项核对，**所有问题与修复结论均已完整收录于本文件**，原始报告无独立信息价值。
+如需追溯原始叙述，见 git 历史（commit `9d2e30c` 及更早）。
+
+| 原文件 | 核心内容（已并入本文件） |
 |---|---|
-| `audit_reports/AUDIT_R10.md` (319 行) | scen_build 漏缩 / IPR 双计 / 尾逗号 / 边界保护 |
-| `audit_reports/AUDIT_R11.md` (271 行) | jfac 双乘 / scan_parallel 死代码 / nfail / 窗口样本数 |
-| `audit_reports/AUDIT_R12.md` (222 行) | 数据链断裂 / 文档 API / make nc / clean / input 定位 |
-| `audit_reports/AUDIT_R13.md` (180 行) | 三位指数 / sat2surf / fig_ridge5 / sys.path |
-| **本文件** `AUDIT_COMPLETE.md` | **R1–R14 完整合并记录（含 R1–R9 的重建）；4 份分轮报告在 `audit_reports/`** |
+| ~~`audit_reports/AUDIT_R10.md`~~ (319 行) | scen_build 漏缩 / IPR 双计 / 尾逗号 / 边界保护 → §10 |
+| ~~`audit_reports/AUDIT_R11.md`~~ (271 行) | jfac 双乘 / scan_parallel 死代码 / nfail / 窗口样本数 → §11 |
+| ~~`audit_reports/AUDIT_R12.md`~~ (222 行) | 数据链断裂 / 文档 API / make nc / clean / input 定位 → §12 |
+| ~~`audit_reports/AUDIT_R13.md`~~ (180 行) | 三位指数 / sat2surf / fig_ridge5 / sys.path → §13 |
+| ~~`audit_reports/AUDIT_R16.md`~~ (205 行) | MODE=DIRECT 死开关 / RADIAT 死配置 / 九项健康 → §14c |
+| **`AUDIT_COMPLETE.md`**（本文件） | **R1–R16 完整合并记录（含 R1–R9 重建）——唯一事实源** |

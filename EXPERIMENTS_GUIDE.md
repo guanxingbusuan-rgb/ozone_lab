@@ -243,7 +243,6 @@ fac_v3 / fac_batch_omp                 (两个二进制)
 | `experiments/run/` | **10 个实跑脚本**（A–I + M，只落 CSV 不绘图） | 加实验时 |
 | `experiments/*.py` | 旧版实验脚本（含终端报告/绘图/反演） | 一般不用 |
 | `output/` | 所有实验产物（已 gitignore） | 清理用 `make clean-build` |
-| `audit_reports/` | 历次自审过程报告（已 gitignore，结论已进文档） | 只读 |
 | `figures/` | 机制图集（SCI 版 + 漫画版）与工程图 | 改图时 |
 
 ### 1.5 一次最小完整工作流（跑通它你就入门了）
