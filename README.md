@@ -556,7 +556,7 @@ f_CO → CO              f_CH4 → CH4        另: jfac 乘 J 通道, dt 加 TEM
 | 9 | `drydep.config` | `物种 vd BLHFOLD` | vd: cm/s | 不列=不沉 | `O3 0.80 on` |
 | 10 | `wetdep.config` | `物种 A B`（Λ=A·R^B） | s⁻¹/(mm/h)^B | 不列=无 | `HNO3 5.0e-5 0.8` |
 | 11 | `scenarios.config` | `NAME = E_*乘 JFAC乘 DT加` | - | 可选 | `SCEN_HVOC = E_NOx*1.0 E_VOC*3.0` |
-| 12 | `model.parameters` | 4 行：天/输出步/rtol/atol | - | 必需 | `5.0` |
+| 12 | `model.parameters` | 4 行：天/输出步/rtol/atol（**可改**，行序固定） | - | 必需 | `5.0` |
 
 ### 4.2 配置编译器处理链
 
@@ -606,7 +606,7 @@ RO2 = CH3O2 ;                       ← 过氧池 (可选)
 | **干沉降 vd** | cm/s | 不列=不沉 | — |
 | **湿沉降** | a: s⁻¹/(mm·h⁻¹)^b | 不列=无 | — |
 | **光解 JMAP** | D 值: s⁻¹（正午） | — | 槽位缺失 → 拒绝 |
-| **model.parameters** | 天 / 输出小时 / rtol / atol | — | 必需 |
+| **model.parameters** | 天 / 输出步长[s] / rtol / atol | 非法值编译期拒绝 | 必需（改后需重编译） |
 
 `unit_factor` 单源函数（read_series/read_ic/BC 三处共用）——新增单位只改一处。
 **完备性结论**：V2.3 补齐 BC 内联后缀与排放 ppb/h 指令后，用户数据可用原始单位

@@ -487,6 +487,38 @@ try:
 finally:
     shutil.rmtree(_phot_tmp, ignore_errors=True)
 
+# ================= FT-MP: model.parameters 非法值必须编译期拒绝 =================
+print("== FT-MP model.parameters 校验 ==")
+# 陷阱: 该文件是"4 行位置参数"无键名; 旧版零校验 → days=0 或 dtout=0 时
+# fac_v3 照样打印 "ok", 但 nst 是未初始化值、O3max=0、CSV 只有表头。
+_mp_tmp = tempfile.mkdtemp()
+_mp_cases = [
+    ("dtout=0 (除零)", "5.0\n0.0\n1.0e-6\n1.0e3\n", "输出步长必须 > 0"),
+    ("days=0 (空结果)", "0.0\n3600.0\n1.0e-6\n1.0e3\n", "模拟天数必须 > 0"),
+    ("只有 3 行", "5.0\n3600.0\n1.0e-6\n", "需要 4 行数值"),
+    ("非数值", "5.0\nabc\n1.0e-6\n1.0e3\n", "无法解析为数值"),
+]
+try:
+    for _name, _body, _kw in _mp_cases:
+        _d = os.path.join(_mp_tmp, "d")
+        shutil.rmtree(_d, ignore_errors=True)
+        os.makedirs(_d)
+        for _f in os.listdir("input_v3"):
+            _p = os.path.join("input_v3", _f)
+            if os.path.isfile(_p):
+                shutil.copy(_p, _d)
+        shutil.copytree("input_v3/constraints", os.path.join(_d, "constraints"))
+        open(os.path.join(_d, "model.parameters"), "w").write(_body)
+        _r = subprocess.run([sys.executable, "src/cfgbuild.py", _d,
+                             os.path.join(_mp_tmp, "rt.dat"), "--mech",
+                             "mechanism/mechanism_3_full_chain.fac"],
+                            capture_output=True, text=True)
+        _out = (_r.stdout or "") + (_r.stderr or "")
+        check(f"model.parameters 拒绝 {_name}", _r.returncode != 0 and _kw in _out,
+              "cfgbuild 编译期拒绝")
+finally:
+    shutil.rmtree(_mp_tmp, ignore_errors=True)
+
 n_pass = sum(1 for x in PASS if x)
 print(f"\n===== functional_test: {n_pass}/{len(PASS)} PASS =====")
 sys.exit(0 if n_pass == len(PASS) else 1)

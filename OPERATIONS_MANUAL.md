@@ -282,7 +282,7 @@ VOCs/卫星模板同路径（卫星先离线转换）；排放清单模板直接
 | 干沉降 vd | cm/s | k = vd/BLH | 不列=0 | — |
 | 湿沉降 | a: s⁻¹/(mm·h⁻¹)^b | — | 不列=0 | — |
 | 光解 JMAP D 值 | s⁻¹（正午） | — | — | 槽位缺失拒绝 |
-| model.parameters | 天 / 输出小时 / rtol / atol | — | — | 必需 |
+| model.parameters | 天 / 输出步长[s] / rtol / atol | — | days/dtout≤0 或行数不足 → 拒绝 | 必需；可改，详见 GUIDE §3⑫ |
 
 #### 表 B · .fac 机制参数（半硬编码: 用户可改文本, 改 = 重编译）
 

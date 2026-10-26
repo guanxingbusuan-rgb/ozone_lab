@@ -299,12 +299,52 @@ def compile_cfg(input_dir="input_v3", out_path="runtime_v3.dat", mech_override=N
         scen.append((head, d))
 
     # ============ ⑫ 模型参数 ============
+    # 格式: 4 行, 每行"一个数值 + 可选 # 注释"; 无键名, 只取每行首个 token (位置固定)
+    #   1=模拟天数  2=输出步长[s]  3=RTOL  4=ATOL(基础值)
     mp = []
     for ln in open(inp / "model.parameters"):
         s = strip_comment(ln)
         if s:
-            mp.append(float(s.split()[0]))
+            try:
+                mp.append(float(s.split()[0]))
+            except ValueError:
+                errs.append(f"model.parameters: 无法解析为数值 '{s.split()[0]}' "
+                            f"(需 4 行: 天数/输出步长/RTOL/ATOL)")
+                mp.append(float("nan"))
         if len(mp) == 4: break
+    if len(mp) < 4:
+        errs.append(f"model.parameters: 需要 4 行数值 (天数/输出步长/RTOL/ATOL), "
+                    f"实际只有 {len(mp)} 行 — 缺项会在 Fortran 端导致除零或空结果")
+        mp += [float("nan")] * (4 - len(mp))
+    else:
+        _days, _dtout, _rtol, _atol = mp
+        if not (_days > 0):
+            errs.append(f"model.parameters: 模拟天数必须 > 0 (当前 {_days:g}) — "
+                        f"0 或负值会得到 0 个输出步, 程序照样打印 ok 但不产出数据")
+        if not (_dtout > 0):
+            errs.append(f"model.parameters: 输出步长必须 > 0 (当前 {_dtout:g}) — "
+                        f"0 会导致 days*86400/dtout 除零, 静默产出空 CSV")
+        if not (_rtol > 0):
+            errs.append(f"model.parameters: RTOL 必须 > 0 (当前 {_rtol:g})")
+        if not (_atol > 0):
+            errs.append(f"model.parameters: ATOL 必须 > 0 (当前 {_atol:g})")
+        if _days > 0 and _dtout > 0:
+            _nst = _days * 86400.0 / _dtout
+            if _nst < 1:
+                errs.append(f"model.parameters: 输出步长 {_dtout:g}s 超过总时长 "
+                            f"{_days * 86400.0:g}s → 0 个输出步")
+            elif _nst < 24:
+                print(f"[cfgbuild] ⚠ 只有 {_nst:.0f} 个输出步 (<24): "
+                      f"fac_v3 的『末 24 步』窗口会覆盖全程, 与『末 24 h』不再是同一件事",
+                      file=sys.stderr)
+            if _dtout != 3600.0:
+                print(f"[cfgbuild] ⚠ 输出步长 {_dtout:g}s ≠ 3600s —— 注意两点:\n"
+                      f"  ① conc/irr/ipr 的 h 列写的是【输出步序号】而非小时\n"
+                      f"  ② 所有『末 24h』统计实为最后 24 步 = {24 * _dtout / 3600.0:g} h,\n"
+                      f"     且 diagnostics.irr_integrate 以 h 列为时间轴做 trapz → 积分差 "
+                      f"{3600.0 / _dtout:g} 倍\n"
+                      f"  如需小时语义请保持 3600; 要更细输出建议改天数值而不是步长",
+                      file=sys.stderr)
 
     # ============ R16: 死配置告警 (RADIAT 当前无消费者) ============
     if abs(met_c.get("RADIAT", 0.0)) > 0.0 and met_s.get("RADIAT", 0) == 0:
