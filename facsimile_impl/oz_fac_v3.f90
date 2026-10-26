@@ -3,9 +3,10 @@
 !   输入: runtime.dat (12 类配置, cfgbuild 编译) — 全功能消费:
 !     真光解 (SZA + MCM l/m/n) / 时变气象 (T,P,RH,BLH,RAIN) /
 !     时变边界层 (膨胀稀释) / 排放日型 / 干湿沉降 / BC 松弛 / 情景因子
-!   求解: CVODE BDF + DENSE (53 物种稠密直接法, 黎明光解过渡段比
-!         无预条件 SPGMR 稳健; 批量并行版另用 C API+SPGMR)
-!   输出: <pref>_conc.csv (53 物种全列) + <pref>_irr.csv (96 反应 IRR)
+!   求解: CVODE BDF + DENSE (74 物种稠密直接法; 批量并行版同为 DENSE,
+!         并行只发生在案例之间, 单箱内部仍单线程)
+!   输出: <pref>_conc.csv (74 物种全列) + <pref>_irr.csv (131 反应 IRR)
+!         + <pref>_ipr.csv (74 物种 × 6 账 P/L/E/D/B/X 小时窗积分)
 ! CLI: fac_v3 [scenario_name] [out_prefix] [runtime.dat]
 ! =====================================================================
 module facv3_mod

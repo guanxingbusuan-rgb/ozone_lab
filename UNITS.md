@@ -304,7 +304,7 @@ J = JFAC · l · cosχ^m · exp(−n/cosχ)      (cosχ ≤ 1e-3 → J = 0)
 | 子量 | 单位 | 校验 |
 |---|---|---|
 | `t` | **秒，自模拟起点**，严格递增 | 非严格递增 → 拒绝；外延取端点值 |
-| `值` | 该量原生单位（TEMP: K / PRES: hPa / RH: % / BLH: m / RAIN: mm·h⁻¹ / JFAC: 1 / BC: 由 `# unit:` 决定） | ≤128 点（Fortran `ser_t(8,128)`）；气象+BC 共享 8 条池 |
+| `值` | 该量原生单位（TEMP: K / PRES: hPa / RH: % / BLH: m / RAIN: mm·h⁻¹ / JFAC: 1 / **RADIAT: W·m⁻²，但当前无消费者** / BC: 由 `# unit:` 决定） | ≤128 点（Fortran `ser_t(8,128)`）；气象+BC 共享 8 条池 |
 
 **现有序列文件**：`met_BLH.txt`/`met_RAIN.txt`（默认 7 点）、
 `met_{TEMP,PRES,RH,BLH,RAIN,JFAC}_demo.txt`（121 点逐时样例，实验 M 用）、
@@ -491,6 +491,7 @@ dy/dt −= y · (dBLH/BLH)     dBLH[cm/s], BLH[cm]
 | 8 | **序列总数 ≤8（气象+BC 共享池）** | `NSER_MAX=8`；超限编译期拒绝。 |
 | 9 | **极痕量物种可出现负值** | O/O₁D 实测 min = −4e−4 / −1.5e−71（相对峰值 <1e-7）。BDF 不保正性是正常行为（10b 坑 #5），**不施加 `max(y,0)`**（会引入 RHS 折点，曾致 15× 步数惩罚）。 |
 | 10 | **CSV 三位指数（历史产物）** | R13 前输出用 `ES13.5`，\|指数\|≥100 时静默丢 E（如 `3.07932-174`）。现已改 `ES15.5E3`；旧文件用 `diagnostics/csvfloat.fix_fortran_exp()` 解析。 |
+| 11 | **无风速/风向/平流/对流** | 0-D 箱体**结构上没有**这些通道：模型无 x/y/z 坐标、无输运算子，风速风向无处可用（不是"没实现"，是"维度不存在"）。水平输送由 **`dilution.config` 的 `DIL`**（一阶通风率 [s⁻¹]）集总替代，垂直混合由 **BLH** 表达，湍流扩散并入 BLH 膨胀项。实测 `DIL` 是强控制量：0 → O3max 157.5 ppb，1.16e-5 → 101.6，5e-5 → 55.6。需要真实风场驱动的平流/对流 → 必须上三维模式（CMAQ/GEOS-Chem/WRF-Chem），0-D 箱体无法承载。 |
 
 ---
 

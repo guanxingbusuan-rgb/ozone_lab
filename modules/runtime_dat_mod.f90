@@ -101,8 +101,10 @@ contains
                     sec = "DIL"
                 case ("PHOT")
                     ! PHOT 头行: MODE lat doy (后续 nj 行 J idx l m n)
+                    ! 行只有 3 个 token: MODE=1, lat=2, doy=3 → 判据必须是 nt>=3
+                    ! (旧写 nt>=4 使 DOY 永远读不到, 静默停留在默认值 172)
                     if (nt >= 3) phot_lat = num(tok(2))
-                    if (nt >= 4) phot_doy = num(tok(3))
+                    if (nt >= 3) phot_doy = num(tok(3))
                     sec = "PHOT"
                 case ("IC")
                     sec = "IC"
@@ -149,7 +151,7 @@ contains
                 if (tok(1) == "MCM" .or. tok(1) == "DIRECT") then
                     phot_mode = merge(1, 2, tok(1) == "MCM")   ! R16: 记录模式
                     if (nt >= 3) phot_lat = num(tok(2))
-                    if (nt >= 4) phot_doy = num(tok(3))
+                    if (nt >= 3) phot_doy = num(tok(3))
                 else if (tok(1) == "J") then
                     idx = int_val(tok(2))
                     j_l(idx) = num(tok(3)); j_m(idx) = num(tok(4)); j_n(idx) = num(tok(5))

@@ -440,7 +440,7 @@ ISOP    2.5e9    cm3
 TEMP   = 298.15                        # K
 PRES   = 1013.25                       # hPa
 RH     = 60                            # %
-RADIAT = 0                             # W/m²（保留，当前不参与 J）
+RADIAT = 0                             # W/m²（当前无消费者；见下方说明）
 BLH    = file:constraints/met_BLH.txt  # m（序列, 必须 >0）
 RAIN   = file:constraints/met_RAIN.txt # mm/h（序列）
 JFAC   = 1.0                           # 光解缩放（云订正 0–1）
@@ -500,8 +500,12 @@ LAT  = 40.0           # 纬度（决定 SZA 日变化）
 DOY  = 172.0          # 年积日（172≈夏至）
 JMAP = 13=D4.0e-5,14=D1.0e-5,...   # 槽位→l 参数（速率表未定义时的直给）
 ```
-- J 计算式：`J = JFAC·l·cosᶻᵐ·exp(−n/cosχ)`；`cosχ≤1e-3 → J=0`（夜间）
+- J 计算式：`J = JFAC·l·cosᵐχ·exp(−n/cosχ)`；`cosχ≤1e-3 → J=0`（夜间）
 - 槽位 1–41，机制用到 23 个；MAPPING 缺省恒等
+- **LAT/DOY 是光解的唯二地理控制**：SZA 由 `LAT + DOY + 时角` 现算，
+  所以 METEO 里的 RADIAT **不需要、也无法**参与（见下）
+- 实测：lat=60 时夏至 O3max 99.77 ppb vs 冬至 10.95 ppb（差 9×）
+  —— 这条已被 `FT-PHOT` 回归用例锁住（曾因 `nt>=4` 判据错误使 DOY 静默失效）
 
 #### ⑦ `emissions.config` —— 排放（四列格式）
 
@@ -2785,7 +2789,7 @@ RH    = file:constraints/met_RH_mysite.txt        # %
 BLH   = file:constraints/met_BLH_mysite.txt       # m，必须 > 0（编译期强制）
 RAIN  = file:constraints/met_RAIN_mysite.txt      # mm/h
 JFAC  = file:constraints/met_JFAC_mysite.txt      # 0–1（云订正）
-RADIAT = file:constraints/met_RADIAT_mysite.txt   # W/m²（保留，当前不参与 J）
+RADIAT = file:constraints/met_RADIAT_mysite.txt   # W/m²（当前无消费者，填了也不生效）
 ```
 
 **⚠ 与模板①的关键差别：气象序列里不能写 `# unit:` 行。**

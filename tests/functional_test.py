@@ -10,6 +10,7 @@ import numpy as np
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(HERE)
 sys.path.insert(0, "diagnostics")
+import re
 import shutil
 import tempfile
 import diagnostics as dg
@@ -439,6 +440,52 @@ try:
           "逐字节一致" if _fresh == _repo else "⚠ 仓库内 runtime_v3.dat 陈旧, 请 make runtime_v3.dat")
 finally:
     shutil.rmtree(os.path.dirname(_tmp_rt), ignore_errors=True)
+
+# ================= FT-PHOT: PHOT 头行 LAT/DOY 必须真正生效 =================
+print("== FT-PHOT 光解头行 MODE lat doy 解析 ==")
+# 陷阱: runtime_dat_mod 的 PHOT 头行是 "MCM <lat> <doy>" 共 3 个 token。
+# 若 doy 的判据写成 nt>=4, DOY 永远读不到, 静默停在默认 172 —— 换季节毫无效果。
+# 防线: 同纬度下夏至/冬至必须产生显著不同的 O3。
+_phot_tmp = tempfile.mkdtemp()
+_o3_by_doy = {}
+try:
+    for _doy in (172, 355):
+        _d = os.path.join(_phot_tmp, f"d{_doy}")
+        os.makedirs(_d)
+        for _f in os.listdir("input_v3"):
+            _p = os.path.join("input_v3", _f)
+            if os.path.isfile(_p):
+                shutil.copy(_p, _d)
+        shutil.copytree("input_v3/constraints", os.path.join(_d, "constraints"))
+        # 高纬才拉得开差距: lat=60 的冬至接近极夜
+        # 只改 LAT/DOY 两行, 保留 JMAP 等其余行 (否则光解槽位校验会报缺参)
+        _ph = os.path.join(_d, "photolysis.config")
+        _lines = []
+        for _ln in open(_ph):
+            if _ln.strip().startswith("LAT"):
+                _lines.append("LAT  = 60.0\n")
+            elif _ln.strip().startswith("DOY"):
+                _lines.append(f"DOY  = {_doy}\n")
+            else:
+                _lines.append(_ln)
+        open(_ph, "w").writelines(_lines)
+        _rt = os.path.join(_phot_tmp, f"rt{_doy}.dat")
+        _rc = subprocess.run([sys.executable, "src/cfgbuild.py", _d, _rt,
+                              "--mech", "mechanism/mechanism_3_full_chain.fac"],
+                             capture_output=True, text=True)
+        _pref = os.path.join(_phot_tmp, f"o{_doy}")
+        # fac_v3 按相对路径读 gen_v3/oz.reac → 必须 cwd=facsimile_impl
+        _r = subprocess.run([os.path.abspath("facsimile_impl/fac_v3"),
+                             "SCEN_BAU", _pref, os.path.abspath(_rt)],
+                            capture_output=True, text=True, cwd="facsimile_impl")
+        _m = re.search(r"O3max=\s*([\d.]+)", _r.stdout or "")
+        _o3_by_doy[_doy] = float(_m.group(1)) if _m else float("nan")
+    _summer, _winter = _o3_by_doy[172], _o3_by_doy[355]
+    check("PHOT 的 DOY 真正生效 (夏至 vs 冬至 O3 显著不同)",
+          _summer == _summer and _winter == _winter and abs(_summer - _winter) > 20,
+          f"lat60 夏至 {_summer:.2f} vs 冬至 {_winter:.2f} ppb")
+finally:
+    shutil.rmtree(_phot_tmp, ignore_errors=True)
 
 n_pass = sum(1 for x in PASS if x)
 print(f"\n===== functional_test: {n_pass}/{len(PASS)} PASS =====")
