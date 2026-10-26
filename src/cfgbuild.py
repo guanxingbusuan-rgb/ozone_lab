@@ -113,7 +113,13 @@ def parse_photolysis_table(path):
         entries[j] = (l_, m_, n_)
     return entries
 
-def compile_cfg(input_dir="input_v3", out_path="runtime_v3.dat", mech_override=None):
+def compile_cfg(input_dir="input_v3", out_path="runtime_v3.dat", mech_override=None,
+                days_override=None, dtout_override=None):
+    """编译 12 类配置 → runtime.dat
+
+    days_override   : 命令行 --days 覆盖 model.parameters 第 1 行（不改文件）
+    dtout_override  : 命令行 --dtout 覆盖第 2 行（一般不需要；见 GUIDE §3⑫ 坑①）
+    """
     errs = []
     inp = Path(input_dir)
 
@@ -317,6 +323,15 @@ def compile_cfg(input_dir="input_v3", out_path="runtime_v3.dat", mech_override=N
                     f"实际只有 {len(mp)} 行 — 缺项会在 Fortran 端导致除零或空结果")
         mp += [float("nan")] * (4 - len(mp))
     else:
+        # 命令行覆盖（--days / --dtout）优先于文件；不改文件本体
+        if days_override is not None:
+            print(f"[cfgbuild] --days {days_override:g} 覆盖 model.parameters 第1行 "
+                  f"(文件值 {mp[0]:g}，文件未改动)")
+            mp[0] = float(days_override)
+        if dtout_override is not None:
+            print(f"[cfgbuild] --dtout {dtout_override:g} 覆盖 model.parameters 第2行 "
+                  f"(文件值 {mp[1]:g}，文件未改动)")
+            mp[1] = float(dtout_override)
         _days, _dtout, _rtol, _atol = mp
         if not (_days > 0):
             errs.append(f"model.parameters: 模拟天数必须 > 0 (当前 {_days:g}) — "
@@ -336,6 +351,11 @@ def compile_cfg(input_dir="input_v3", out_path="runtime_v3.dat", mech_override=N
             elif _nst < 24:
                 print(f"[cfgbuild] ⚠ 只有 {_nst:.0f} 个输出步 (<24): "
                       f"fac_v3 的『末 24 步』窗口会覆盖全程, 与『末 24 h』不再是同一件事",
+                      file=sys.stderr)
+            # spin-up 提示: 前 2 天是建立期, 天数 <2 时"末 24h"仍含建立期
+            if _days < 2.0:
+                print(f"[cfgbuild] ⚠ 模拟 {_days:g} 天 < 2 天: 前 1–2 天是 spin-up 建立期, "
+                      f"『末 24h』结果会包含未充分平衡的段。做稳态判据分析建议 ≥3 天",
                       file=sys.stderr)
             if _dtout != 3600.0:
                 print(f"[cfgbuild] ⚠ 输出步长 {_dtout:g}s ≠ 3600s —— 注意两点:\n"
@@ -444,10 +464,41 @@ def compile_cfg(input_dir="input_v3", out_path="runtime_v3.dat", mech_override=N
 if __name__ == "__main__":
     args = sys.argv[1:]
     mech_override = None
-    if "--mech" in args:
-        i = args.index("--mech")
-        mech_override = args[i + 1]
-        args = args[:i] + args[i + 2:]
+    days_override = None
+    dtout_override = None
+
+    def _take(flag):
+        """取出 --flag VALUE，返回 (值, 剩余参数)"""
+        global args
+        if flag in args:
+            i = args.index(flag)
+            if i + 1 >= len(args):
+                print(f"[cfgbuild] ✗ {flag} 缺少数值", file=sys.stderr)
+                sys.exit(2)
+            val = args[i + 1]
+            args = args[:i] + args[i + 2:]
+            return val
+        return None
+
+    _m = _take("--mech")
+    if _m is not None:
+        mech_override = _m
+    _d = _take("--days")
+    if _d is not None:
+        try:
+            days_override = float(_d)
+        except ValueError:
+            print(f"[cfgbuild] ✗ --days 需要数值，收到 '{_d}'", file=sys.stderr)
+            sys.exit(2)
+    _t = _take("--dtout")
+    if _t is not None:
+        try:
+            dtout_override = float(_t)
+        except ValueError:
+            print(f"[cfgbuild] ✗ --dtout 需要数值（秒），收到 '{_t}'", file=sys.stderr)
+            sys.exit(2)
+
     inp = args[0] if args else "input_v3"
     out = args[1] if len(args) > 1 else "runtime_v3.dat"
-    compile_cfg(inp, out, mech_override=mech_override)
+    compile_cfg(inp, out, mech_override=mech_override,
+                days_override=days_override, dtout_override=dtout_override)

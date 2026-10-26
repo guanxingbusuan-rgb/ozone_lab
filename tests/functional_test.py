@@ -519,6 +519,47 @@ try:
 finally:
     shutil.rmtree(_mp_tmp, ignore_errors=True)
 
+# ================= FT-DAYS: --days 覆盖生效且不修改文件 =================
+print("== FT-DAYS cfgbuild --days 天数覆盖 ==")
+_days_tmp = tempfile.mkdtemp()
+try:
+    _rt5 = os.path.join(_days_tmp, "rt5.dat")
+    _rt3 = os.path.join(_days_tmp, "rt3.dat")
+    _base = [sys.executable, "src/cfgbuild.py", "input_v3",
+             "--mech", "mechanism/mechanism_3_full_chain.fac"]
+    _r5 = subprocess.run(_base[:3] + [_rt5] + _base[3:],
+                         capture_output=True, text=True)
+    _r3 = subprocess.run(_base[:3] + [_rt3, "--days", "3"] + _base[3:],
+                         capture_output=True, text=True)
+
+    def _model_line(p):
+        for _ln in open(p):
+            if _ln.startswith("MODEL"):
+                return _ln.split()
+        return []
+
+    _m5, _m3 = _model_line(_rt5), _model_line(_rt3)
+    check("--days 3 写入 runtime (MODEL 第2列=3)",
+          _r3.returncode == 0 and _m3 and float(_m3[1]) == 3.0,
+          f"MODEL {_m3[1] if _m3 else '?'} 天")
+    check("--days 不改 model.parameters 文件本身",
+          "5.0" in open("input_v3/model.parameters").readline(),
+          "文件首行仍为 5.0")
+    # 天数变了必须真的影响输出行数 (否则覆盖是假的)
+    _o3 = os.path.join(_days_tmp, "o3")
+    _r = subprocess.run([os.path.abspath("facsimile_impl/fac_v3"), "SCEN_BAU",
+                         _o3, os.path.abspath(_rt3)],
+                        capture_output=True, text=True, cwd="facsimile_impl")
+    _lines = open(_o3 + "_conc.csv").read().strip().splitlines()
+    _last_h = int(_lines[-1].split(",")[0])          # h 列 = 步序号
+    _rows = len(_lines) - 1
+    # 3 天 = 72 步 → 末步序号必须是 72（5 天则是 120）。窗口恒为末 24 步 → 25 行
+    check("--days 3 输出末步序号=72 且窗口 25 行",
+          _r.returncode == 0 and _last_h == 72 and _rows == 25,
+          f"末 h={_last_h}, {_rows} 行")
+finally:
+    shutil.rmtree(_days_tmp, ignore_errors=True)
+
 n_pass = sum(1 for x in PASS if x)
 print(f"\n===== functional_test: {n_pass}/{len(PASS)} PASS =====")
 sys.exit(0 if n_pass == len(PASS) else 1)

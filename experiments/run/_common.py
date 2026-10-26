@@ -155,7 +155,7 @@ def run_mcm(days, pref, fnox=1.0, fvoc=1.0):
 
 # ══════════════════════ 输入变体 ══════════════════════
 def clone_input(dst, emissions_scale=None, bc_lines=None, tau=None, obs=None,
-                extra_constraints=None):
+                extra_constraints=None, days=None, dtout=None):
     """复制 input_v3 → dst，并按需改写排放/bc/约束，然后 cfgbuild 编译。
 
     参数:
@@ -164,7 +164,9 @@ def clone_input(dst, emissions_scale=None, bc_lines=None, tau=None, obs=None,
       tau             : 仅设 TAU_MIX（保留原 bc 物种行）
       obs             : {species: (times_h, vals_ppb)} → 生成序列文件并登记为约束
       extra_constraints : {dst_name: source_path} 复制到 constraints/
-    返回: (runtime_dat_path, output_prefix_helper)
+      days            : 模拟天数；走 cfgbuild --days 覆盖，**不改 model.parameters 文件**
+      dtout           : 输出步长 [s]；一般不需改（见 GUIDE §3⑫ 坑①）
+    返回: runtime_dat_path
     """
     import shutil
     ensure_dir(dst)
@@ -228,7 +230,12 @@ def clone_input(dst, emissions_scale=None, bc_lines=None, tau=None, obs=None,
         open(src_bc, "w").write("\n".join(kept) + "\n")
 
     rt = os.path.join(os.path.dirname(os.path.abspath(dst)), os.path.basename(dst) + "_rt.dat")
-    run([PY, CFGBUILD, dst, rt, "--mech", MECH])
+    cmd = [PY, CFGBUILD, dst, rt, "--mech", MECH]
+    if days is not None:
+        cmd += ["--days", f"{days:g}"]
+    if dtout is not None:
+        cmd += ["--dtout", f"{dtout:g}"]
+    run(cmd)
     return rt
 
 

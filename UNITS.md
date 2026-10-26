@@ -156,8 +156,26 @@ PAN     5.0e9             # 省略单位 → 按 cm3
 | DMS, MSA, TERP | 1e6 |
 | 其余（含全部自由基） | **沿用第 4 行基线** |
 
-> 详细操作与三个坑（步长耦合、天数过小、ATOL 覆盖）见
-> [EXPERIMENTS_GUIDE.md §3 ⑫](EXPERIMENTS_GUIDE.md)。
+**天数灵活设置（不必改文件）**：
+
+```bash
+make run DAYS=3 SCEN=SCEN_BAU PREF=../output/d3     # 一步跑
+make runtime_v3.dat DAYS=2                           # 只重编译
+python src/cfgbuild.py input_v3 runtime_v3.dat --mech mechanism/mechanism_3_full_chain.fac --days 7
+```
+
+`--days` 只对本次编译生效，`input_v3/model.parameters` 保持原值。
+实测收敛（末 24h O₃ 均值）：1 天 42.69 / 2 天 57.88 / 3 天 58.59 / 5 天 59.21 /
+7 天 59.23 ppb → **建议 ≥3 天，5 天最稳**。
+
+**RTOL / ATOL 含义**：CVODE 的自适应步长判据是
+`|err_i| ≤ RTOL×|y_i| + ATOL`（逐物种）。RTOL 管大数（主量），ATOL 管小数
+（痕量/自由基），两者取大者。本模型实测极不敏感：RTOL 1e-2→1e-10、
+ATOL 1e1→1e6 范围内 O₃ 结果完全一致（仅步数变化 4324–6019）。
+**默认 `1e-6 / 1e3` 足够，除非求解失败不要动。**
+
+> 三个坑（步长耦合、天数过小、ATOL 按名覆盖）与 RTOL/ATOL 完整推导见
+> [EXPERIMENTS_GUIDE.md §3 ⑫⑬](EXPERIMENTS_GUIDE.md)。
 
 ### 2.4 `bc.config` —— 边界条件（观测张弛）
 

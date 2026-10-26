@@ -21,7 +21,7 @@ CVODELIB ?= $(HOME)/soft/atmenv/cvode/lib
 FFLAGS := -Wall -O2 -ffree-line-length-none
 export PATH := $(CONDA_ENV)/bin:$(PATH)
 
-.PHONY: all mcm smoke functional test v3 batch figures nc clean clean-build clean-output FORCE
+.PHONY: all mcm smoke functional test v3 batch run figures nc clean clean-build clean-output FORCE
 
 all: facsimile_impl/fac_v3 facsimile_impl/fac_batch_omp
 
@@ -37,8 +37,17 @@ facsimile_impl/gen_v3/oz_mech.f90: mechanism/mechanism_3_full_chain.fac facsimil
 # 原因: 仅靠 mtime 会漏掉"同一秒内改配置又改回"的情形 —— make 误判 up-to-date,
 # 导致 runtime.dat 保留中间值, 模拟结果无声出错(实测复现)。
 # cfgbuild 幂等 + 极快, 强制重建是更安全的默认。
+#
+# 模拟天数: 用 DAYS= 临时覆盖, 不改 input_v3/model.parameters 文件
+#   make runtime_v3.dat DAYS=3      # 本次只跑 3 天
+#   make run DAYS=1 SCEN=SCEN_BAU   # 编译+跑一步到位
+DAYS ?=
+_CFGBUILD = $(PY) src/cfgbuild.py input_v3 runtime_v3.dat \
+            --mech mechanism/mechanism_3_full_chain.fac \
+            $(if $(DAYS),--days $(DAYS),)
+
 runtime_v3.dat: FORCE $(wildcard input_v3/* input_v3/constraints/*) src/cfgbuild.py
-	@$(PY) src/cfgbuild.py input_v3 runtime_v3.dat --mech mechanism/mechanism_3_full_chain.fac
+	@$(_CFGBUILD)
 
 FORCE:
 
@@ -86,6 +95,13 @@ mcm: mcm_city/mcm_run
 
 batch: v3 runtime_v3.dat
 	cd facsimile_impl && ./fac_batch_omp 9 ../output/batch_v3_indicators.csv ../runtime_v3.dat
+
+# 单情景一步跑: make run [DAYS=n] [SCEN=SCEN_X] [PREF=前缀]
+SCEN ?= SCEN_BAU
+PREF ?= ../output/run1
+run: v3 runtime_v3.dat
+	@echo "[run] $(SCEN) · $(if $(DAYS),$(DAYS) 天,默认天数) → $(PREF)"
+	cd facsimile_impl && ./fac_v3 $(SCEN) $(PREF) ../runtime_v3.dat
 
 # 注: make all 不含 mcm_run（它是独立子树），需要时显式 make mcm
 

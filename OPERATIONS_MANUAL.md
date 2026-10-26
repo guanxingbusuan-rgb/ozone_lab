@@ -97,9 +97,14 @@ fac_expanded · fac_spgmr · kpp_batch · `rate_sensitivity.py`/`species_constra
 ```bash
 make all          # 两个工程可执行体 (fac_v3/fac_batch_omp)
 make mcm          # MCM 对照路线 (mcm_run, 29sp 独立子树) — R15 补建
-make test         # 冒烟 1/1 → 功能 24/24 (含金值哨兵+R10-R13 防线) → 元素审计 131/131 → 体制诊断
+make test         # 冒烟 1/1 → 功能 35/35 (含金值哨兵/R10-R13/PHOT/MP/DAYS) → 元素审计 131/131
+make run DAYS=3 SCEN=SCEN_BAU PREF=../output/d3   # 单情景一步跑（天数控）
 make clean        # 删除二进制+生成码 (fac_v3/fac_batch_omp 自动重建)
 ```
+
+**模拟天数**：`DAYS=` / `--days` **临时覆盖，不改 `model.parameters` 文件**。
+实测收敛（末 24h O₃）：1 天 42.69 / 3 天 58.59 / 5 天 59.21 / 7 天 59.23 ppb
+→ 建议 ≥3 天。详见 [GUIDE §3⑫-1](EXPERIMENTS_GUIDE.md)。
 
 `make test` 全绿是任何实验的**前置条件**。审计 131/131 由 `audit/element_audit.py`
 执行（机制自带 FORMULA 段为配平事实源）。
@@ -282,7 +287,7 @@ VOCs/卫星模板同路径（卫星先离线转换）；排放清单模板直接
 | 干沉降 vd | cm/s | k = vd/BLH | 不列=0 | — |
 | 湿沉降 | a: s⁻¹/(mm·h⁻¹)^b | — | 不列=0 | — |
 | 光解 JMAP D 值 | s⁻¹（正午） | — | — | 槽位缺失拒绝 |
-| model.parameters | 天 / 输出步长[s] / rtol / atol | — | days/dtout≤0 或行数不足 → 拒绝 | 必需；可改，详见 GUIDE §3⑫ |
+| model.parameters | 天 / 输出步长[s] / rtol / atol | — | days/dtout≤0 或行数不足 → 拒绝 | 必需；天数用 `--days`/`DAYS=` 覆盖（不改文件），详见 GUIDE §3⑫ |
 
 #### 表 B · .fac 机制参数（半硬编码: 用户可改文本, 改 = 重编译）
 
