@@ -342,8 +342,31 @@ def main(argv=None):
             print(f"    本: → {r['our_rhs'][:60]}")
             print(f"    MCM: → {r['mcm_rhs']}")
 
+    # ══ 第三道关口: 文档一致性（mechanism/README 反应表 vs .fac 实际值）══
+    doc_bad = []
+    _rd_path = os.path.join(ROOT, "mechanism", "README.md")
+    if os.path.exists(_rd_path):
+        _rd = open(_rd_path).read()
+        _defs = {k: v.strip() for k, v in
+                 re.findall(r"^([A-Z][A-Za-z0-9_]*)\s*=\s*([^;]+);",
+                            open(OURS).read(), re.M)}
+        _rows = re.findall(r"`([A-Z][A-Za-z0-9_]*)` = ([^|`\n]+)", _rd)
+        _norm = lambda x: x.replace(" ", "").replace("D", "e").replace("d", "e").upper()
+        for _n, _v in _rows:
+            _v = _v.strip().rstrip("| ").strip()
+            if _n in _defs:
+                if (_norm(_v) not in _norm(_defs[_n])
+                        and _norm(_defs[_n]) not in _norm(_v)):
+                    doc_bad.append((_n, _v, _defs[_n]))
+    if not args.quiet and doc_bad:
+        print(f"\n{'=' * 78}")
+        print(f"文档漂移 {len(doc_bad)} 处（mechanism/README 与 .fac 不一致）")
+        print("=" * 78)
+        for _n, _v, _a in doc_bad:
+            print(f"  {_n:12s} README={_v[:26]:26s} 实际={_a[:30]}")
+
     max_rel = max([r["rel"] for r in rows + lump_rows] or [0])
-    ok = max_rel <= args.threshold
+    ok = max_rel <= args.threshold and not doc_bad
     print(f"\n[{'PASS' if ok else 'FAIL'}] 速率系数一致性 "
           f"({len(rows)} 条无机 + {len(lump_rows)} 条集总映射, "
           f"最大偏差 {max_rel * 100:.1f}% vs 阈值 {args.threshold:.0%})"

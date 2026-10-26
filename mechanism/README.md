@@ -74,6 +74,10 @@ NOx–O₃–HOx–ROx 三大循环 + 生物源/人为 VOC 降解 + 夜间化学
 | V2.3 | 74sp / 131rx | ① 臭氧化 OH 产率显式化（OLE 0.30 / ISOP 0.26，Criegee 通道）② **烷基硝酸盐家族**（RONO₂/OLENIT；ISOPNIT 死物种复活）③ **单萜迷你链**（TERP 五物种，三入口，O₃ 通道 OH 产率 0.80）④ PNA+OH 汇 | ① 夜间/黎明 OH 源缺失（臭氧化无自由基产物，物理不自洽）② NOx 远程输送缺失（RO₂+NO 无硝酸酯分支）③ 森林场景不可用（无 TERP）④ HO₂NO₂ 只有生成无消耗 |
 | **V2.4** | **111sp / 198rx** | 见下节 V2.4 专项 | **二次 HCHO 生成不足**（GLY 光解不产 HCHO）+ **VOC 谱系缺失**（无芳香分级/长链烷烃/醇醚酯/倍半萜/乙烯/内烯烃/高级醛）+ **RO₂+HO₂ 闭环缺口**（ARO1O2/ARO2O2 只有 +NO 无 +HO₂）+ **RO₂ 交叉缔合仅 CH₃O₂ 单代表** + **MACR+NO₃ 缺失** |
 
+> 📊 **升级必要性评估**：[V25_ASSESSMENT.md](V25_ASSESSMENT.md) —— 用实测反应通量量化 P0/P1/P2 共 11 项，结论是**只有 P1-4 Criegee 显式化值得做**。
+> 关键数据：RO₂ 交叉仅占 0.34%、DMS 仅占 VOC 0.014%、夜间 N₂O₅ 仅占 NOy 0.5%、
+> 但**夜间 OH 的 100% 来自 Criegee 通道**（现用产率法）。
+
 ### 2.1b MCM v3.3.1 官方系数对齐（2026-10-26，V2.4 内修订）
 
 官方导出已入库 `mechanism/reference/mcm_v3.3.1_export.fac`（5832sp/17224rx）。
@@ -231,7 +235,7 @@ EOF
 | ② | NO₃/N₂O₅ 夜化学 | 10 | MCM Troe 逐字（KMT03/04/07/08/11） |
 | ③ | CH₄ 氧化链 + PAN 储库 | 19 | RO₂+NO / RO₂+HO₂ / PAN 生成与热解 |
 | ④ | ISOP 完整二代链 | 21 | OH/NO₃/O₃ 三入口、三分支、MVK/MACR→MPAN/MGLY 回灌 |
-| ⑤ | 硫链 | 4 | DMS→SO₂→SO₃→H₂SO₄ + MSA |
+| ⑤ | 硫链 | 5 | SO₂→SO₃→H₂SO₄ + DMS→MSA（简化：缺 CH₃SCH₂O₂ 中间体） |
 | ⑥ | 卤素闭环 | 17 | Cl/Br × 2 储库 × 光解再生 |
 | ⑦ | VOC 集总类 | 18 | OLE/ALK/ARO1/ARO2/KET/GLY |
 | ⑧ | 支撑化学 | 4 | PNA 温度计、N₂O₅ 光解、OH+HNO₃ |
@@ -462,17 +466,17 @@ EOF
 | 7 | 6.0D-34*(TEMP/300)@-2.6*M*O2 | `O + O2 + M = O3` |
 | 8 | `KO3NO` = 1.4D-12*EXP(-1310/TEMP) | `O3 + NO = NO2` |
 | 9 | `KO3NO2NO3` = 1.4D-13*EXP(-2470/TEMP) | `O3 + NO2 = NO3` |
-| 10 | `KONO2` = 1.0D-11 | `O + NO2 = NO` |
+| 10 | `KONO2` = 5.5D-12*EXP(188/TEMP) | `O + NO2 = NO` |
 | 11 | `KMT08` = (K80*K8I)*F8/(K80+K8I) | `NO2 + OH = HNO3` |
 | 12 | `KMT07` = (K70*K7I)*F7/(K70+K7I) | `NO + OH = HONO` |
 | 13 | `KHONOOH` = 2.5D-12*EXP(260/TEMP) | `HONO + OH = NO2` |
 | 14 | `KO1DH2O` = 2.2D-10*H2O | `O1D + H2O = OH + OH` |
 | 15 | `KO1DM` = 2.9D-11*M | `O1D + M = O` |
 | 16 | `KCOOH` = 1.44D-13*(1+(M/4.2D19)) | `CO + OH = HO2` |
-| 17 | `KHCHOOH` = 1.0D-11 | `HCHO + OH = HO2 + CO` |
+| 17 | `KHCHOOH` = 5.4D-12*EXP(135/TEMP) | `HCHO + OH = HO2 + CO` |
 | 18 | `J<11>` (光解) | `HCHO = HO2 + HO2 + CO` |
 | 19 | `J<12>` (光解) | `HCHO = CO` |
-| 20 | `KHO2NO` = 8.6D-12*EXP(270/TEMP) | `HO2 + NO = NO2 + OH` |
+| 20 | `KHO2NO` = 3.45D-12*EXP(270/TEMP)*EXP(270/TEMP) | `HO2 + NO = NO2 + OH` |
 | 21 | `KHO2HO2A` = 2.20D-13*KMT06*EXP(600/TEMP) | `HO2 + HO2 = H2O2` |
 | 22 | `KHO2HO2B` = 1.90D-33*M*KMT06*EXP(980/TEMP) | `HO2 + HO2 = H2O2` |
 | 23 | `KH2O2OH` = 1.8D-12 | `H2O2 + OH = HO2` |
@@ -529,19 +533,19 @@ EOF
 | 59 | 1.9D-11 | `ISOPOOH + OH = ISOPBO2` |
 | 60 | 4.0D-12 | `ISOPNO3 + NO = MACR + HCHO + 2 NO2` |
 | 61 | `KRO2HO2` = 2.91D-13*EXP(1300/TEMP) | `ISOPNO3 + HO2 = ISOPDNT` |
-| 62 | `KMVKOH` = 4.13D-12*EXP(452/TEMP) | `MVK + OH = MVKO2` |
+| 62 | `KMVKOH` = 2.6D-12*EXP(610/TEMP)*EXP(452/TEMP) | `MVK + OH = MVKO2` |
 | 63 | `KRO2NO` = 2.7D-12*EXP(360/TEMP) | `MVKO2 + NO = MVKO + NO2` |
 | 64 | `KRO2HO2` = 2.91D-13*EXP(1300/TEMP) | `MVKO2 + HO2 = MVKOOH` |
 | 65 | 1.9D-11 | `MVKOOH + OH = MVKO2` |
 | 66 | 7.3D-13*EXP(580/TEMP)*O2 | `MVKO + O2 = CH3CO3 + HCHO + HCHO` |
-| 67 | `KMACROH` = 4.2D-12*EXP(540/TEMP) | `MACR + OH = MACRO2` |
+| 67 | `KMACROH` = 8.0D-12*EXP(380/TEMP)*EXP(540/TEMP) | `MACR + OH = MACRO2` |
 | 68 | `KFPAN` = (KC0*KCI)*FC/(KC0+KCI) | `MACRO2 + NO2 = MPAN` |
-| 69 | `KMPANTH` = 1.6D-3*EXP(-13500/TEMP) | `MPAN = MACRO2 + NO2` |
+| 69 | `KMPANTH` = 1.6D+16*EXP(-13500/TEMP) | `MPAN = MACRO2 + NO2` |
 | 70 | 4.0D-12 | `MACRO2 + NO = MACROO + NO2` |
 | 71 | 7.3D-13*EXP(580/TEMP)*O2 | `MACROO + O2 = MGLY + CO + OH` |
 | 72 | `KRO2HO2` = 2.91D-13*EXP(1300/TEMP) | `MACRO2 + HO2 = MACROOH` |
 | 73 | `J<22>` (光解) | `MGLY = CO + CH3CHO` |
-| 74 | `KMGLYOH` = 1.9D-12 | `MGLY + OH = CH3CO3 + CO` |
+| 74 | `KMGLYOH` = 1.9D-12*EXP(575/TEMP) | `MGLY + OH = CH3CO3 + CO` |
 
 #### ⑤ 硫链 DMS→SO₂→SO₃→H₂SO₄（4 条）
 
@@ -549,7 +553,7 @@ EOF
 |---|---|---|
 | 75 | `KSO2OH` = 9.0D-13 | `SO2 + OH = SO3 + HO2` |
 | 76 | `KSO3HYD` = 1.0D-2 | `SO3 = H2SO4` |
-| 77 | `KDMSOH` = 5.0D-12*EXP(-330/TEMP) | `DMS + OH = MSA + CH3O2` |
+| 77 | `KDMSOH` = 1.12D-11*EXP(-250/TEMP) | `DMS + OH = MSA + CH3O2` |
 | 78 | `KDMSNO3` = 1.9D-13*EXP(520/TEMP) | `DMS + NO3 = MSA + CO + NO2` |
 
 #### ⑥ 卤素催化 O₃ 损耗 + 储库闭环（19 条）
@@ -592,10 +596,10 @@ EOF
 | 107 | `KRO2HO2` = 2.91D-13*EXP(1300/TEMP) | `ALKRO2 + HO2 = ALKOOH + O2` |
 | 108 | `KHCLOH` = 7.8D-13*EXP(-290/TEMP) | `ALKOOH + OH = ALKRO2 + H2O` |
 | 109 | `KARO1OH` = 5.6D-12 | `ARO1 + OH = ARO1O2 + O2` |
-| 110 | `KARO2OH` = 1.3D-11 | `ARO2 + OH = ARO2O2 + O2` |
+| 110 | `KARO2OH` = 2.31D-11 | `ARO2 + OH = ARO2O2 + O2` |
 | 111 | `KRO2NO` = 2.7D-12*EXP(360/TEMP) | `ARO1O2 + NO + O2 = GLY + MGLY + CH3CO3 + NO2` |
 | 112 | `KRO2NO` = 2.7D-12*EXP(360/TEMP) | `ARO2O2 + NO + 2.50 O2 = 0.50 GLY + MGLY + 2.00 CH3CO3 + NO2` |
-| 113 | `KKETOH` = 2.2D-13 | `KET + OH = KETRO2 + H2O` |
+| 113 | `KKETOH` = 8.8D-12*EXP(-1320/TEMP)+1.7D-14*EXP(423/TEMP) | `KET + OH = KETRO2 + H2O` |
 | 114 | `KRO2NO` = 2.7D-12*EXP(360/TEMP) | `KETRO2 + NO + O2 = CH3CO3 + HCHO + NO2` |
 | 115 | `J<15>` (光解) | `KET = CH3CO3 + CH3O2 + 0.50 O2` |
 | 116 | `J<16>` (光解) | `GLY = CO + CO + H2` |
@@ -620,10 +624,10 @@ EOF
 
 | # | 速率 | 反应 |
 |---|---|---|
-| 123 | `KTERPOH` = 1.2D-10 | `TERP + OH = TERPRO2 + H2O` |
-| 124 | `KTERPO3` = 8.0D-17 | `TERP + O3 = TERPCHO + 0.80 OH + 0.10 O2 + 0.60 H2` |
-| 125 | `KTERPNO3` = 3.8D-12 | `TERP + NO3 = TERPNIT` |
-| 126 | `KTERPOH` = 1.2D-10 | `TERPRO2 + NO = TERPCHO + NO2 + 1.50 H2` |
+| 123 | `KTERPOH` = 1.2D-11*EXP(440/TEMP) | `TERP + OH = TERPRO2 + H2O` |
+| 124 | `KTERPO3` = 8.05D-16*EXP(-640/TEMP) | `TERP + O3 = TERPCHO + 0.80 OH + 0.10 O2 + 0.60 H2` |
+| 125 | `KTERPNO3` = 1.2D-12*EXP(490/TEMP) | `TERP + NO3 = TERPNIT` |
+| 126 | `KTERPOH` = 1.2D-11*EXP(440/TEMP) | `TERPRO2 + NO = TERPCHO + NO2 + 1.50 H2` |
 | 127 | `KRO2HO2` = 2.91D-13*EXP(1300/TEMP) | `TERPRO2 + HO2 = TERPOOH` |
 | 128 | `KRO2HO2` = 2.91D-13*EXP(1300/TEMP) | `TERPNIT + HO2 = TERPCHO + HNO3 + H2` |
 | 129 | `J<14>` (光解) | `N2O5 = NO2 + NO3` |
@@ -972,7 +976,7 @@ H17 版审计立即报 H:−1。同理 NO₃ 加成产物一律不加 H。
 
 | 省略项 | 理由 | 影响 | 补齐成本 |
 |---|---|---|---|
-| **Criegee 显式物种** | 用产率法等效（OH 0.26/0.30/0.80 已显式） | 夜间 OH 量级正确，中间体谱缺失 | 高（需新增 Criegee 家族 + 分解分支） |
+| **Criegee 显式物种** | 用产率法等效（OH 0.26/0.30/0.80 已显式） | **夜间 OH 的 100% 依赖此产率法**（实测）；中间体谱缺失 | 高（+4sp/+8rx）—— **唯一推荐升级项** |
 | **烷基硝酸盐水解** | 无气溶胶耦合 | RONO₂→HNO₃ 非均相通道缺失 | 中 |
 | **甲酸/乙酸等有机酸** | 城市贡献小 | 未覆盖 | 低-中 |
 | **多环芳烃 (PAH)** | 需专门 SOA 模块 | 未覆盖 | 高 |
