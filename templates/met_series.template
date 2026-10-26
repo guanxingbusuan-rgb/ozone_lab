@@ -1,5 +1,5 @@
 # =====================================================================
-现成可跑样例: input_v3/constraints/met_{TEMP,PRES,RH,BLH,RAIN,JFAC}_demo.txt
+# 现成可跑样例: input_v3/constraints/met_{TEMP,PRES,RH,BLH,RAIN,JFAC}_demo.txt
 # 完整单位与换算手册: UNITS.md (仓库根)
 # 气象观测序列输入模板 (站点逐时气象 → meteo.config 的 file:)
 # 消费方: meteo.config  TEMP = file:<本文件> → cfgbuild SERIES 段 →

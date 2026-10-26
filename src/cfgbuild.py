@@ -62,7 +62,14 @@ def read_series(path, allow_unit=True):
                 unit = u
             continue
         p = s.split()
-        t.append(float(p[0])); v.append(float(p[1]))
+        try:
+            t.append(float(p[0])); v.append(float(p[1]))
+        except (ValueError, IndexError):
+            raise ValueError(
+                f"{path}: 第 {len(t)+1} 行数据无法解析: '{s[:50]}'\n"
+                f"    序列文件只允许两类行: '# 注释' 与 't[s] 值' 两列。\n"
+                f"    常见原因: 说明文字缺少 '#' 前缀, 或某行只有一列。"
+            ) from None
     f = unit_factor(unit) if allow_unit else 1.0
     v = [x * f for x in v]
     for i in range(1, len(t)):
@@ -500,5 +507,12 @@ if __name__ == "__main__":
 
     inp = args[0] if args else "input_v3"
     out = args[1] if len(args) > 1 else "runtime_v3.dat"
-    compile_cfg(inp, out, mech_override=mech_override,
-                days_override=days_override, dtout_override=dtout_override)
+    try:
+        compile_cfg(inp, out, mech_override=mech_override,
+                    days_override=days_override, dtout_override=dtout_override)
+    except ValueError as e:
+        # 序列/单位类校验错误 → 干净输出, 不喷 Python traceback
+        print("[cfgbuild] 配置错误:", file=sys.stderr)
+        for ln in str(e).splitlines():
+            print(f"   ✗ {ln}" if not ln.startswith("    ") else ln, file=sys.stderr)
+        sys.exit(1)

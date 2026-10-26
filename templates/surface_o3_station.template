@@ -1,12 +1,16 @@
 # =====================================================================
-现成可跑样例: input_v3/constraints/bc_O3_demo.txt
+# 现成可跑样例: input_v3/constraints/bc_O3_demo.txt
 # 完整单位与换算手册: UNITS.md (仓库根)
 # 地面臭氧监测站点输入模板 (站点时间序列 → BC 张弛约束)
 # 消费方: bc.config  O3 = file:<本文件> → cfgbuild SERIES 段 →
 #         runtime_dat_mod bc_s → chem_phys_mod 物理账③ (向观测张弛, τ=TAU_MIX)
 # 物理语义: 0-D 箱体以 1/TAU_MIX 的速率向观测序列松弛 (nudging 同化)
 # =====================================================================
-# unit: ppb                      ← 单位指令 (cm3=molec/cm3 | ppb | ppm), 缺省 cm3
+# unit: ppb                      ← 单位指令 (cm3=molec/cm3 | ppb | ppm)
+#                                  不写这一行 = 默认按 cm3 (molec/cm3) 解释 → 数值原样使用
+#                                  写成 ppb  → cfgbuild 自动 ×2.46e10 换算成 molec/cm3
+#                                  写成 ppm  → 自动 ×2.46e13
+#                                  ⚠ 观测数据通常是 ppb, 强烈建议保留本行
 # station: BJ-PKU                ← 站点标识 (仅注释, 供溯源)
 # lat: 39.99  lon: 116.31        ← 站点坐标 (仅注释)
 # t[s]  O3                        ← 列头 (t=自模拟起点秒; 时间必须严格递增)

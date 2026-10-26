@@ -1,5 +1,5 @@
 # =====================================================================
-现成可跑样例: input_v3/constraints/bc_HCHO_demo.txt
+# 现成可跑样例: input_v3/constraints/bc_HCHO_demo.txt
 # 地面 VOCs 组份监测输入模板 (一站一物种一时间序列, 同 O3 站点格式)
 # 可约束物种 (111sp mechanism_3 (V2.4+) 内的排放/化学物种):
 #   HCHO CH3CHO CH3CO3 PAN ISOP MVK MACR MGLY CH4 CO CH3O2 CH3OOH ...

@@ -651,6 +651,30 @@ try:
 finally:
     _sh.rmtree(_unit_tmp, ignore_errors=True)
 
+# FT-TPL: 模板文件必须"原样可用"（每行非数据部分都以 # 开头）
+_tpl_bad = []
+for _tp in sorted(__import__("pathlib").Path("templates").glob("*.template")):
+    _in_data = False
+    for _i, _ln in enumerate(_tp.read_text().splitlines(), 1):
+        _st = _ln.strip()
+        if not _st:
+            continue
+        if _st.startswith("#"):
+            continue
+        _parts = _st.split()
+        _is_data = False
+        try:
+            float(_parts[0])
+            _is_data = len(_parts) >= 2
+        except (ValueError, IndexError):
+            # 物种名+若干列 (emissions/drydep/wetdep 型)
+            _is_data = len(_parts) >= 2 and not _st.startswith("现成") and not _st.startswith("完整")
+        if not _is_data:
+            _tpl_bad.append(f"{_tp.name}:{_i} '{_st[:40]}'")
+check("templates 全部原样可用 (无缺 # 前缀的说明行)", not _tpl_bad,
+      f"{len(list(__import__('pathlib').Path('templates').glob('*.template')))} 个模板通过"
+      if not _tpl_bad else f"缺#: {_tpl_bad[:3]}")
+
 check("scan_suite.py 已删除（职能已并入 make batch + run_B + 本测试）",
       not os.path.exists("scan_suite.py")
       and "scan_suite.py" not in open("Makefile").read().replace(
