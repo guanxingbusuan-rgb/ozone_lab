@@ -143,6 +143,11 @@ NOx–O₃–HOx–ROx 三大循环 + 生物源/人为 VOC 降解 + 夜间化学
 | 7 | `tests/functional_test.py` `SENT` | 机制改动必然改变金值 | 测试红（或更糟：假绿） | ✓ 4 值重标定 |
 | 8 | 文档与模板表 | `SPECIES_INPUT_MATRIX` / README 计数 | 文档与实际不符 | ✓ 74→111 行 |
 
+> **V2.4+ 补正记录**：8 处清单之外还有一类易漏项——「稳定产物缺物理汇」。
+> `drydep.config` 曾漏配 GLY/CH3OOH/ALKOOH/PNA 四个稳定二次产物（矩阵均标 DRY ✓），
+> 实测导致 GLY 高估 32%、ALKOOH 49%。已补齐，并新增 `FT-CFGSPEC` 守卫
+> （检查"只产不耗且无干沉/湿沉/排放"的死端物种）。
+
 **两个"不需要改"的地方**（V2.4 实测确认）：
 - `diagnostics/indicators.py` 的 NOy 定义**自动**从 FORMULA 段读含 N 物种
   （实测识别 25 个，与 batch 硬编码表逐项一致）→ 这是 M3 单一事实源的收益。

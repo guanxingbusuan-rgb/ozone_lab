@@ -572,6 +572,49 @@ check("modules/ 有职责说明文档（含核心/预留区分）",
       and "预留钩子" in open("modules/README.md").read(),
       "已标注 2 核心 + 1 工具 + 1 预留")
 
+# FT-CFGSPEC: input_v3 配置与机制物种的一致性
+_mech_spec = re.search(r"(?m)^VARIABLE\s*\n(.*?);", _mech_txt, re.S)
+_sp_list = _mech_spec.group(1).replace(";", " ").split() if _mech_spec else []
+_sp_set = set(_sp_list)
+
+def _cfg_keys(path):
+    out = set()
+    for _l in open(path):
+        _s = _l.split("#")[0].split()
+        if _s:
+            out.add(_s[0])
+    return out
+
+# ① 反向: 配置里不得出现机制中不存在的物种（cfgbuild 也会拒绝，此处提前拦截）
+_bad_cfg = []
+for _f in ("bc.config", "emissions.config", "drydep.config", "wetdep.config",
+           "initialConcentrations.config"):
+    _ks = _cfg_keys(f"input_v3/{_f}") - {"TAU_MIX", "DIL"}
+    _unknown = sorted(_ks - _sp_set)
+    if _unknown:
+        _bad_cfg.append(f"{_f}: {_unknown}")
+check("input_v3 各配置无失效物种名", not _bad_cfg,
+      "; ".join(_bad_cfg) if _bad_cfg else "5 个配置全部只含机制物种")
+
+# ② 正向: 有化学产物的稳定物种必须有物理汇（干沉或湿沉或排放）
+_rx_lines = [l.strip() for l in _mech_txt.splitlines()
+             if l.strip().startswith("%") and "=" in l]
+_produced, _consumed = set(), set()
+for _l in _rx_lines:
+    _b = _l.rstrip(";").strip()
+    _, _eq = _b[1:].split(":", 1)
+    _lhs, _rhs = _eq.split("=")
+    _consumed |= set(re.findall(r"[A-Z][A-Za-z0-9]*", _lhs))
+    _produced |= set(re.findall(r"[A-Z][A-Za-z0-9]*", _rhs))
+_dry = {k for k in _cfg_keys("input_v3/drydep.config") if k in _sp_set}
+_wet = {k for k in _cfg_keys("input_v3/wetdep.config") if k in _sp_set}
+_emis = {k for k in _cfg_keys("input_v3/emissions.config") if k in _sp_set}
+_no_sink = [s for s in _sp_list
+            if s in _produced and s not in _consumed
+            and s not in _dry and s not in _wet and s not in _emis]
+check("无「只产不耗且无物理汇」的死端物种", not _no_sink,
+      f"死端={_no_sink}" if _no_sink else "全物种均有化学或物理去除")
+
 check("audit_reports/ 已删除（结论已并入 AUDIT_COMPLETE）",
       not os.path.exists("audit_reports")
       and os.path.exists("AUDIT_COMPLETE.md"),
