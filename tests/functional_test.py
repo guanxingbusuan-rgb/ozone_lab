@@ -745,6 +745,14 @@ try:
 finally:
     shutil.rmtree(_days_tmp, ignore_errors=True)
 
+# 收尾: 清掉本测试写到 /tmp 的固定产物 (避免每次跑 test 都留垃圾)
+import glob as _glob_clean
+for _f in _glob_clean.glob("/tmp/ft_*"):
+    try:
+        os.remove(_f) if os.path.isfile(_f) else shutil.rmtree(_f, ignore_errors=True)
+    except OSError:
+        pass
+
 n_pass = sum(1 for x in PASS if x)
 print(f"\n===== functional_test: {n_pass}/{len(PASS)} PASS =====")
 sys.exit(0 if n_pass == len(PASS) else 1)
