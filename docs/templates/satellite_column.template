@@ -1,0 +1,70 @@
+# =====================================================================
+# 现成可跑样例: configs/constraints/bc_NO2_sat_demo.txt (必须弱 τ=43200)
+# 完整单位与换算手册: ../UNITS.md (docs/)
+# 卫星监测数据输入模板 (TROPOMI/OMI 对流层柱浓度 → 箱体约束的转换约定)
+# =====================================================================
+# 【重要】当前 ozone_lab 无柱浓度直接 ingestion 通路 (0-D 箱体无气柱概念)。
+# 【工具】转换已工具化: python3 inputproc/sat2surf.py <raw.raw> <out.txt>
+#        (内置两法交叉核对/QA 过滤/BLH 序列插值/点数限制/量级自检)
+# 卫星数据的标准使用路径 = 离线转换为地表等效体积混合比后, 走站点序列约束:
+#   表面等效混合比 [ppb] = 柱浓度/(空气柱分子数) × 1e9 / 混合层分数
+#     空气柱 ≈ 2.15e25 molec/cm2 (≈8.74 km); 混合层分数 = BLH/8.74km
+#   —— 等价直观式 (推荐, 免"柱高"假设) ——
+#   表面等效浓度 [molec/cm3] = 柱浓度 [molec/cm2] / BLH[cm]
+#   表面等效混合比 [ppb]     = 上式 / 2.46e10
+#   [量纲注记] 原式漏 ×1e9 时得到的是无量纲混合比 (如 1.5e-8), 不是 ppb。
+#   [主准则] 直观法 (柱/BLH/2.46e10) 假设最少 → 为主; 混合比法仅参考。
+#            两法分歧时只告警, 不中断, 输出一律用直观法。
+# ---------------------------------------------------------------------
+# ---- 原始卫星柱浓度存档格式 (本模板, 供转换脚本消费; 引擎不直接读) ----
+# satellite: TROPOMI/S5P  product: OFFL L2  v: 2.4.0
+# species: NO2_tropo            ← 支持: NO2_tropo | HCHO_tropo | SO2_tropo | CO | CH4 | O3
+# overpass: 13:30 local         ← 过境时刻 (太阳同步轨道)
+# qa_filter: qa_value > 0.75    ← 质量掩膜约定
+# t[YYYY-MM-DDTHH:MM]  column[molec/cm2]  qa
+2024-06-01T13:30   4.2e15   0.92
+2024-06-02T13:30   3.8e16   0.88
+2024-06-03T13:30   5.1e16   0.95
+
+# ---- HCHO 示例 (S5P TROPOMI OFFL L2 HCHO_tropo; 同样支持) ----
+# species: HCHO_tropo
+# 柱量级参考: 清洁背景 2-5e15 · 城郊 0.5-1.5e16 · 生物源/生物质燃烧 1-3e16 molec/cm2
+# 转换后典型地面值: 1-10 ppb (BLH 1 km)
+# t[YYYY-MM-DDTHH:MM]  column[molec/cm2]  qa
+2024-06-01T13:30   8.5e15   0.88
+2024-06-02T13:30   1.2e16   0.91
+2024-06-03T13:30   1.8e16   0.86
+# ---------------------------------------------------------------------
+# ---- 转换后约束格式 (走 O3 站点同款通路; 单位指令 ppb) ----
+# unit: ppb
+# source: TROPOMI NO2_tropo / (2.15e25 × BLH_frac) — 转换记录写注释
+# t[s]  NO2
+      0    4.85
+  86400    3.10
+ 172800    5.95
+# ---------------------------------------------------------------------
+# 使用步骤:
+#   1. 原始柱浓度按本模板存 configs/constraints/sat_<物种>_<日期段>.raw
+#   2. 转换 (工具, 勿手算):
+#        python3 inputproc/sat2surf.py configs/constraints/sat_NO2_x.raw \
+#                configs/constraints/sat_NO2_x_surf.txt \
+#                --blh-file configs/constraints/met_BLH.txt
+#      自检: python3 inputproc/sat2surf.py --selftest
+#   3. bc.config 加行:  <物种> = file:constraints/sat_<物种>..._surf.txt
+#      HCHO + NO2 同时约束 (卫星 FNR 场景, 两物种各一个文件):
+#        HCHO = file:constraints/sat_HCHO_surf.txt
+#        NO2  = file:constraints/sat_NO2_surf.txt
+#   4. make runtime_v3.dat
+#
+# 【全物种输入矩阵】111 物种 × 5 通道的完整可输入清单见
+#                     SPECIES_INPUT_MATRIX.md (同目录)
+# 【物种映射】S5P TROPOMI 产品 → mechanism_3 可接入物种:
+#   HCHO_tropo → HCHO  ✓ (FNR 分子; 机制内有排放+光解, 建议中等 τ)
+#   NO2_tropo  → NO2   ✓ (FNR 分母; 受光稳态支配, 建议弱 τ)
+#   SO2_tropo  → SO2   ✓ (机制硫链)
+#   CO         → CO    ✓ (但 TROPOMI CO 为总柱, BLH 假设误差更大)
+#   CH4        → CH4   ✓ (总柱, 干空气混合比, 换算方式不同, 谨慎)
+#   O3         → O3    ✓ (TROPOMI O3 为廓线/L2 产品, 非常规柱, 需专门处理)
+#   其他产品 ( aerosols / cloud ) 机制无对应物种, 不接入
+# 注意: 卫星过境每日一次 → 序列采样 86400s (cfgbuild 线性插值到逐时窗);
+#       FNR (HCHO/NO2 柱比) 的机制化使用见 indicators.py + ridge5 实验

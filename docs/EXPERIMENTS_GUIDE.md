@@ -33,14 +33,14 @@
   - [6.9 响应面能力全景（能跑多少种类 EKMA 曲面）](#69-响应面能力全景能跑多少种类-ekma-曲面)
   - [6.9.6 经典响应面清单：能实现 4 款，缺 3 款](#696-经典响应面清单能实现-4-款缺-3-款)
   - [6.9.7 FNR 响应面专项（最核心的一张图）](#697-fnr-响应面专项最核心的一张图)
-- [6.10 四大分析能力状态核实](#610-四大分析能力状态核实观测约束--敏感性--伴随--响应面)
+- [6.10 三大分析能力状态核实](#610-三大分析能力状态核实观测约束--敏感性--响应面伴随-已移除)
 - [6.11 情景分析与过程分析](#611-情景分析与过程分析两项都是核心能力)
 - [7. 实验 C：屋脊的跨路线对比](#7-实验-c屋脊的跨路线对比)
 - [8. 实验 D：IPR/IRR 过程诊断](#8-实验-diprirr-过程诊断)
 - [9. 实验 E：指示因子工具箱](#9-实验-e指示因子工具箱)
 - [10. 实验 F：观测约束 OSSE](#10-实验-f观测约束-osse)
 - [11. 实验 G：逐小时过程分析](#11-实验-g逐小时过程分析)
-- [12. 实验 H：灵敏度/伴随分析](#12-实验-h灵敏度伴随分析)
+- [12. 实验 H：排放敏感性 OAT（伴随/反演已移除）](#12-实验-h排放敏感性-oat伴随反演已移除)
 - [13. 实验 I：情景矩阵](#13-实验-i情景矩阵)
 - [14. 六类可选输入数据文件接入操作（templates/ 逐一详解）](#14-六类可选输入数据文件接入操作templates-逐一详解)
 - [15. 输出契约（含真实样例行）](#15-输出契约含真实样例行)
@@ -90,10 +90,11 @@ OZONE_OUT=$HOME/ozone_results python experiments/run/run_all.py
 | `run_A_scenarios.py` | 六情景政策沙盘 | `run_A/<SCEN>_{conc,irr,ipr}.csv` + `summary.csv` | ~3 s |
 | `run_B_surface.py` | 响应面（4D） | `run_B/batch.csv` + **17 个 `indicator_matrix_*.csv`** + `slices.csv` | ~15 s |
 | `run_C_ridge.py` | 屋脊跨路线对比 | `run_C/ridge_{batch,mcm,compare}.csv` | ~16 s |
-| `run_D_process.py` | IPR 六账 + IRR 反应级 | `run_D/ipr_ledger.csv`（111×6）`closure.csv` `irr_top.csv` | ~1 s |
+| `run_D_ipr.py` | IPR 六账过程账本 | `run_D_ipr/ipr_ledger.csv`（长表：逐小时×111物种×6账） | ~1 s |
+| `run_D_irr.py` | IRR 反应级归因（物种参数化） | `run_D_irr/irr_top.csv` `hourly_rxn_top.csv` | ~1 s |
 | `run_E_indicators.py` | 12 指标工具箱 | `run_E/<tag>_indicators.csv` `_timeseries.csv` `compare.csv` | <1 s |
 | `run_F_osse.py` | OSSE 同化技能 | `run_F/obs_samples.csv` `skill_rmse.csv` `skill_delta.csv` | ~4 s |
-| `run_G_hourlyPA.py` | 逐小时过程 + IPR↔IRR | `run_G/hourly_{ledger,share,rxn_top}.csv` `consistency.csv` | ~1 s |
+| `run_G_consist.py` | IPR↔IRR 双路径互证（物种参数化） | `run_G_consist/consistency.csv` | ~1 s |
 | `run_H_sensitivity.py` | OAT 敏感性（±10%） | `run_H/jacobian.csv` `sensitivity.csv` `oat_runs.csv` | ~11 s |
 | `run_I_scenario_matrix.py` | 情景 × 路线矩阵 | `run_I/matrix_{o3max,delta}.csv` `direction.csv` | ~4 s |
 | **`run_M_met_series.py`** | **气象观测序列驱动 + 单变量归因** | `run_M/summary.csv` `attribution.csv` `o3_timeseries.csv` | ~6 s |
@@ -114,11 +115,11 @@ python experiments/run/run_all.py --list         # 列出清单
 
 ```bash
 # 1) 已有 6 条 121 点逐时样例
-ls input_v3/constraints/met_*_demo.txt
+ls configs/constraints/met_*_demo.txt
 #    met_TEMP_demo.txt  met_PRES_demo.txt  met_RH_demo.txt
 #    met_BLH_demo.txt   met_RAIN_demo.txt  met_JFAC_demo.txt
 
-# 2) 切换驱动方式：改 input_v3/meteo.config（文件末尾已备好注释块，取消注释即可）
+# 2) 切换驱动方式：改 configs/meteo.config（文件末尾已备好注释块，取消注释即可）
 #    TEMP = file:constraints/met_TEMP_demo.txt
 #    ...
 
@@ -165,10 +166,10 @@ python experiments/run/run_M_met_series.py
 
 > 所有 `run_*.py` **假设 `runtime_v3.dat` 已由 cfgbuild 编译完成**——
 > 只做**前置检查**（存在性/大小），不自动编译。需要改数据时先手工：
-> `make runtime_v3.dat`（或 `python src/cfgbuild.py input_v3 ...`）。
+> `make runtime_v3.dat`（或 `python inputproc/cfgbuild.py configs ...`）。
 
 例外：`run_F_osse.py`（需为每个 τ 生成变体）、`run_H_sensitivity.py`（需为每个 ±扰动生成
-变体）会在**自己输出目录内**建 `in_*/` 并调 cfgbuild —— 但它们不触碰仓库里的 `input_v3/`。
+变体）会在**自己输出目录内**建 `in_*/` 并调 cfgbuild —— 但它们不触碰仓库里的 `configs/`。
 
 ### 0.5 详细说明
 
@@ -178,6 +179,30 @@ python experiments/run/run_M_met_series.py
 ---
 
 ## 1. 环境与首次构建
+
+### 1.0 实验三条纪律（机制 V2.5+ 封版时代，先读这个再跑任何实验）
+
+> **🚨 违反第 2 条 = 丢掉你全部实验结果，违反第 1/3 条 = 白跑 simulations**：
+>
+> 1. **机制只读**：`mechanism/` 已封版（V2.5+），实验永远不改 `.fac`。日常循环 =
+>    改 `configs/` 输入 → `make runtime_v3.dat`（0.37 s，幂等）→ 直接跑已编译的
+>    `fac_v3` / `fac_batch_omp`。只有改 `.fac`/Fortran 才需要 `make v3`（~8 s）——
+>    那是开 V2.6 的动作，不是实验动作。教学要点：**"改数"与"改代码"的边界画在
+>    runtime.dat 通路 vs .fac 文件上**（§4 路线决策树）。
+> 2. **做实验期间严禁 `make clean`**：它会 `rm -rf output/`（**你的全部实验结果**），
+>    并删除二进制与 `gen_v3/` 生成码（fac_v3 运行时必需读 oz.reac/oz.prod，
+>    删了连重跑都不行）。需要清理只允许两个安全变体：
+>
+>    | 命令 | 删什么 | 留什么 | 之后的重建 |
+>    |---|---|---|---|
+>    | `make clean-build` | 二进制 + gen_v3 生成码 | **output/ 全部实验结果** | `make all && make runtime_v3.dat`（mcm 实验再加 `make mcm`） |
+>    | `make clean-output` | output/ 实验结果（交互确认） | 二进制 | 无需重建 |
+>
+>    `make clean` 只在一种场景使用：把仓库恢复到"刚克隆"状态（明知道并接受删除一切）。
+> 3. **runtime_v3.dat 只经 make 生成**：不手改、不用旧文件冒充——FT-CFG 会把它与
+>    cfgbuild 重生成结果做逐字节比对，Makefile 的 FORCE 强制重建防同秒 mtime 陷阱。
+>    做"输入变体"实验（不同排放/BC/天数组合）走 `experiments/run/_lib.py`
+>    的 `clone_input`（复制到独立目录改写+编译，主 `configs/` 不被污染）。
 
 ### 1.1 依赖清单
 
@@ -234,18 +259,18 @@ fac_v3 / fac_batch_omp                 (两个二进制)
 | 目录/文件 | 职责 | 你会不会改它 |
 |---|---|---|
 | `mechanism/` | 机制唯一事实源（**V2.5+ 冻结版** 111sp/203rx）+ `reference/` MCM 官方导出 | 冻结，不再改 |
-| `input_v3/` | **12 类生效配置** + `constraints/` 序列 | **最常改这里** |
-| `templates/` | 5 类数据落位模板（人读格式合同） | 只读（照它落位） |
+| `configs/` | **12 类生效配置** + `constraints/` 序列 | **最常改这里** |
+| `docs/templates/` | 5 类数据落位模板（人读格式合同） | 只读（照它落位） |
 | `runtime_v3.dat` | cfgbuild 产物（Fortran 唯一输入） | 不手改（自动生成） |
 | `facsimile_impl/` | 工程主线两个可执行体 + 生成码 | 改物理逻辑时 |
 | `mcm_city/` | MCM 对照子树的独立机制与二进制 | 机制扩链后跑一次 |
 | `modules/` | 共享 Fortran 模块（runtime_dat_mod / chem_phys_mod） | 改物理/解析时 |
 | `src/` | Python 编译前端（cfgbuild / sat2surf）；机制编译在 `facsimile_impl/mechc.py` | 改输入格式时 |
-| `diagnostics/` | 诊断库（diagnostics.py + indicators.py） | 改指标定义时 |
+| `analysis_lib/` | 诊断库（diagnostics.py + indicators.py） | 改指标定义时 |
 | `audit/` | 元素审计与 C 证人 | 加机制时跑 |
 | `tests/` | 冒烟 + 功能测试 | 加哨兵时 |
 | `experiments/run/` | **10 个实跑脚本**（A–I + M，只落 CSV 不绘图） | 加实验时 |
-| `experiments/*.py` | 旧版实验脚本（含终端报告/绘图/反演） | 一般不用 |
+| `post/` `viz/` | 诊断 / 绘图 | 按需 |
 | `output/` | 所有实验产物（已 gitignore） | 清理用 `make clean-build` |
 | `figures/` | 机制图集（SCI 版 + 漫画版）与工程图 | 改图时 |
 
@@ -258,7 +283,7 @@ cd facsimile_impl
 ./fac_v3 SCEN_BAU ../output/my_first ../runtime_v3.dat   # ② 跑一个情景（0.2–0.9 s）
 cd ..
 python3 - <<'PY'                             # ③ 看指标
-import sys; sys.path.insert(0, "diagnostics")
+import sys; sys.path.insert(0, "analysis_lib")
 from indicators import route_indicators
 d = route_indicators("output/my_first", "mechanism/mechanism_3_full_chain.fac")
 for k in ("O3_ppb", "FNR", "L_NOx_Q", "OPE"): print(f"{k:10s} {d[k]:.3f}")
@@ -348,24 +373,24 @@ HCHO + hν (J₄) → 2 HO₂ + CO        一张 HCHO 光解 = 两个 HO₂
 ### 3.1 五段管线（程序只认 runtime_v3.dat）
 
 ```
-templates/*.template          ① 格式合同（人读；程序零直读, grep 可证）
+docs/templates/*.template          ① 格式合同（人读；程序零直读, grep 可证）
      │ 人工落位（唯一的"手工"环节）
      ▼
-input_v3/constraints/*.txt    ② 两列 "t[s] 值" + "# unit: cm3|ppb|ppm"
+configs/constraints/*.txt    ② 两列 "t[s] 值" + "# unit: cm3|ppb|ppm"
      │ 在 config 中登记（bc.config / meteo.config 的 file: 行）
      ▼
-input_v3/*.config (12 类)     ③ 生效配置（活数据）
-     │ src/cfgbuild.py 编译：物种存在性/单位/单调/点数≤128/序列≤8/槽位完备
+configs/*.config (12 类)     ③ 生效配置（活数据）
+     │ inputproc/cfgbuild.py 编译：物种存在性/单位/单调/点数≤128/序列≤8/槽位完备
      ▼
 runtime_v3.dat                ④ Fortran 唯一输入（零文本解析）
      │ modules/runtime_dat_mod.f90 → chem_phys_mod 物理四账
      ▼
-fac_v3 / fac_batch_omp        ⑤ 输出 CSV → diagnostics/indicators
+fac_v3 / fac_batch_omp        ⑤ 输出 CSV → analysis_lib/indicators
 ```
 
 #### 源码级验证：谁在真正读文件（逐 open 点，带行号）
 
-**`templates/` 零代码引用**——可自行验证：
+**`docs/templates/` 零代码引用**——可自行验证：
 
 ```bash
 grep -rn "templates" --include="*.py" --include="*.f90" --include="*.sh" \
@@ -375,7 +400,7 @@ grep -rn "\.template" src/ modules/ facsimile_impl/ tests/ experiments/
 # 输出为空 → 也没有 *.template 通配读取
 ```
 
-**`src/cfgbuild.py` 的全部文件读取点**（11 个显式 + 2 个 glob = 12 类）：
+**`inputproc/cfgbuild.py` 的全部文件读取点**（11 个显式 + 2 个 glob = 12 类）：
 
 | 行号 | 读取内容 | 用途 |
 |---|---|---|
@@ -402,9 +427,9 @@ grep -rn "\.template" src/ modules/ facsimile_impl/ tests/ experiments/
 | `facsimile_impl/oz_fac_v3.f90:107` | `call read_runtime(trim(rtfile))` | rtfile 默认 `runtime_v3.dat`（CLI 第 3 参可覆盖） |
 
 **结论（三点，均可 grep 复现）**：
-1. **模板是格式合同**：`templates/*.template` 不被任何程序读取（零引用、零通配）
-2. **真正的数据入口只有两条**：`input_v3/*.config`（12 类，cfgbuild 读）与
-   `input_v3/constraints/*.txt`（被 config 的 `file:` 指向后由 cfgbuild 读）
+1. **模板是格式合同**：`docs/templates/*.template` 不被任何程序读取（零引用、零通配）
+2. **真正的数据入口只有两条**：`configs/*.config`（12 类，cfgbuild 读）与
+   `configs/constraints/*.txt`（被 config 的 `file:` 指向后由 cfgbuild 读）
 3. **运行时零文本解析**：Fortran 只读 cfgbuild 产出的 `runtime_v3.dat`
 
 ### 3.2 十二类配置逐个详解（含当前实测值）
@@ -471,7 +496,7 @@ JFAC   = 1.0                           # 光解缩放（云订正 0–1）
 - 上限：**每序列 ≤128 点、全池 ≤8 条**（气象 + BC 共享）
 - 外延：超出时间轴取端点值（**不是外推**）；缺测：直接省行，自动线性插值
 
-**现有序列文件清单**（`input_v3/constraints/`）：
+**现有序列文件清单**（`configs/constraints/`）：
 
 | 文件 | 点数 | 用途 |
 |---|---|---|
@@ -588,27 +613,26 @@ SCEN_ISOPX = E_NOx*0.5 E_VOC*2 E_CO*1 E_CH4*1 JFAC*1
 | 2 输出步长 | ✅ **保持 3600 就好** | 1 h 语义已内建于全套诊断，不要动 |
 | 3 RTOL | ⚠ 一般不用动 | 本模型对容差极不敏感（实测见 §3⑬） |
 | 4 ATOL 基线 | ⚠ **改了基本没用** | 主量被按名覆盖（见 §3⑬ 坑③） |
+| 5 SPINUP | ✅ 常调 | 丢弃多少天的建立期不落盘；`0`=全程逐时。须 `< 天数` |
 
-##### 坑① 输出步长 ≠ 3600 时，"末 24h" 不再是 24 小时
+##### 坑① 输出步长 ≠ 3600 时，`h` 列是步序号不是小时
 
-这是最容易踩的坑，涉及**三处耦合**：
+fac_v3 的 conc/irr/ipr 现在由 **SPINUP**（第 5 行）控制窗口：
+`step >= nspin`，`nspin = SPINUP×86400/dtout`。仍是三处耦合：
 
-1. **Fortran 端窗口按"步数"写死**：`if (step >= nsteps - 24)`（fac_v3）
-   / `if (k > nsteps - 24)`（batch）——取的是**最后 24 步**。
+1. **Fortran 端窗口按"步数"算**：`nspin` 由天数换算成步数。
 2. **`h` 列写的是步序号，不是小时**：`write(u1,'(I5)') step`。
    dtout=3600 时两者恰好相等，所以平时看不出来。
 3. **`diagnostics.irr_integrate` 拿 `h` 列当时间轴做 `trapz`** → dtout≠3600 时积分差 `3600/dtout` 倍。
 
-实测（`days=2, dtout=1800`）：输出 26 行，`h` 列是 72…96（步序号），
-而真实时刻是 36…48 h。"末 24h 均值"实际只覆盖 **12 小时**。
+**结论**：要更长/更短模拟就改**第 1 行天数**；要更多/更少落盘行就调**第 5 行 SPINUP**；
+输出步长保持 3600。`cfgbuild` 会在 dtout≠3600 时打印警告。
 
-**结论**：要更长/更短模拟就改**第 1 行天数**；需要更细时间分辨率建议改机制/加输出
-开关，而不是动第 2 行。若确实要改，`cfgbuild` 会打印警告列出这两个后果。
+##### 坑② SPINUP 设置不当
 
-##### 坑② 天数太小会让"末 24h"覆盖全程
-
-`nsteps < 24` 时（如 `days=0.5, dtout=3600` → 12 步），"末 24 步"就是全部输出，
-已经包含 spin-up 段，与"准稳态"含义不符。`cfgbuild` 会警告。
+- `SPINUP ≥ 天数` → cfgbuild 编译期拒绝（0 个输出行）。
+- `SPINUP=0` → 全程逐时落盘，包括初值主导的建立期（分析"准稳态"时需自行剔除前几天）。
+- 缺省 `2.0` 天：5 天模拟落盘 h=48..120 共 73 行。
 
 ##### 坑③ 第 4 行 ATOL 大部分被按名覆盖
 
@@ -649,11 +673,12 @@ SCEN_ISOPX = E_NOx*0.5 E_VOC*2 E_CO*1 E_CH4*1 JFAC*1
 
 | 位置 | 依赖方式 |
 |---|---|
-| `fac_v3` / `fac_batch_omp` 输出窗口 | 硬编码 `nsteps-24`（步数） |
+| `fac_v3` 输出窗口 | `nspin`（= SPINUP×86400/dtout，配置驱动） |
+| `fac_batch_omp` 输出窗口 | 硬编码 `nsteps-24`（步数，未跟随 SPINUP） |
 | `_common.last24_mean()` | `[-24:]` 取最后 24 行（步数） |
 | `diagnostics.irr_integrate()` | 以 `h` 列为时间轴 `trapz`（步序号当小时） |
 | `run_B` 的 `_pm` 午后列 | `hh = mod(t,86400)/3600` 在 **12–18 时**，这个用真实时刻，不受 dtout 影响 |
-| 所有文档里的"末 24h" | 实为"末 24 步" |
+| 旧文档里的"末 24h" | 实为"末 24 步"；fac_v3 现已改为 SPINUP 后全部步 |
 
 ---
 
@@ -662,21 +687,21 @@ SCEN_ISOPX = E_NOx*0.5 E_VOC*2 E_CO*1 E_CH4*1 JFAC*1
 **你的诉求是"像气象变量一样灵活设置天数"**——现在完全支持，且**不必改文件**：
 
 ```bash
-# ① 推荐：命令行临时覆盖（不改 input_v3/model.parameters）
+# ① 推荐：命令行临时覆盖（不改 configs/model.parameters）
 make run DAYS=3 SCEN=SCEN_BAU PREF=../output/d3      # 编译+跑，一条命令
 make runtime_v3.dat DAYS=2                            # 只重编译，跑法不变
 
 # ② 直接调 cfgbuild
-python src/cfgbuild.py input_v3 runtime_v3.dat \
+python inputproc/cfgbuild.py configs runtime_v3.dat \
     --mech mechanism/mechanism_3_full_chain.fac --days 7
 
 # ③ 彻底换成新默认值（所有实验都跟着变）
-vi input_v3/model.parameters    # 首行 5.0 → 你想要的
+vi configs/model.parameters    # 首行 5.0 → 你想要的
 make runtime_v3.dat
 ```
 
 三种方式的关系：`--days` **只在本次编译生效**，文件保持原值；下次不带 `--days`
-就回到文件里的值。脚本里用 `clone_input(..., days=3)`（`experiments/run/_common.py`）。
+就回到文件里的值。脚本里用 `clone_input(..., days=3)`（`experiments/run/_lib.py`）。
 
 **天数怎么选（实测收敛曲线）**：同一套配置只改天数，末 24 h O₃ 均值：
 
@@ -707,13 +732,13 @@ done
 
 #### ⑫-2 改完必须重新编译（原因）
 
-Fortran **只读** `runtime_v3.dat`，不读任何 config。改 `input_v3/` 后不重编译 =
+Fortran **只读** `runtime_v3.dat`，不读任何 config。改 `configs/` 后不重编译 =
 跑的还是旧参数。`cfgbuild` 会做完整校验（行数/数值/days>0/dtout>0/…），
 非法值直接拒绝（见上文"非法值现在会被拒绝"表）。
 
 ```bash
 # 每次改数据后的标准三步
-vi input_v3/xxx            # ① 改配置
+vi configs/xxx            # ① 改配置
 make runtime_v3.dat       # ② 重编译（0.4 s，且 FORCE 强制重建）
 cd facsimile_impl && ./fac_v3 SCEN_BAU ../output/test ../runtime_v3.dat   # ③ 跑
 ```
@@ -844,7 +869,7 @@ E=2.157e7 → SS ≈ 1.7e9 ≈ **70 ppb**，与城市量级吻合 ✓。
 | `emissions_inventory` | 排放清单（换算成 molec/cm³/s） | **直接编辑** `emissions.config` | — |
 | `satellite_column` | 卫星柱浓度（特殊语义） | **需离线转表面等效 ppb** | `bc.config` |
 
-> ⚠ 卫星模板是唯一"引擎不直读"的例外：0-D 箱无气柱概念，必须先离线反演成
+> ⚠ 卫星模板是唯一"引擎不直读"的例外：0-D 箱无气柱概念，必须先离线转换成
 > 表面等效 ppb（OSSE 实验 F 演示了这一决策）。
 
 ### 3.5 数据硬约束（违反即 cfgbuild 拒绝，错误信息会指路）
@@ -918,15 +943,15 @@ E=2.157e7 → SS ≈ 1.7e9 ≈ **70 ppb**，与城市量级吻合 ✓。
 ### 5.2 前置条件
 
 - `make test` 全绿
-- `input_v3/` 的 12 类配置已就绪
+- `configs/` 的 12 类配置已就绪
 - 想改政策：先看 `scenarios.config` 现有 6 个情景
 
 ### 5.3 逐步命令
 
 ```bash
 # 步骤 1: 检查排放与情景配置
-grep -v "^#" input_v3/emissions.config      # 15 个物种的排放
-grep "^SCEN" input_v3/scenarios.config      # 6 个情景定义
+grep -v "^#" configs/emissions.config      # 15 个物种的排放
+grep "^SCEN" configs/scenarios.config      # 6 个情景定义
 
 # 步骤 2: 编译数据（改过任何 config 后必须；没改也幂等）
 make runtime_v3.dat
@@ -1175,8 +1200,8 @@ fnox,fvoc,jfac,dt
 | 实验 | 扫描维度 | 案例数 | 产物 |
 |---|---|---|---|
 | **实验 C `ridge5.py`** | fnox（15 点 logspace）× **多路线**（batch/mcm） | ~30 | `figures/ridge5_routes.png` |
-| **实验 F `obs_osse.py`** | **τ_mix 4 档**（2/6/24/72 h）× 站点物种 × 卫星反演 | ~20 | RMSE 技能表 + 过冲指标 |
-| **实验 H `sens_adj.py`** | OAT 扰动 ±10% × 各排放组 + 截断 SVD | ~10 | 灵敏度斜率 + 反演对比 |
+| **实验 F `run_F_osse.py`** | τ_mix 4 档（2/6/24/72 h）× 站点物种 | ~20 | RMSE 技能表 |
+| **实验 H `run_H_sensitivity.py`** | OAT 扰动 ±10% × 各排放组 | ~10 | 雅可比 CSV（~~SVD 反演~~ 已移除） |
 | **实验 I `scen5.py`** | 6 情景 × 3 路线 | 18 | 方向一致性矩阵 |
 | ~~`scan_suite.py`~~ **已删除** | 9×9 响应面 → 改用 `make batch` + `run_B_surface.py` | 81 | — |
 
@@ -1342,9 +1367,9 @@ cd facsimile_impl
 
 ---
 
-### 6.10 四大分析能力状态核实（观测约束 / 敏感性 / 伴随 / 响应面）
+### 6.10 三大分析能力状态核实（观测约束 / 敏感性 / 响应面；~~伴随~~ 已移除）
 
-> 逐项对照源码与实跑，含**能力边界**与**不是真伴随**这类必须说清的点。
+> 逐项对照源码与实跑，含**能力边界**这类必须说清的点（原第 4 项"伴随"已移除，见 §12 墓碑）。
 
 #### 6.10.-1 六项能力速查（可复制命令）
 
@@ -1356,23 +1381,23 @@ cd ozone_lab
 make all && make test                    # 构建 + 自检（24→25 断言）
 
 # ═══ 1. 背景边界（A 用法：定环境）═══
-grep -v '^#' input_v3/bc.config          # 看当前背景值(O3 25ppb/CO 61ppb/CH4 1829ppb)
-vim input_v3/bc.config                   # 改成你要的背景气候值（常数形式）
+grep -v '^#' configs/bc.config          # 看当前背景值(O3 25ppb/CO 61ppb/CH4 1829ppb)
+vim configs/bc.config                   # 改成你要的背景气候值（常数形式）
 make runtime_v3.dat && cd facsimile_impl
 ./fac_v3 SCEN_BAU ../output/bg_demo ../runtime_v3.dat
 
 # ═══ 2. 观测约束（B 用法：定真值）═══
 # ① 准备约束文件（两列 + 单位头）
 printf '# unit: ppb\n      0 30.0\n   3600 35.2\n   7200 42.8\n' \
-    > ../input_v3/constraints/o3_demo.txt
+    > ../configs/constraints/o3_demo.txt
 # ② 登记（把常数行改成 file: 行）
-sed -i '' 's|^O3 .*|O3 = file:constraints/o3_demo.txt|' ../input_v3/bc.config
+sed -i '' 's|^O3 .*|O3 = file:constraints/o3_demo.txt|' ../configs/bc.config
 # ③ 重编译 + 运行
 cd .. && make runtime_v3.dat && cd facsimile_impl
 ./fac_v3 SCEN_BAU ../output/assim_demo ../runtime_v3.dat
 # ④ 验证同化生效（IPR 的 B 账应显著非零）
 cd .. && python3 -c "
-import sys; sys.path.insert(0,'diagnostics'); import diagnostics as dg
+import sys; sys.path.insert(0,'analysis_lib'); import diagnostics as dg
 sp,ipr=dg.ipr_from_fac('output/assim_demo'); print('O3_B =', f\"{ipr['O3']['B']:.3e}\")"
 
 # ═══ 3. 响应面（4D 参数扫描）═══
@@ -1392,32 +1417,32 @@ for r in rows:
     if abs(float(r['fvoc'])-1.012)<0.01: print(r['fnox'], r['FNR_mean'], r['O3max'])"
 
 # ═══ 5. 情景分析 ═══
-grep '^SCEN' input_v3/scenarios.config   # 看 6 个预置情景
+grep '^SCEN' configs/scenarios.config   # 看 6 个预置情景
 cd facsimile_impl
 for S in BAU LNNOX HVOC HOT CLOUD ISOPX; do
     ./fac_v3 SCEN_$S ../output/expA_$S ../runtime_v3.dat
 done
-cd .. && python3 experiments/scen5.py    # → 情景×路线方向一致性矩阵
+python3 experiments/run/run_I_scenario_matrix.py    # → 情景×路线方向一致性矩阵
 
 # ═══ 6. 过程分析（IPR 六账 + IRR 203 反应）═══
 cd facsimile_impl && ./fac_v3 SCEN_BAU ../output/pa_demo ../runtime_v3.dat && cd ..
-python3 experiments/hourly_pa.py output/pa_demo    # → 逐小时六账 + 反应级 top4 + 一致性
-python3 experiments/ipr_closure_check.py          # → 六账闭合校验（1.004–1.019）
+python3 experiments/run/run_G_consist.py output/pa_demo    # → 逐小时六账 + 反应级 top4 + 一致性
+python3 experiments/post/ipr_closure_check.py          # → 六账闭合校验（1.004–1.019）
 python3 -c "
-import sys; sys.path.insert(0,'diagnostics'); import diagnostics as dg
+import sys; sys.path.insert(0,'analysis_lib'); import diagnostics as dg
 sp,ipr=dg.ipr_from_fac('output/pa_demo')
 print('O3 六账:', {k: f'{v:+.2e}' for k,v in ipr['O3'].items()})"
 
 # ═══ 7. 敏感性 OAT（局部梯度）═══
-python3 experiments/sens_adj.py          # → jacobian.csv (24×9) + SVD 反演
+python3 experiments/run/run_H_sensitivity.py  # → jacobian.csv (24×9)；SVD 反演已移除
 
 # ═══ 8. 观测系统模拟实验 OSSE（评价同化）═══
-python3 experiments/obs_osse.py          # → τ 扫描 + RMSE 技能 + 过冲指标
+python3 experiments/run/run_F_osse.py          # → τ 扫描 + RMSE 技能
 
 # ═══ 9. 卫星柱转换（配合观测约束）═══
-python3 src/sat2surf.py --selftest       # 先自检
-python3 src/sat2surf.py 柱数据.raw ../input_v3/constraints/sat_NO2_surf.txt \
-    --blh-file ../input_v3/constraints/met_BLH.txt
+python3 inputproc/sat2surf.py --selftest       # 先自检
+python3 inputproc/sat2surf.py 柱数据.raw ../configs/constraints/sat_NO2_surf.txt \
+    --blh-file ../configs/constraints/met_BLH.txt
 ```
 
 > **每项对应的详细章节**：① 背景边界 → §3.2⑤ / ② 观测约束 → §14.1 + §10
@@ -1428,14 +1453,14 @@ python3 src/sat2surf.py 柱数据.raw ../input_v3/constraints/sat_NO2_surf.txt \
 
 这两个常被混为一谈，但在数学与工程上完全不同：
 
-| | **OAT 敏感性**（`sens_adj.py`） | **响应面**（`fac_batch_omp`） |
+| | **OAT 敏感性**（`run_H_sensitivity.py`） | **响应面**（`fac_batch_omp`） |
 |---|---|---|
 | **自变量** | **1 个**（逐个参数单独扰动） | **2–4 个**（同时扫描） |
 | **扫描方式** | 中心差分 ±10%（**局部线性化**） | 全网格枚举（**全局形状**） |
 | **输出形态** | **雅可比矩阵** J（24 观测维 × 9 参数） | **2D 等值线图**（9×9 → 19 个响应量） |
 | **回答的问题** | "参数动 1%，结果动多少%"（**梯度**） | "整个空间什么形状？转折点在哪？"（**拓扑**） |
 | **成本** | 18 次运行（9 参数 × 2 方向） | 81 次运行（9×9） |
-| **结果用途** | 反演、不确定性传播、参数可辨识性 | 体制判别、政策扫描、屋脊定位 |
+| **结果用途** | 灵敏度排序、不确定性传播 | 体制判别、政策扫描、屋脊定位 |
 | **典型产物** | `jacobian.csv` | `response_surface_v3.png` |
 | **能否互相替代** | ❌ 不能 | ❌ 不能 |
 
@@ -1455,8 +1480,8 @@ python3 src/sat2surf.py 柱数据.raw ../input_v3/constraints/sat_NO2_surf.txt \
 | 概念 | 英文 / 代码 | 是什么 | 不是什么 |
 |---|---|---|---|
 | **① 观测约束** | Observation Constraint<br>`chem_phys_mod.f90` 物理账③ | **一个能力/机制**：把观测序列按 `1/τ` 速率拉进模型（**Newtonian Relaxation / Nudging，牛顿松弛**），属**资料同化（Data Assimilation）的简化形式** | 不是"仿真分析"——它是**动作**，不是**分析** |
-| **② OSSE** | Observing System Simulation Experiment<br>`experiments/obs_osse.py` | **一个评价实验**：双胞胎法（真值→采样加噪→同化→RMSE 技能），检验"同化方法有没有用" | 不是同化方法本身——它是**检验方法的实验** |
-| **③ 基于观测的模拟仿真分析** | — | **泛称**，可指 OSSE、可指观测约束运行、也可指反演 | **不是严格术语**，不宜当"观测约束"的全称 |
+| **② OSSE** | Observing System Simulation Experiment<br>`run_F_osse.py` | **一个评价实验**：双胞胎法（真值→采样加噪→同化→RMSE 技能），检验"同化方法有没有用" | 不是同化方法本身——它是**检验方法的实验** |
+| **③ 基于观测的模拟仿真分析** | — | **泛称**，可指 OSSE、可指观测约束运行 | **不是严格术语**，不宜当"观测约束"的全称 |
 
 **三者关系**：
 ```
@@ -1467,7 +1492,7 @@ python3 src/sat2surf.py 柱数据.raw ../input_v3/constraints/sat_NO2_surf.txt \
 
 **所以准确说法**：
 - 说"**观测约束**" = 指 **nudging 同化机制**（`bc.config` + `TAU_MIX`）
-- 说"**OSSE**" = 指 **观测系统模拟实验**（`obs_osse.py`，用于评价）
+- 说"**OSSE**" = 指 **观测系统模拟实验**（`run_F_osse.py`，用于评价）
 - 说"**基于观测的模拟仿真分析**" = 口语泛称，**建议避免**在技术文档中使用
 
 > 另外：AtChem2 里对应概念叫 **constrained species（约束物种）**，
@@ -1547,59 +1572,21 @@ python3 src/sat2surf.py 柱数据.raw ../input_v3/constraints/sat_NO2_surf.txt \
 | 数据通路 | `bc.config` 的 `物种 = file:constraints/xxx.txt` → cfgbuild SERIES → 运行时每内步 `ser_interp(t)` 插值 |
 | 强度控制 | `TAU_MIX`（86400=弱 / 21600=中 / 7200=强） |
 | 分账追踪 | IPR 第三账 `B`（BC 张弛 + 稀释），可定量看同化贡献 |
-| 验证实验 | `experiments/obs_osse.py`（OSSE：真值→采样→同化→RMSE 技能） |
-| 实测结论 | 地面 HCHO τ=2h → RMSE **+27%**；卫星反演 E_NOx×1.34 → NO₂ RMSE +74%（观测算子误差被放大） |
-| 可约束物种 | **32 个推荐**（详见 `templates/SPECIES_INPUT_MATRIX.md` §4.2）；自由基类**不建议**（寿命≪τ） |
+| 验证实验 | `experiments/run/run_F_osse.py`（OSSE：真值→采样→同化→RMSE 技能） |
+| 实测结论 | 地面 HCHO τ=2h → RMSE **+27%**（nudge 劣于自由运行） |
+| 可约束物种 | **32 个推荐**（详见 `docs/templates/SPECIES_INPUT_MATRIX.md` §4.2）；自由基类**不建议**（寿命≪τ） |
 | 关键限制 | 强 nudging 会**破坏光稳态**（NO₂ 尤其敏感，建议弱 τ）；1/τ 线性松弛不是最优估计理论 |
 
 #### 6.10.2 敏感性扰动分析（OAT）—— ✅ 有
 
 | 项 | 实况 |
 |---|---|
-| 实现位置 | `experiments/sens_adj.py`（主入口 `main()`） |
+| 实现位置 | ~~`experiments/sens_adj.py`~~ **已删除**（OAT 由 `run_H_sensitivity.py` 承担） |
 | 方法 | **OAT 中心差分**：9 个排放物种各 ±10%，重跑 `fac_v3`，构造雅可比 |
 | 输出 | `jacobian.csv`（24 观测维 × 9 排放列）+ 各列范数 |
 | 实测 | fac_v3 OAT **42.6 ppb/unit fnox** vs batch 网格局部斜率 52.3 → **19% 偏差**（小扰动 vs 大步长的非线性差异，非错误） |
 | 成本 | 每个物种 2 次全跑 → 9 物种 = **18 次 fac_v3**（约 2 min） |
 | 边界 | 局部线性；扰动 >50% 会跨越体制边界；只覆盖 `EMIT` 列表里的 9 个物种 |
-
-#### 6.10.3 伴随分析 —— ⚠ **不是真伴随，是"有限差分雅可比 + 截断 SVD 反演"**
-
-这是必须纠正的常见误解：
-
-| | 真伴随（adjoint, 如 CMAQ-DDM / GEOS-Chem adjoint） | ozone_lab 实际做的 |
-|---|---|---|
-| 实现方式 | 反向求解伴随方程（需编译器 AD 或手写伴随代码） | **前向有限差分**：逐参数 ±10% 重跑，拼雅可比 |
-| 成本 | **与参数个数无关**（1 次前向 + 1 次反向） | **线性于参数个数**（9 参数 = 18 次前向） |
-| 精度 | 解析梯度（机器精度） | 数值梯度（受步长/非线性影响，实测 19% 偏差） |
-| 代码状态 | — | **无伴随代码**（`grep adjoint` 零命中） |
-
-**实际提供的是**（`sens_adj.py` ②段）：
-```
-J = ∂y/∂(E/E0)   (中心差分, 24×9)
-SVD 分解 → 截断小奇异值 (S > S0×0.1) → 伪逆 → 反演 ΔE/E
-```
-
-**⚠ 实测能力很有限（2026-10-26 实跑）**：
-```
-奇异值条件数 = 3,153,320        ← 极高病态
-保留 1/9 个模态                  ← 9 个排放参数里只有 1 个方向可辨识
-```
-原因：非线性光化学使 9 个排放物种对 24 维观测的响应**近乎共线**（尤其是
-NO/NO₂/CO/ALK/OLE 同属"促进 O₃"方向，ISOP 也高度相关）。所以：
-
-| 能做 | 不能做 |
-|---|---|
-| 算**单参数**灵敏度（OAT 斜率，实测 42.6 ppb/unit fnox） | 同时反演 9 个排放的**唯一解** |
-| 给出"最可辨识的 1 个组合方向" | 逐物种精确反演（条件数 3e6，噪声会放大百万倍） |
-| 演示 SVD 正则化方法本身 | 作为实用源解析工具 |
-
-**改进方向**（若要做实用反演）：减少参数（先按排放组聚合到 3–4 个）、
-增加观测维度（多时刻 + 多物种）、引入先验协方差（贝叶斯反演）。
-
-> **准确的表述**：ozone_lab 提供的是**线性化反演（有限差分雅可比 + 截断 SVD 正则化）**，
-> 不是伴随模式。若需真伴随，需引入 AD 工具（Tapenade/ADIFOR）或手写伴随方程——
-> 本项目没有。
 
 #### 6.10.4 响应面分析 —— ✅ 有（4 维参数扫描）
 
@@ -1612,8 +1599,8 @@ NO/NO₂/CO/ALK/OLE 同属"促进 O₃"方向，ISOP 也高度相关）。所以
 | 能力 | 状态 | 核心实现 | 关键限制 |
 |---|---|---|---|
 | **观测约束** | ✅ 生产级 | `chem_phys_mod` 物理账③ + F3 序列 BC | 线性松弛非最优估计；强 τ 破坏光稳态 |
-| **敏感性扰动** | ✅ 有 | `sens_adj.py` OAT 中心差分 | 局部线性；成本线性于参数数 |
-| **伴随分析** | ⚠ **非真伴随** | 有限差分雅可比 + 截断 SVD 反演 | 数值梯度（19% 偏差）；**实测条件数 3.2e6、仅 1/9 模态可辨识** |
+| **敏感性扰动** | ✅ 有 | `run_H_sensitivity.py` OAT 中心差分 | 局部线性；成本线性于参数数 |
+| ~~**伴随分析**~~ | **已移除（2026-10-27）** | —（`sens_adj.py` 已删除） | 方法论存档（0-D 无真伴随，SVD 仅 1/9 模态可辨识） |
 | **响应面** | ✅ 有（4D 参数扫描） | `fac_batch_omp` | 非空间网格；缺 3 款经典面 |
 
 ### 6.11 情景分析与过程分析（两项都是核心能力）
@@ -1624,8 +1611,8 @@ NO/NO₂/CO/ALK/OLE 同属"促进 O₃"方向，ISOP 也高度相关）。所以
 
 | 层 | 机制 | 位置 |
 |---|---|---|
-| **情景表驱动**（主用） | `scenarios.config` 定义命名情景 → `fac_v3 SCEN_NAME` 直接跑 | `input_v3/scenarios.config` + `runtime_dat_mod.scen_build` |
-| **情景矩阵对比** | 6+ 情景 × 多路线 → 方向一致性检验 | `experiments/scen5.py` |
+| **情景表驱动**（主用） | `scenarios.config` 定义命名情景 → `fac_v3 SCEN_NAME` 直接跑 | `configs/scenarios.config` + `runtime_dat_mod.scen_build` |
+| **情景矩阵对比** | 6+ 情景 × 多路线 → 方向一致性检验 | `experiments/run/run_I_scenario_matrix.py` |
 
 **支持的 6 个情景因子**（源码 `scen_build`）：
 
@@ -1722,9 +1709,9 @@ O3 六账: P=+4.63e13  L=−4.16e13  E=0.00  D=−2.48e12  B=−2.26e12  X=0.00
     │
     ├→ 情景分析 (What if?)   scenarios.config   在关键区试政策组合
     │       └→ 过程分析 (Why?)   IPR + IRR        为什么变 (六账/203 反应)
-    │              └→ 敏感性 OAT (How much?)  sens_adj.py   精确梯度 ∂y/∂p
+    │              └→ 敏感性 OAT (How much?)  run_H_sensitivity.py  精确梯度 ∂y/∂p
     │
-    └→ 反演/伴随 (推断)   FD+SVD   从观测反推排放
+    └→ ~~反演/伴随~~        已移除（2026-10-27：0-D 无真伴随）
 ```
 
 **四者的依赖链**：**响应面定地图 → 情景试政策 → 过程查原因 → 敏感性求梯度**。
@@ -1740,15 +1727,15 @@ O3 六账: P=+4.63e13  L=−4.16e13  E=0.00  D=−2.48e12  B=−2.26e12  X=0.00
 | 2 | **响应面** | **全局扫描** | ✅ 4D 参数空间 | `fac_batch_omp` | 24 列 CSV → 114 曲面族 |
 | 3 | **情景分析** | **离散场景对比** | ✅ 政策沙盘 | `scenarios.config` + `scen5.py` | 情景矩阵 + 方向一致性 |
 | 4 | **过程分析** | **过程归因** | ✅ **核心差异化** | `hourly_pa.py` + IPR/IRR | 六账 + 203 反应优先级 |
-| 5 | **敏感性 OAT** | **局部梯度** | ✅ | `sens_adj.py` | `jacobian.csv`（24×9） |
-| 6 | **伴随/反演** | 推断（非真伴随） | ⚠ 仅 1/9 模态可辨识 | `sens_adj.py` ② | FD 雅可比 + 截断 SVD |
+| 5 | **敏感性 OAT** | **局部梯度** | ✅ | `run_H_sensitivity.py` | `jacobian.csv`（24×9） |
+| ~~6~~ | ~~伴随/反演~~ | 推断 | **已移除（2026-10-27）** | ~~`sens_adj.py`~~ 已删 | — |
 
 **类型分组的含义**：
 - **全局扫描**（响应面）：铺满参数空间，看形状/转折
 - **离散场景**（情景分析）：几个特定点，看政策响应方向
 - **过程归因**（过程分析）：给定一个点，看内部机制
 - **局部梯度**（OAT）：给定一个点，看微小扰动响应
-- **推断**（反演）：由观测反推参数
+- ~~**推断**（反演）~~：**已移除**
 - **数据同化**（观测约束）：把观测强行拉进模型
 
 这六类**互为补充而非替代**——各自回答不同层次的问题。
@@ -1767,9 +1754,9 @@ O3 六账: P=+4.63e13  L=−4.16e13  E=0.00  D=−2.48e12  B=−2.26e12  X=0.00
 ### 7.3 逐步命令
 
 ```bash
-python3 experiments/ridge5.py            # fnox ∈ logspace(-1,1,13)，现役路线
-python3 experiments/ridge5.py --fast     # 快速版
-python3 experiments/fig_ridge5.py        # → figures/ridge5_routes.png
+python3 experiments/run/run_C_ridge.py          # fnox 序列，现役路线（CSV）
+# ⚠ viz/fig_ridge5.py 原读旧版 output/ridge5/ 输出——数据源已随 legacy 删除，
+#   待改为消费 run_C 的 ridge_compare.csv 或移除（待定夺）
 ```
 
 ### 7.4 V2.3 实测与判读
@@ -1820,7 +1807,7 @@ python3 ipr_irr5.py
 # D-3 单案例手工读账（Python API）
 cd ..
 python3 - <<'PY'
-import sys; sys.path.insert(0, "diagnostics")
+import sys; sys.path.insert(0, "analysis_lib")
 import diagnostics as dg
 
 h, C, ih, I = dg.load("output/expA_BAU")       # (25,),(25,74),(25,),(25,131)
@@ -1895,7 +1882,7 @@ for k, l in enumerate(mech, 1):
 ### 9.3 逐步命令
 
 ```python
-import sys; sys.path.insert(0, "diagnostics")
+import sys; sys.path.insert(0, "analysis_lib")
 from indicators import route_indicators, route_timeseries, Mechanism
 
 # ① 末 24h 窗口均值 → 12 指标
@@ -1969,7 +1956,7 @@ d2 = route_indicators("output/expA_LNNOX", "mechanism/mechanism_3_full_chain.fac
 ### 10.3 逐步命令
 
 ```bash
-python3 experiments/obs_osse.py        # 全自动: 真值→采样→同化→技能评估
+python3 experiments/run/run_F_osse.py        # 全自动: 真值→采样→同化→技能评估
 ```
 
 ### 10.4 V2.3 实测与判读
@@ -1977,12 +1964,10 @@ python3 experiments/obs_osse.py        # 全自动: 真值→采样→同化→�
 | 实验设置 | 结果 |
 |---|---|
 | 地面同化 HCHO（τ=2h） | RMSE **+27%** |
-| 卫星反演 E_NOx×1.34 | NO₂ RMSE +74%、O₃ +58% |
 | B 账同化倾向 | O₃ −1.9e7（占过程总账 ~2%） |
 
 **判读**：
 1. 张弛 τ 决定技能上限——τ 太大（弱约束）几乎无效，τ 太小（强约束）压制模型化学
-2. **观测算子误差会被放大**（NO₂ +74% >> E_NOx 误差 34%）——为什么卫星反演要谨慎
 3. 同化作用可在 `_ipr.csv` 的 `B` 账中定量核算
 
 ### 10.5 变异玩法
@@ -2012,8 +1997,8 @@ fac_v3 的 IPR/IRR 是**小时窗精确积分**——逐时看每个过程何时
 ### 11.2 逐步命令
 
 ```bash
-python3 experiments/hourly_pa.py                        # 缺省现跑 SCEN_BAU
-python3 experiments/hourly_pa.py output/expA_LNNOX      # 用已有输出
+python3 experiments/run/run_G_consist.py                        # 缺省现跑 SCEN_BAU
+python3 experiments/run/run_G_consist.py output/expA_LNNOX      # 用已有输出
 ```
 
 ### 11.3 V2.3 实测
@@ -2037,7 +2022,7 @@ python3 experiments/hourly_pa.py output/expA_LNNOX      # 用已有输出
 
 ---
 
-## 12. 实验 H：灵敏度/伴随分析
+## 12. 实验 H：排放敏感性 OAT（伴随/反演已移除）
 
 ### 12.1 科学问题
 
@@ -2045,8 +2030,11 @@ python3 experiments/hourly_pa.py output/expA_LNNOX      # 用已有输出
 
 ### 12.2 逐步命令
 
+> 🚫 **伴随/反演已移除（2026-10-27）**：0-D 无真伴随，FD+SVD 实测仅 1/9 模态可辨识
+> ——功能与载体 `sens_adj.py` 一并删除。
+
 ```bash
-python3 experiments/sens_adj.py        # OAT 雅可比 + 截断 SVD (~2 min)
+python3 experiments/run/run_H_sensitivity.py 5     # OAT 雅可比（±5% 扰动）
 ```
 
 ### 12.3 V2.3 实测与判读
@@ -2062,9 +2050,9 @@ batch 网格局部斜率:        52.3 ppb / unit fnox
 
 ### 12.4 变异玩法
 
-- 改扰动幅度：`sens_adj.py [exe_path] [delta_pct]`（如 5、20）
+- 改扰动幅度：`run_H_sensitivity.py [扰动%]`（如 5、20）
 - 加扰动变量：改脚本中的 OAT 表
-- 用 SVD 结果做参数辨识（脚本已含截断 SVD 反演框架）
+- ~~用 SVD 结果做参数辨识~~：已随伴随/反演移除
 
 ### 12.5 常见坑
 
@@ -2082,7 +2070,7 @@ batch 网格局部斜率:        52.3 ppb / unit fnox
 ### 13.2 逐步命令
 
 ```bash
-python3 experiments/scen5.py       # 路线×情景 O₃max 响应矩阵 (%Δ) + 方向一致性
+python3 experiments/run/run_I_scenario_matrix.py       # 路线×情景 O₃max 响应矩阵 (%Δ) + 方向一致性
 ```
 
 ### 13.3 V2.3 实测与判读
@@ -2105,9 +2093,9 @@ python3 experiments/scen5.py       # 路线×情景 O₃max 响应矩阵 (%Δ) +
 
 ## 14. 六类可选输入数据文件接入操作（templates/ 逐一详解）
 
-> **核心原则（源码实证）**：`templates/*.template` **不被任何程序读取**——它是
+> **核心原则（源码实证）**：`docs/templates/*.template` **不被任何程序读取**——它是
 > **格式合同**：告诉你原始数据长什么样、怎么换算、落到哪个路径、去哪个 config 登记。
-> 真正被程序消费的只有 `input_v3/constraints/*.txt` 与 12 类 config。
+> 真正被程序消费的只有 `configs/constraints/*.txt` 与 12 类 config。
 >
 > **复现验证**（两条命令，输出均为空）：
 > ```bash
@@ -2119,10 +2107,10 @@ python3 experiments/scen5.py       # 路线×情景 O₃max 响应矩阵 (%Δ) +
 >
 > **通用四步**（五类模板全部适用）：
 > ```
-> ① 按模板格式准备数据  →  ② 落位到 input_v3/constraints/（或直接编辑 emissions.config）
+> ① 按模板格式准备数据  →  ② 落位到 configs/constraints/（或直接编辑 emissions.config）
 > ③ 在 bc.config / meteo.config 登记一行 file:  →  ④ make runtime_v3.dat 重编译
 > ```
-> **单位总参考**：[UNITS.md](../UNITS.md)（449 行逐子量表 + 换算公式 + 硬编码登记）。
+> **单位总参考**：[UNITS.md](UNITS.md)（449 行逐子量表 + 换算公式 + 硬编码登记）。
 
 ### 14.0 六类模板总览
 
@@ -2153,12 +2141,12 @@ python3 experiments/scen5.py       # 路线×情景 O₃max 响应矩阵 (%Δ) +
 准确说是**四层**，每一层都有明确角色：
 
 ```
-第 1 层  templates/*.template          ← 格式合同（人读，程序零读）
+第 1 层  docs/templates/*.template          ← 格式合同（人读，程序零读）
            │ 你照它的格式，写自己的数据
            ▼
-第 2 层  input_v3/*.config             ← ★ 真正的数据源（你编辑这里）
-         input_v3/constraints/*.txt        排放/IC/气象/BC/情景 + 序列数据
-           │ src/cfgbuild.py 编译（校验+单位换算+归一）
+第 2 层  configs/*.config             ← ★ 真正的数据源（你编辑这里）
+         configs/constraints/*.txt        排放/IC/气象/BC/情景 + 序列数据
+           │ inputproc/cfgbuild.py 编译（校验+单位换算+归一）
            ▼
 第 3 层  runtime_v3.dat                ← 编译产物（自动生成，勿手改）
            │ 唯一被 Fortran 读的文件
@@ -2172,25 +2160,25 @@ python3 experiments/scen5.py       # 路线×情景 O₃max 响应矩阵 (%Δ) +
 |---|---|
 | "模板只是学习语法" | ✅ 部分对：程序**确实不读** templates（`grep` 零引用）；但它除了语法还带**可直接复制的示例数据** |
 | "只有 runtime.dat 才起效" | ✅ 对：Fortran **只读** `runtime_v3.dat`（`runtime_dat_mod.f90:72`） |
-| **漏掉的** | ❌ **`input_v3/*.config` 才是真正的数据源**——`runtime.dat` 是它的**编译产物**，你不直接编辑 runtime.dat |
+| **漏掉的** | ❌ **`configs/*.config` 才是真正的数据源**——`runtime.dat` 是它的**编译产物**，你不直接编辑 runtime.dat |
 
 #### 实测验证（数据源确认）
 
 ```bash
-# 只改 input_v3/meteo.config 一个数（TEMP 298.15 → 300.15）
+# 只改 configs/meteo.config 一个数（TEMP 298.15 → 300.15）
 md5 runtime_v3.dat     # 52d75f91... （改前）
 # 重新编译
 make runtime_v3.dat
 md5 runtime_v3.dat     # 673f9065... （改后，已变化 ✓）
 ```
-→ 证明 `runtime.dat` 完全由 `input_v3/` 派生；**改 `input_v3/` 才是"改数据"**。
+→ 证明 `runtime.dat` 完全由 `configs/` 派生；**改 `configs/` 才是"改数据"**。
 
 #### 三层的准确定位
 
 | 层 | 你会不会改 | 作用 |
 |---|---|---|
-| `templates/*.template` | **只读**（照它抄格式） | 告诉你"文件该长什么样" |
-| `input_v3/*.config` + `constraints/*.txt` | **✓ 改这里** | 真正的数据（排放/气象/观测/情景） |
+| `docs/templates/*.template` | **只读**（照它抄格式） | 告诉你"文件该长什么样" |
+| `configs/*.config` + `constraints/*.txt` | **✓ 改这里** | 真正的数据（排放/气象/观测/情景） |
 | `runtime_v3.dat` | **✗ 不手改** | 自动生成的中间产物，Fortran 唯一输入 |
 
 #### 一个容易忽略的细节：`constraints/*.txt` 是**间接**读取的
@@ -2212,10 +2200,10 @@ runtime_v3.dat 的 SERIES 段（序列被内联成表）
 代码位置：`cfgbuild.py:178`（meteo 的 file:）、`:197`（bc 的 file:）。
 
 **所以完整表述应该是**：
-> **模板告诉你格式 → 你在 `input_v3/` 按格式写数据（config 里用 `file:` 引用 constraints 序列）
+> **模板告诉你格式 → 你在 `configs/` 按格式写数据（config 里用 `file:` 引用 constraints 序列）
 > → cfgbuild 编译成 `runtime_v3.dat` → Fortran 只读 runtime.dat 运行。**
 >
-> 改数据 = 改 `input_v3/` + `make runtime_v3.dat`；
+> 改数据 = 改 `configs/` + `make runtime_v3.dat`；
 > 改 `runtime.dat` 本身没有意义（会被下次编译覆盖）。
 
 #### ⚠ mtime 陷阱（本项目真实踩过，已修复）
@@ -2235,8 +2223,8 @@ md5 runtime_v3.dat        # → 仍是 299.15 那次的版本（错！）
 
 **已修复**（Makefile）：
 ```make
-runtime_v3.dat: FORCE $(wildcard input_v3/* ...)
-	@$(PY) src/cfgbuild.py input_v3 runtime_v3.dat --mech ...
+runtime_v3.dat: FORCE $(wildcard configs/* ...)
+	@$(PY) inputproc/cfgbuild.py configs runtime_v3.dat --mech ...
 FORCE:
 ```
 `FORCE` 让 `runtime_v3.dat` **每次 make 都重建**——cfgbuild 只需 0.37 s 且幂等，
@@ -2249,7 +2237,7 @@ FORCE:
 ```
 
 **给用户的纪律**：
-- 改完任何 `input_v3/` 内容 → **`make runtime_v3.dat`**（现在总会真的重建）
+- 改完任何 `configs/` 内容 → **`make runtime_v3.dat`**（现在总会真的重建）
 - 手动编译过 Fortran 后 → 确认 `runtime_v3.dat` 是最新的
 - 怀疑数据没生效 → 跑 `python tests/functional_test.py`，看 FT-CFG 是否 PASS
 
@@ -2257,7 +2245,7 @@ FORCE:
 
 #### 📋 实验操作 1：逐层验证四层链路（完整可复现）
 
-**目的**：亲手证明"改 `input_v3/` → `runtime_v3.dat` 变化 → 运行结果变化"这条链路，
+**目的**：亲手证明"改 `configs/` → `runtime_v3.dat` 变化 → 运行结果变化"这条链路，
 以及"templates 不参与"。
 
 ```bash
@@ -2267,11 +2255,11 @@ cd ozone_lab
 grep -rn "templates" --include="*.py" --include="*.f90" --include="*.sh" \
      --include="Makefile" src/ modules/ facsimile_impl/ tests/ experiments/
 # 期望输出: 空（或仅 sat2surf.py 的注释文字）
-# → 证明 templates/*.template 从不被程序打开
+# → 证明 docs/templates/*.template 从不被程序打开
 
 # ═══ L2 → L3 验证：改数据源，产物随之变化 ═══
 md5 -q runtime_v3.dat                    # 记下改前 md5: 52d75f91...
-sed -i '' 's/^TEMP   = 298.15/TEMP   = 300.15/' input_v3/meteo.config
+sed -i '' 's/^TEMP   = 298.15/TEMP   = 300.15/' configs/meteo.config
 make runtime_v3.dat                      # 重新编译（0.37 s）
 md5 -q runtime_v3.dat                    # 改后 md5: 673f9065... ← 已变化 ✓
 grep -A1 "^MET" runtime_v3.dat           # 直接看产物里的值
@@ -2284,7 +2272,7 @@ cd facsimile_impl
 cd ..
 
 # ═══ 还原 ═══
-sed -i '' 's/^TEMP   = 300.15/TEMP   = 298.15/' input_v3/meteo.config
+sed -i '' 's/^TEMP   = 300.15/TEMP   = 298.15/' configs/meteo.config
 make runtime_v3.dat
 md5 -q runtime_v3.dat                    # 回到 52d75f91... ✓
 ```
@@ -2300,7 +2288,7 @@ md5 -q runtime_v3.dat                    # 回到 52d75f91... ✓
 | L4 运行 | `O3max = 106.24 ppb` | 比基线 101.61 高（温度效应） |
 | 还原后 md5 | `52d75f91...` | 完全复原 |
 
-**结论**：`runtime.dat` 是 `input_v3/` 的纯函数；`templates` 只在人脑里起作用。
+**结论**：`runtime.dat` 是 `configs/` 的纯函数；`templates` 只在人脑里起作用。
 
 ---
 
@@ -2316,9 +2304,9 @@ md5_ok=$(md5 -q runtime_v3.dat)          # 记录正确值
 echo "正确值: $md5_ok"
 
 # 同秒内：改 → make → 改回 → make
-sed -i '' 's/^TEMP   = 298.15/TEMP   = 299.15/' input_v3/meteo.config
+sed -i '' 's/^TEMP   = 298.15/TEMP   = 299.15/' configs/meteo.config
 make runtime_v3.dat                       # 跑一次（值 → 299.15）
-sed -i '' 's/^TEMP   = 299.15/TEMP   = 298.15/' input_v3/meteo.config
+sed -i '' 's/^TEMP   = 299.15/TEMP   = 298.15/' configs/meteo.config
 make runtime_v3.dat                       # 再次跑（值应回到 298.15）
 
 md5_now=$(md5 -q runtime_v3.dat)
@@ -2349,7 +2337,7 @@ md5 → 14f7a885...（仍是 299.15 那版）        ← 无声出错
 cp runtime_v3.dat /tmp/rt_backup.dat
 sed -i '' 's/^  C 298.15/  C 999.99/' runtime_v3.dat    # 篡改产物
 python3 tests/functional_test.py 2>&1 | grep -A1 "FT-CFG"
-# 期望: [FAIL] runtime_v3.dat 与 input_v3 当前内容一致 (非陈旧)
+# 期望: [FAIL] runtime_v3.dat 与 configs 当前内容一致 (非陈旧)
 #        ⚠ 仓库内 runtime_v3.dat 陈旧, 请 make runtime_v3.dat
 # 恢复:
 cp /tmp/rt_backup.dat runtime_v3.dat && rm /tmp/rt_backup.dat
@@ -2364,13 +2352,13 @@ cp /tmp/rt_backup.dat runtime_v3.dat && rm /tmp/rt_backup.dat
 ```bash
 cd ozone_lab
 
-# ═══ 步骤 1：改数据（改 input_v3/，不是 templates/ 也不是 runtime.dat）═══
+# ═══ 步骤 1：改数据（改 configs/，不是 docs/templates/ 也不是 runtime.dat）═══
 # 例：把 NO 排放基线调成 2 倍
-sed -i '' 's/^NO       2.157e+07/NO       4.314e+07/' input_v3/emissions.config
+sed -i '' 's/^NO       2.157e+07/NO       4.314e+07/' configs/emissions.config
 #    或改背景 O₃（bc 常数用法）
-sed -i '' 's/^O3  = 6.2e11/O3  = 9.84e11/' input_v3/bc.config   # 25→40 ppb
+sed -i '' 's/^O3  = 6.2e11/O3  = 9.84e11/' configs/bc.config   # 25→40 ppb
 #    或加观测约束（bc 序列用法）
-echo "O3 = file:constraints/bc_O3_demo.txt" >> input_v3/bc.config
+echo "O3 = file:constraints/bc_O3_demo.txt" >> configs/bc.config
 
 # ═══ 步骤 2：重编译数据（现在总会真的重建）═══
 make runtime_v3.dat
@@ -2382,7 +2370,7 @@ cd facsimile_impl && ./fac_v3 SCEN_BAU ../output/mytest ../runtime_v3.dat && cd 
 
 # ═══ 可选：验证结果合理性 ═══
 python3 -c "
-import sys; sys.path.insert(0,'diagnostics')
+import sys; sys.path.insert(0,'analysis_lib')
 from indicators import route_indicators
 d = route_indicators('output/mytest', 'mechanism/mechanism_3_full_chain.fac')
 print(f\"O3={d['O3_ppb']:.1f} ppb  FNR={d['FNR']:.2f}\")"
@@ -2392,14 +2380,14 @@ print(f\"O3={d['O3_ppb']:.1f} ppb  FNR={d['FNR']:.2f}\")"
 
 | 你改的是 | 结果 | 正确做法 |
 |---|---|---|
-| `templates/*.template` | **完全没效果**（程序不读） | 改成 `input_v3/` 对应文件 |
-| `runtime_v3.dat` | 下次编译被覆盖 | 改 `input_v3/` |
-| `input_v3/` 但不 make | 跑的还是旧数据 | **`make runtime_v3.dat`** |
-| `input_v3/` + make | ✅ 正确 | — |
+| `docs/templates/*.template` | **完全没效果**（程序不读） | 改成 `configs/` 对应文件 |
+| `runtime_v3.dat` | 下次编译被覆盖 | 改 `configs/` |
+| `configs/` 但不 make | 跑的还是旧数据 | **`make runtime_v3.dat`** |
+| `configs/` + make | ✅ 正确 | — |
 
 ---
 
-### 14.0b `input_v3/constraints/` 里的现成文件是什么（重要区分）
+### 14.0b `configs/constraints/` 里的现成文件是什么（重要区分）
 
 ⚠ **该目录有两种性质完全不同的文件**，格式相同但用途相反：
 
@@ -2409,7 +2397,7 @@ print(f\"O3={d['O3_ppb']:.1f} ppb  FNR={d['FNR']:.2f}\")"
 | **`met_{TEMP,PRES,RH,BLH,RAIN,JFAC}_demo.txt`** | **气象序列样例**（各 121 点逐时） | 同上（6 变量全序列） | 实验 M 的驱动数据 |
 | **`bc_O3_demo.txt`** | **观测约束样例** | `bc.config` 的 `O3 = file:...` | 站点 O₃ 观测（真值校准） |
 | **`bc_HCHO_demo.txt`** | **观测约束样例** | `bc.config` 的 `HCHO = file:...` | HCHO 观测（FNR 分子） |
-| **`bc_NO2_sat_demo.txt`** | **观测约束样例** | `bc.config` 的 `NO2 = file:...` | 卫星反演 NO₂（弱 τ 专用） |
+| **`bc_NO2_sat_demo.txt`** | **观测约束样例** | `bc.config` 的 `NO2 = file:...` | 卫星 NO₂ 转换序列（弱 τ 专用） |
 
 **判断口诀**：
 - 前缀 **`met_`** → 气象，登记到 `meteo.config`
@@ -2437,13 +2425,13 @@ python experiments/run/run_M_met_series.py
 **观测约束的最小试跑**（以 O₃ 为例，3 条命令）：
 ```bash
 # ① bc.config 加一行（保留原有背景常数行）
-echo "O3 = file:constraints/bc_O3_demo.txt" >> input_v3/bc.config
+echo "O3 = file:constraints/bc_O3_demo.txt" >> configs/bc.config
 # ② 重编译
 make runtime_v3.dat
 # ③ 跑 + 查同化账
 cd facsimile_impl && ./fac_v3 SCEN_BAU ../output/assim_demo ../runtime_v3.dat && cd ..
 python3 -c "
-import sys; sys.path.insert(0,'diagnostics'); import diagnostics as dg
+import sys; sys.path.insert(0,'analysis_lib'); import diagnostics as dg
 sp, ipr = dg.ipr_from_fac('output/assim_demo')
 print('O3 的 B账(同化) =', f\"{ipr['O3']['B']:+.3e}\", '→ 非零即生效')"
 ```
@@ -2452,8 +2440,8 @@ print('O3 的 B账(同化) =', f\"{ipr['O3']['B']:+.3e}\", '→ 非零即生效'
 
 ### 14.1 模板①：地面 O₃ 站点序列（最常用，引擎直读）
 
-**模板**：`templates/surface_o3_station.template`
-**现成样例**：`input_v3/constraints/bc_O3_demo.txt`（24 点日循环，实测可用）
+**模板**：`docs/templates/surface_o3_station.template`
+**现成样例**：`configs/constraints/bc_O3_demo.txt`（24 点日循环，实测可用）
 **物理语义**：0-D 箱体以 `1/TAU_MIX` 速率向观测序列松弛（nudging 同化，
 `chem_phys_mod` 物理账③）。
 
@@ -2477,12 +2465,12 @@ out = ["# unit: ppb",
 for r in rows:
     hh, v = int(r[0]), float(r[1])
     out.append(f"{hh*3600:8d} {v:8.2f}")
-open("input_v3/constraints/o3_station_MYSITE.txt", "w").write("\n".join(out) + "\n")
+open("configs/constraints/o3_station_MYSITE.txt", "w").write("\n".join(out) + "\n")
 print("写入", len(out)-4, "点")
 PY
 
 # 检查点数 (≤128)
-grep -vc "^#" input_v3/constraints/o3_station_MYSITE.txt
+grep -vc "^#" configs/constraints/o3_station_MYSITE.txt
 ```
 
 **生产的目标文件**（照模板）：
@@ -2502,7 +2490,7 @@ grep -vc "^#" input_v3/constraints/o3_station_MYSITE.txt
 
 ```bash
 # ① 登记到 bc.config（TAU_MIX 决定张弛强度）
-printf '\n# 站点观测同化\nO3 = file:constraints/o3_station_MYSITE.txt\n' >> input_v3/bc.config
+printf '\n# 站点观测同化\nO3 = file:constraints/o3_station_MYSITE.txt\n' >> configs/bc.config
 
 # ② 重编译数据（cfgbuild 校验单调/点数/单位/物种）
 make runtime_v3.dat
@@ -2517,7 +2505,7 @@ cd facsimile_impl && ./fac_v3 SCEN_BAU ../output/assim_mysite ../runtime_v3.dat
 # ① stdout 对比：O3max 应被拉向观测峰值
 # ② IPR 的 B 账（BC+稀释）应出现明显非零
 python3 - <<'PY'
-import sys; sys.path.insert(0, "diagnostics")
+import sys; sys.path.insert(0, "analysis_lib")
 import diagnostics as dg
 sp, ipr = dg.ipr_from_fac("output/assim_mysite")
 print("O3 的 B 账(同化+稀释) =", f"{ipr['O3']['B']:.3e}")
@@ -2537,7 +2525,7 @@ PY
 
 ### 14.2 模板②：AQI 多污染物宽表（需离线拆分换算）
 
-**模板**：`templates/surface_aqi_station.template`
+**模板**：`docs/templates/surface_aqi_station.template`
 **现成样例**：无（AQI 需先拆分换算；拆分后格式与 `bc_O3_demo.txt` 相同）
 **与模板①的区别**：AQI 站是**多污染物同报的宽表**（中国惯例 HJ 193，μg/m³），
 需逐物种拆列 + 单位换算后才能接入。
@@ -2587,7 +2575,7 @@ for sp, f in list(FACTOR.items()) + [("CO", 0.873)]:
         val = v * f * (1000 if sp == "CO" else 1)   # CO: mg/m³ → ppb
         lines.append(f"{t:8d} {val:8.2f}")
         t += 3600
-    open(f"input_v3/constraints/aqi_{sp}_BJ-PKU.txt", "w").write("\n".join(lines)+"\n")
+    open(f"configs/constraints/aqi_{sp}_BJ-PKU.txt", "w").write("\n".join(lines)+"\n")
     print(f"{sp}: {len(lines)-3} 点")
 PY
 ```
@@ -2621,8 +2609,8 @@ CO  = file:constraints/aqi_CO_BJ-PKU.txt
 
 ### 14.3 模板③：VOCs 组份监测（一站一物种）
 
-**模板**：`templates/surface_voc_station.template`
-**现成样例**：`input_v3/constraints/bc_HCHO_demo.txt`（HCHO 24 点，实测可用）
+**模板**：`docs/templates/surface_voc_station.template`
+**现成样例**：`configs/constraints/bc_HCHO_demo.txt`（HCHO 24 点，实测可用）
 **格式**：与模板①**完全相同**（两列 + `# unit: ppb`），只是**一个物种一个文件**。
 
 ```
@@ -2667,31 +2655,31 @@ ISOP = file:constraints/voc_ISOP_BJ-PKU.txt
 
 ### 14.4 模板④：卫星柱浓度（唯一"引擎不直读"，用 sat2surf.py 转换）
 
-**模板**：`templates/satellite_column.template`
-**现成样例**：`input_v3/constraints/bc_NO2_sat_demo.txt`（逐日 6 点，实测可用，需弱 τ）
+**模板**：`docs/templates/satellite_column.template`
+**现成样例**：`configs/constraints/bc_NO2_sat_demo.txt`（逐日 6 点，实测可用，需弱 τ）
 **关键限制**：ozone_lab 是 **0-D 箱体，无气柱概念**——引擎**不直接读**卫星柱浓度。
 必须**离线转换**为地表等效体积混合比后，走模板①同款 BC 通路。
 
-> ✅ **别再手算了**：转换已工具化 —— **`src/sat2surf.py`**（内置两法交叉核对 +
+> ✅ **别再手算了**：转换已工具化 —— **`inputproc/sat2surf.py`**（内置两法交叉核对 +
 > QA 过滤 + 点数限制 + 量级自检）。手算极易踩下面那个 ×1e9 的坑。
 
 #### 14.4.1 转换工具用法
 
 ```bash
 # 最小用法（BLH 取常数 1000 m）
-python3 src/sat2surf.py 原始柱.raw 输出约束.txt
+python3 inputproc/sat2surf.py 原始柱.raw 输出约束.txt
 
 # 完整选项
-python3 src/sat2surf.py <raw.raw> <out.txt> \
+python3 inputproc/sat2surf.py <raw.raw> <out.txt> \
     --blh 1000 \                    # 混合层高度常数 [m]
-    --blh-file input_v3/constraints/met_BLH.txt \   # 或 BLH 序列, 过境时刻线性插值
+    --blh-file configs/constraints/met_BLH.txt \   # 或 BLH 序列, 过境时刻线性插值
     --qa-min 0.75 \                 # QA 阈值 (也可由文件头 qa_filter 解析)
     --species NO2 \                 # 覆盖头部 species
     --t0 2024-06-01 \               # 模拟起点日期 (缺省=首条观测当日 00:00)
     --max-points 128                # 超限自动等间隔抽稀
 
 # 自检（3 组已知值 + 两法互证 + 旧式反证）
-python3 src/sat2surf.py --selftest
+python3 inputproc/sat2surf.py --selftest
 ```
 
 #### 14.4.2 输入：原始柱浓度（照模板）
@@ -2712,7 +2700,7 @@ python3 src/sat2surf.py --selftest
 QA 低于阈值（默认 0.75）的过境自动剔除并打印。
 
 > 📋 **全物种输入矩阵**：111 物种 × 5 通道（IC/BC/EMIS/DRY/WET）的完整可输入清单
-> 与物理合理性判断见 [templates/SPECIES_INPUT_MATRIX.md](../templates/SPECIES_INPUT_MATRIX.md)。
+> 与物理合理性判断见 [templates/SPECIES_INPUT_MATRIX.md](templates/SPECIES_INPUT_MATRIX.md)。
 > 每物种每个通道标注 **✓ 推荐 / △ 可行有前提 / ✗ 无意义**。
 
 #### 14.4.2b 支持哪些卫星产品？（无白名单，凡机制物种皆可）
@@ -2744,10 +2732,10 @@ QA 低于阈值（默认 0.75）的过境自动剔除并打印。
 
 ```bash
 # 两个文件分别转换
-python3 src/sat2surf.py sat_HCHO_202406.raw input_v3/constraints/sat_HCHO_surf.txt \
-        --blh-file input_v3/constraints/met_BLH.txt
-python3 src/sat2surf.py sat_NO2_202406.raw  input_v3/constraints/sat_NO2_surf.txt \
-        --blh-file input_v3/constraints/met_BLH.txt
+python3 inputproc/sat2surf.py sat_HCHO_202406.raw configs/constraints/sat_HCHO_surf.txt \
+        --blh-file configs/constraints/met_BLH.txt
+python3 inputproc/sat2surf.py sat_NO2_202406.raw  configs/constraints/sat_NO2_surf.txt \
+        --blh-file configs/constraints/met_BLH.txt
 
 # bc.config 同时登记
 HCHO = file:constraints/sat_HCHO_surf.txt
@@ -2766,7 +2754,7 @@ IPR 分账: HCHO_B = −2.517e+11 ✓ | NO2_B = +5.490e+11 ✓  (双物种同化
 #### 14.4.3 输出的转换报告（实测）
 
 ```
-$ python3 src/sat2surf.py sat_NO2_demo.raw sat_NO2_surf.txt
+$ python3 inputproc/sat2surf.py sat_NO2_demo.raw sat_NO2_surf.txt
 [QA] 阈值 0.75: 剔除 1 条低质量过境 (保留 5)
 
 == 转换结果 → sat_NO2_surf.txt ==
@@ -2858,10 +2846,10 @@ $ python3 src/sat2surf.py sat_NO2_demo.raw sat_NO2_surf.txt
 
 ```bash
 # ① 转换
-python3 src/sat2surf.py sat_NO2_demo.raw input_v3/constraints/sat_NO2_surf.txt
+python3 inputproc/sat2surf.py sat_NO2_demo.raw configs/constraints/sat_NO2_surf.txt
 
 # ② 登记
-printf '\nNO2 = file:constraints/sat_NO2_surf.txt\n' >> input_v3/bc.config
+printf '\nNO2 = file:constraints/sat_NO2_surf.txt\n' >> configs/bc.config
 
 # ③ 编译（cfgbuild 会打印 "序列: [..., 'bc_NO2']"）
 make runtime_v3.dat
@@ -2890,7 +2878,7 @@ IPR 分账: NO2_B = +5.523e+11   (无约束基线 -4.975e+10 → 同化增量 +5
 
 ### 14.5 模板⑤：排放清单（直接对应 emissions.config）
 
-**模板**：`templates/emissions_inventory.template`
+**模板**：`docs/templates/emissions_inventory.template`
 **这是唯一"直接就是配置"的模板**——正文语法即 `emissions.config` 语法。
 
 #### 格式与两种单位（V2.3 起支持 ppb/h 指令）
@@ -2914,7 +2902,7 @@ cat > /tmp/t/emissions.config <<'EOF'
 NO      20.0    BOX  0.9
 NO2     1.0     BOX  0.9
 EOF
-python3 src/cfgbuild.py /tmp/t /tmp/rt.dat --mech mechanism/mechanism_3_full_chain.fac
+python3 inputproc/cfgbuild.py /tmp/t /tmp/rt.dat --mech mechanism/mechanism_3_full_chain.fac
 # EMIS 段输出: E 1.366667e+08 BOX 0.9   (20×6.833e6 ✓)
 #             E 6.833333e+06 BOX 0.9   (1×6.833e6 ✓)
 ```
@@ -2958,9 +2946,9 @@ E = F × 6.022e23 / (1e4 × H[cm])
 
 ```bash
 # ① 编辑清单（模板正文可直接用作起点）
-cp templates/emissions_inventory.template input_v3/emissions.config
+cp docs/templates/emissions_inventory.template configs/emissions.config
 # 或追加自己的行
-cat >> input_v3/emissions.config <<'EOF'
+cat >> configs/emissions.config <<'EOF'
 # --- 我的清单 (ppb/h 直给, V2.3 特性) ---
 # unit: ppb/h
 NO      20.0    BOX   0.9     # 早高峰 20 ppb/h
@@ -3003,7 +2991,7 @@ E_CH4 → CH4
 
 ### 14.6 模板⑥：气象序列（`met_series.template`）
 
-**模板**：`templates/met_series.template`（6 条现成样例：`input_v3/constraints/met_*_demo.txt`）
+**模板**：`docs/templates/met_series.template`（6 条现成样例：`configs/constraints/met_*_demo.txt`）
 
 `meteo.config` 的 7 个量都支持 `file:`（两列 + 可选注释）：
 
@@ -3045,7 +3033,7 @@ python experiments/run/run_M_met_series.py
 ### 14.7 新增政策情景
 
 ```bash
-cat >> input_v3/scenarios.config <<'EOF'
+cat >> configs/scenarios.config <<'EOF'
 SCEN_MINE = E_NOx*0.7 E_CO*0.5 E_CH4*1 E_VOC*1 JFAC*1
 SCEN_HOT2 = E_NOx*1 E_VOC*1 E_CO*1 E_CH4*1 JFAC*0.8 DT+3
 EOF
@@ -3102,7 +3090,7 @@ for ln in open("facsimile_impl/gen_v3/oz.reac"):
 for ln in open("facsimile_impl/gen_v3/oz.prod"):
     p = ln.split(); n = int(p[0]); tk = p[1:]
     for i in range(n): prod[int(tk[2*i])-1] += 1
-dry = {l.split()[0] for l in open("input_v3/drydep.config")
+dry = {l.split()[0] for l in open("configs/drydep.config")
        if l.strip() and not l.startswith("#")}
 dead = [sp[i] for i in range(ns) if prod[i] > 0 and loss[i] == 0 and sp[i] not in dry]
 print("零汇物种 (必须修!):", dead if dead else "无")
@@ -3143,7 +3131,7 @@ ISOP = file:constraints/voc_ISOP_A.txt
 # 一条命令做 2+3
 grep -A2 "^SERIES" runtime_v3.dat | head -6
 python3 -c "
-import sys; sys.path.insert(0,'diagnostics'); import diagnostics as dg
+import sys; sys.path.insert(0,'analysis_lib'); import diagnostics as dg
 sp, ipr = dg.ipr_from_fac('output/assim_mysite')
 print('O3 B账:', f\"{ipr['O3']['B']:.3e}\")"
 ```
@@ -3160,7 +3148,7 @@ print('O3 B账:', f\"{ipr['O3']['B']:.3e}\")"
 | `未知单位 'ug/m3'` | 用了未支持的单位 | AQI 必须**离线**换成 ppb（模板②） |
 | 结果与无约束完全一致 | 忘记 `make runtime_v3.dat` | 重编译 |
 | 结果与观测差很远 | TAU_MIX 太大（弱约束） | 改 21600 或 7200 |
-| NO₂ 同化后反而变差 | NO₂ 受光稳态支配，强 nudging 有害 | 用弱 τ 或改 NOx 排放反演 |
+| NO₂ 同化后反而变差 | NO₂ 受光稳态支配，强 nudging 有害 | 用弱 τ 或调 NOx 排放 |
 | 卫星数据量级离谱 | 混合层分数假设错 | 按 §14.4 公式重算 |
 | 排放改了但结果没变 | emission 未重编译 / 物种名拼错 | `make runtime_v3.dat` + 核对 VARIABLE |
 
@@ -3343,8 +3331,7 @@ PNA/RONO₂/OLENIT/TERPNIT 时，该不变量抓住了 4 个格点的 FAIL。
 | 机制变更后重编译 | ~8 s | mechc + gfortran |
 | `make test` 全链 | <2 min | — |
 | 实验 B→D→G 一轮完整诊断 | ~5 min | — |
-| `sens_adj.py` | ~2 min | OAT+SVD |
-| `obs_osse.py` | ~2–5 min | 多次重跑调库 |
+| `run_H_sensitivity.py` | ~2 min | OAT（无 SVD） |
 
 **负载警告**：OpenMP 加速比在系统 load > 核数时测量无意义；
 `scan_parallel.sh` 内置负载闸门（SKIP 而非 FAIL）。
@@ -3356,7 +3343,7 @@ PNA/RONO₂/OLENIT/TERPNIT 时，该不变量抓住了 4 个格点的 FAIL。
 ### 20.1 `diagnostics.py`（3 个函数）
 
 ```python
-import sys; sys.path.insert(0, "diagnostics")
+import sys; sys.path.insert(0, "analysis_lib")
 import diagnostics as dg
 
 h, C, irr_h, I = dg.load("output/expA_BAU")
@@ -3412,7 +3399,7 @@ for sp in ("O3", "HNO3", "H2O2"):
 
 ```bash
 # 1) 3 天模拟，1 小时输出
-cat > input_v3/model.parameters <<'EOF'
+cat > configs/model.parameters <<'EOF'
 3.0        # 天数
 3600.0     # 输出步长
 1.0e-6     # RTOL
@@ -3420,14 +3407,14 @@ cat > input_v3/model.parameters <<'EOF'
 EOF
 
 # 2) 最小排放（只有 NO/CO/ISOP）
-cat > input_v3/emissions.config <<'EOF'
+cat > configs/emissions.config <<'EOF'
 NO      2.0e7   BOX  0.9
 CO      1.0e7   BOX  0.9
 ISOP    2.0e6   BOX  0.9
 EOF
 
 # 3) 无序列依赖（常数气象）
-cat > input_v3/meteo.config <<'EOF'
+cat > configs/meteo.config <<'EOF'
 TEMP   = 298.15
 PRES   = 1013.25
 RH     = 60
@@ -3444,7 +3431,7 @@ cd facsimile_impl && ./fac_v3 SCEN_BAU ../output/minimal ../runtime_v3.dat
 ### A.2 最小观测约束（24 点序列）
 
 ```bash
-cat > input_v3/constraints/o3_demo.txt <<'EOF'
+cat > configs/constraints/o3_demo.txt <<'EOF'
 # unit: ppb
       0    30.0
    3600    35.0
@@ -3471,7 +3458,7 @@ cat > input_v3/constraints/o3_demo.txt <<'EOF'
   79200    14.0
   82800    20.0
 EOF
-printf 'TAU_MIX = 21600\nO3 = file:constraints/o3_demo.txt\n' > input_v3/bc.config
+printf 'TAU_MIX = 21600\nO3 = file:constraints/o3_demo.txt\n' > configs/bc.config
 make runtime_v3.dat
 ```
 

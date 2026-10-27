@@ -20,10 +20,10 @@
 > **路线现状（2026-10-27）**：现役 **fac_v3 / fac_batch_omp / mcm_run** 三条；
 > fac_run、kpp_run、kpp_batch、EBI、fac_expanded、fac_spgmr 已退役（详见 §1.1）。
 >
-> **七大分析能力**：①观测约束（nudging 同化）· ②响应面（4D 参数扫描，最高 262,144 案例）
+> **六大分析能力**：①观测约束（nudging 同化）· ②响应面（4D 参数扫描，最高 262,144 案例）
 > · ③情景分析（6 政策情景）· ④过程分析（IPR 六账 + IRR 203 反应）
-> · ⑤敏感性 OAT · ⑥反演（⚠ 非真伴随，FD+SVD）
-> · ⑦气象序列驱动（6 变量逐时观测）——索引见
+> · ⑤敏感性 OAT · ⑥气象序列驱动（6 变量逐时观测）
+> （原第 7 项"伴随/反演"已于 2026-10-27 移除：0-D 无真伴随，FD+SVD 不可辨识）——索引见
 > [OPERATIONS_MANUAL §0.7](docs/OPERATIONS_MANUAL.md)，详解见
 > [EXPERIMENTS_GUIDE §6.9–6.11](docs/EXPERIMENTS_GUIDE.md) 与 [§0.3b](docs/EXPERIMENTS_GUIDE.md)。
 >
@@ -38,7 +38,7 @@
 >
 > **一键复现**（计数为 2026-10-27 实跑值）：
 > ```bash
-> make test   # 构建 → 冒烟 1/1 → 功能 62/62 → 元素审计 203/203 → 81 案例响应面 + 批量自检
+> make test   # 构建 → 冒烟 1/1 → 功能 67/67 → 元素审计 203/203 → 81 案例响应面 + 批量自检
 > make v3 && make batch   # 工程版: fac_v3 情景 + fac_batch_omp OpenMP 响应面
 > make mcm                # MCM 对照路线 (29sp 独立子树, 可 clean 后重建)
 > make figures            # response_surface_v3.png + indicators_vs_ridge.png
@@ -96,7 +96,7 @@ cd facsimile_impl && ./fac_v3 SCEN_BAU ../output/base_v3 ../runtime_v3.dat
 make batch            # = v3 + runtime_v3.dat + fac_batch_omp 9
 
 # ④ 诊断一键报告 (指示因子/IRR/family/账本)
-python -c "import sys; sys.path.insert(0,'diagnostics')
+python -c "import sys; sys.path.insert(0,'analysis_lib')
 from indicators import route_indicators
 print(route_indicators('output/batch_v3_indicators', 'mechanism/mechanism_3_full_chain.fac'))"
 
@@ -110,6 +110,16 @@ make figures
 # ③ mcm_run = 机制正确性体外参照 (MCM 独立来源), 机制扩链后跑一次作第四道关卡。
 # 何时编译: 改配置→零编译(make runtime_v3.dat, 0.37s); 改 .fac/Fortran→make v3(~8s)。
 ```
+
+> **⚠ 实验纪律（机制 V2.5+ 封版时代）**：
+> ① **机制只读**——`mechanism/` 已封版，实验永远不改 `.fac`；日常循环 =
+> 改 `configs/` 输入 → `make runtime_v3.dat`（0.37 s，幂等）→ 直接跑
+> `fac_v3` / `fac_batch_omp`。只有改 `.fac`/Fortran 才 `make v3`（~8 s）——那是开 V2.6 的动作。
+> ② **做实验期间严禁 `make clean`**——它 `rm -rf output/`（**你的全部实验结果**）并删
+> 二进制与 `gen_v3/` 生成码；要清理只用 `make clean-build`（output/ 保留）或
+> `make clean-output`（只删结果，交互确认）。
+> ③ **runtime_v3.dat 只经 make 生成**——不手改、不用旧文件冒充（FT-CFG 逐字节比对
+> \+ FORCE 强制重建双防线）；输入变体走 `run/_runner.py clone_input` 独立编译。
 
 ---
 
@@ -174,8 +184,9 @@ make figures
     （**RTOL/ATOL 含义、实测敏感性与"何时该动"见 [GUIDE §3⑬](docs/EXPERIMENTS_GUIDE.md)**）
   - DENSE（111×111；无预条件 SPGMR 黎明崩塌——10b #12）；`MAX_STEP=100 s`，重启后 10 s
   - 输出目录自动 `mkdir -p`；情景名匹配 → 序号解析 → 失败回落情景 1（`ios` 显式置 0）
-- **输出**：`<pref>_conc.csv`（表头 `h,<111 物种名动态生成>`，**末 24 h**）+
+- **输出**：`<pref>_conc.csv`（表头 `h,<111 物种名动态生成>`，**spin-up 后全部逐时**）+
   `<pref>_irr.csv`（`h,r1..r203`）+ `<pref>_ipr.csv`（`h` + 111×6 账）
+  （三者同一闸门：`step ≥ nspin`，`nspin = SPINUP×86400/dtout`；SPINUP 见 `configs/model.parameters` 第 5 行）
   + stdout（`FAC-V3 ok (…s, nst=…, O3max=… ppb)`）
 
 ### ② `facsimile_impl/fac_batch_omp` —— OpenMP 批量响应面
@@ -212,12 +223,12 @@ mechc.py → gen*/、fac2kpp.py → KPP 三件套、cfgbuild --mech → runtime_
 
 | # | 脚本 | 实读确认的功能 | 用法 |
 |---|---|---|---|
-| 1 | `src/cfgbuild.py` | 12 类配置 → Fortran 顺序表控 runtime.dat；段结构（与解析端 `runtime_dat_mod.read_runtime` 逐段对上）：`RUN ns nj nser nscen / SPECIES / MODEL days dtout rtol atol / IC / MET×7 / BC / PHOT lat doy + J idx l m n ×nj / EMIS×ns / DRY×ns / WET×ns / DIL / SCEN name fnox fvoc fco fch4 jfac dt / SERIES name n + t行 + v行`；编译期校验全过才写出；`--days/--dtout` 临时覆盖 | `python src/cfgbuild.py input_v3 runtime_v3.dat` |
+| 1 | `inputproc/cfgbuild.py` | 12 类配置 → Fortran 顺序表控 runtime.dat；段结构（与解析端 `runtime_dat_mod.read_runtime` 逐段对上）：`RUN ns nj nser nscen / SPECIES / MODEL days dtout rtol atol / IC / MET×7 / BC / PHOT lat doy + J idx l m n ×nj / EMIS×ns / DRY×ns / WET×ns / DIL / SCEN name fnox fvoc fco fch4 jfac dt / SERIES name n + t行 + v行`；编译期校验全过才写出；`--days/--dtout` 临时覆盖 | `python inputproc/cfgbuild.py configs runtime_v3.dat` |
 | 2 | `facsimile_impl/mechc.py` | **FACSIMILE→Fortran 机制编译器**：`.fac` → `gen_v3/oz_mech.f90`（ns/nr/nq/nj + update_rates）+ `oz.reac/oz.prod` 计量表；V2.5 硬化（行内 `!` 注释剥离 + 未知 token 硬失败） | `make v3`（自动） |
-| 3b | `src/sat2surf.py` | **卫星柱 → 地表等效 ppb 转换器**（两法互证/QA 过滤/BLH 序列插值/点数抽稀/量级自检；`--selftest` 内置校验） | `python src/sat2surf.py <raw> <out> [--blh-file ...]` |
-| 4 | `diagnostics/diagnostics.py` | CSV 读取与六账积分纯函数（§6.2） | `import diagnostics as dg` |
-| 4b | `diagnostics/indicators.py` | **路线无关 12 指标引擎**（NOy 从 FORMULA 段自动判定，§6.1） | `from indicators import route_indicators` |
-| 4c | `diagnostics/csvfloat.py` | gfortran 三位指数省略 E 的健壮解析共享件 | 被 diagnostics/nc_output 引用 |
+| 3b | `inputproc/sat2surf.py` | **卫星柱 → 地表等效 ppb 转换器**（两法互证/QA 过滤/BLH 序列插值/点数抽稀/量级自检；`--selftest` 内置校验） | `python inputproc/sat2surf.py <raw> <out> [--blh-file ...]` |
+| 4 | `analysis_lib/diagnostics.py` | CSV 读取与六账积分纯函数（§6.2） | `import diagnostics as dg` |
+| 4b | `analysis_lib/indicators.py` | **路线无关 12 指标引擎**（NOy 从 FORMULA 段自动判定，§6.1） | `from indicators import route_indicators` |
+| 4c | `analysis_lib/csvio.py` | **CSV 读写唯一实现**（含 gfortran 三位指数兜底、PPB 常数）；`csvfloat.py` 为兼容转发层 | `from csvio import read_table, write_csv` |
 | 5 | `src/fac2kpp.py` | ozone.fac → KPP 三件套转换脚本——**KPP 路线已退役，脚本保留作历史工具（无 make 目标）** | 手动运行 |
 | 6 | `figures/fig_indicators_ridge.py` + `fig_response_v3.py` | 消费 `output/batch_v3_indicators.csv` → 两张工程图（`make figures` 调用，自检轮次 3 落盘可复现） | `make figures` |
 
@@ -227,8 +238,8 @@ mechc.py → gen*/、fac2kpp.py → KPP 三件套、cfgbuild --mech → runtime_
 
 | # | 文件 | 实读确认的功能 | 用法 / 实测 |
 |---|---|---|---|
-| 1 | `audit/element_audit.py` | 逐反应 C/H/N/O/S/Cl/Br 平衡；储库（H₂O/O₂/CO₂/H₂）自动推断但**限定物理方向**（CO₂/H₂ 只许产物侧、O₂ 反应物侧≤2.5）；111 物种元素表内嵌（机制自带 FORMULA 块覆盖） | `python audit/element_audit.py mechanism/mechanism_3_full_chain.fac` → **203/203** |
-| 2 | `audit/mcm_compare.py` | 与 MCM v3.3.1 官方导出逐反应系数比对（反应物集合匹配 / 多分支求和 / 集总映射 / 文档漂移检查） | `python audit/mcm_compare.py` → 最大偏差 8.9% |
+| 1 | `mechanism/audit/element_audit.py` | 逐反应 C/H/N/O/S/Cl/Br 平衡；储库（H₂O/O₂/CO₂/H₂）自动推断但**限定物理方向**（CO₂/H₂ 只许产物侧、O₂ 反应物侧≤2.5）；111 物种元素表内嵌（机制自带 FORMULA 块覆盖） | `python mechanism/audit/element_audit.py mechanism/mechanism_3_full_chain.fac` → **203/203** |
+| 2 | `mechanism/audit/mcm_compare.py` | 与 MCM v3.3.1 官方导出逐反应系数比对（反应物集合匹配 / 多分支求和 / 集总映射 / 文档漂移检查） | `python mechanism/audit/mcm_compare.py` → 最大偏差 8.9% |
 | 3 | `tests/smoke_test.sh` | FAC-V3 冒烟（log 含 ok + O₃ 末列非零） | `make smoke` → 1/1 |
 | 4 | `tests/functional_test.py` | **62 断言**（FT-CFG/CFGSPEC/DAYS/FREEZE/GIT/MECHK/MP/PHOT/SAT/SYNC/TPL/UNIT 12 族）：编译期负测试 / batch 24 列契约 / 屋脊 / FNR 单调 / IPR 六账闭合 / L_NOx-Q 值域 / 金值哨兵 / 冻结版规格三向一致 / mechc 计量表防御 / output 不入库 | `make functional` |
 
@@ -244,11 +255,11 @@ mechc.py → gen*/、fac2kpp.py → KPP 三件套、cfgbuild --mech → runtime_
 | `mechanism/mechanism_3_full_chain.fac` | **111sp/203rx V2.5+** | fac_v3 / fac_batch_omp `gen_v3/` | 十段链条骨架（①无机核心+HONO 晨爆 ②NO₃-N₂O₅ 夜化学 MCM Troe 逐字 ③CH₄+PAN 储库 ④**isoprene 完整二代链** ⑤DMS→MSA ⑥卤素+储库 ⑦集总类 ⑧支撑化学 ⑨硝酸酯家族 ⑩单萜+V2.4 扩展）；GLY 光解三分支；每反应 C/H/N/O/S/Cl/Br 精确配平（203/203） |
 | `mcm_city/input/mechanism_mcm_ch4.fac` | 29sp/71rx | mcm_city `gen/` | AtChem2 自带 MCM v3.3.1 CH₄ 子集；完整无机组（NO₃/N₂O₅/HO₂NO₂/HONO）+ Troe（KMT01-03/KBPAN/KFPAN）+ HSO₃/SO₃ 硫链 + CL |
 | ~~`kpp_impl/ozone_kpp.{spc,eqn,def}`~~（已随 KPP 路线退役删除） | — | — | `src/fac2kpp.py` 转换脚本保留 |
-| （已删）`input_v3/mechanism_3_full_chain.fac` | — | — | 旧副本已删除；cfgbuild 经 `--mech mechanism/mechanism_3_full_chain.fac` 直引真源 |
+| （已删）`configs/mechanism_3_full_chain.fac` | — | — | 旧副本已删除；cfgbuild 经 `--mech mechanism/mechanism_3_full_chain.fac` 直引真源 |
 
 ## 1.5 输入系统（12 类配置 → runtime.dat）
 
-**唯一工程输入目录是 `input_v3/`**（12 类配置，文件名沿用 AtChem2 约定）。
+**唯一工程输入目录是 `configs/`**（12 类配置，文件名沿用 AtChem2 约定）。
 旧的 `input/`（15sp 教学同构份）已于 2026-10 彻底删除——它零消费者且易被误
 当工程入口；15sp 教学机制档亦已删除（不再保留死代码）。
 解析端（`runtime_dat_mod.read_runtime`）逐段实读确认的 12 段：
@@ -282,14 +293,15 @@ f_CO  → CO             f_CH4 → CH4        另: jfac 乘 J 通道, dt 加 TEM
 |---|---|---|
 | ~~fac_run conc~~（退役） | 曾为 `h,O3,...,CH3O2` 10 列；现由 fac_v3 67 列契约取代 | dg.load 需按列名适配 |
 | fac_run irr | `h,r1..r25`（末 24 h 快照） | `dg.irr_integrate` |
-| fac_v3 conc | `h` + **111 物种** = **112 列**（末 24 h 逐时，molec/cm³） | `diagnostics.load` / 自定义分析 |
+| fac_v3 conc | `h` + **111 物种** = **112 列**（spin-up 后逐时，molec/cm³） | `diagnostics.load` / 自定义分析 |
 | fac_v3 irr | `h` + **203 反应** = **204 列**（**小时窗积分**，非速率） | `dg.irr_integrate` |
-| fac_v3 ipr | `h` + **111×6 账** = **667 列**（`P L E D B X`，小时窗积分） | `run_D_process` / 过程归因 |
+| fac_v3 ipr | `h` + **111×6 账** = **667 列**（`P L E D B X`，小时窗积分） | `run_D_ipr` / 过程归因 |
 | batch CSV | `fnox,fvoc,O3max,O3mean,HCHOmax,NO2mean,FNR_mean,H2O2HNO3,O3NOy,HCHONOy,O3NOz,NOy_ppb,LnOxQ,PH2O2PHNO3,OPE,nst`（24 列） | figures 两脚本 |
 | mcm_city_* | 29 物种 + 71 反应 | 自定义分析 |
 
-**注意**：conc/irr 只写**末 24 h**（前 96 h 建立准稳态，全程 O₃max 走 stdout）；
-要全程序列改驱动的 `step >= nsteps-24` 条件。
+**注意**：conc/irr/ipr 写**spin-up 之后全部逐时步**（闸门 `step >= nspin`；
+`configs/model.parameters` 第 5 行 SPINUP=丢弃天数，0=全程，缺省 2.0 天=前 48 h 只积分不落盘）；
+全程 O₃max 走 stdout。旧行为（只写末 24 步）等价于把 SPINUP 设成 `days - 1`。
 
 ---
 
@@ -307,8 +319,8 @@ f_CO  → CO             f_CH4 → CH4        另: jfac 乘 J 通道, dt 加 TEM
 - **命令**：`make v3 && cd facsimile_impl && ./fac_v3 SCEN_BAU ../output/base_v3 ../runtime_v3.dat`
 - **产物**：`base_v3_conc.csv`（112 列 = h+111 物种）+ `_irr.csv`（203 反应）+ stdout O3max
 - **解读**：实测（V2.5+，2026-10-27）≈2.6 s / 4802 步 / 零重启；末 24h O₃ **58.4 ppb**
-  （O₃max 99.3 ppb 走 stdout）。CSV 只含末 24 h（§1.6）——要看建立期改
-  `oz_fac_v3.f90` 的 `step >= nsteps-24`。
+  （O₃max 99.3 ppb 走 stdout）。CSV 从 SPINUP 之后逐时落盘（§1.6）——
+  要看建立期把 `configs/model.parameters` 第 5 行设为 `0`（全程逐时）。
 
 ### A2. 六情景政策沙盘
 
@@ -341,7 +353,7 @@ f_CO  → CO             f_CH4 → CH4        另: jfac 乘 J 通道, dt 加 TEM
 
 ### A3. 排放缩放单点（自定义情景）
 
-- **命令**：`input_v3/scenarios.config` 加 `SCEN_MYCASE = E_NOx*1.5 E_VOC*1.0 JFAC*1` →
+- **命令**：`configs/scenarios.config` 加 `SCEN_MYCASE = E_NOx*1.5 E_VOC*1.0 JFAC*1` →
   `make runtime_v3.dat` → `facsimile_impl/fac_v3 SCEN_MYCASE ../output/mycase ../runtime_v3.dat`
 - **解读**：滴定区/稀放区的单点响应由 fac_v3 承载（历史命令 fac_run 已退役；
   FT10 的滴定区判据 1.5 vs 10.4 ppb 已固化为功能测试锚点）。
@@ -392,7 +404,7 @@ f_CO  → CO             f_CH4 → CH4        另: jfac 乘 J 通道, dt 加 TEM
 
 ### B4. 自定义情景扩展
 
-- **命令**：`input_v3/scenarios.config` 追加 `SCEN_MINE = E_NOx*0.7 E_CO*0.5 JFAC*1` →
+- **命令**：`configs/scenarios.config` 追加 `SCEN_MINE = E_NOx*0.7 E_CO*0.5 JFAC*1` →
   重编 runtime_v3 → `./fac_v3 SCEN_MINE …`
 - **注意**：表达式仅乘法/加法；**物种→组映射硬编码于 `scen_build`**（新排放物种需改码）。
 
@@ -436,7 +448,7 @@ f_CO  → CO             f_CH4 → CH4        另: jfac 乘 J 通道, dt 加 TEM
 
 ### E1. 元素守恒审计（机制质检）
 
-- **命令**：`python audit/element_audit.py mechanism/mechanism_3_full_chain.fac` → **203/203**
+- **命令**：`python mechanism/audit/element_audit.py mechanism/mechanism_3_full_chain.fac` → **203/203**
 - **解读**：旧机制 7 处历史 bug 标本（10a.1 全表；标本文件 `mechanism_0_expanded.fac`
   已删除，案例保留于 10a.1 表）——**机制开发审计流程活教材**。
 
@@ -509,13 +521,13 @@ f_CO  → CO             f_CH4 → CH4        另: jfac 乘 J 通道, dt 加 TEM
 
 ```
 ┌────────────────── 用户输入层 ──────────────────────────────────────────┐
-│  input_v3/          (12 类配置, 人类可读, # 注释)                      │
+│  configs/          (12 类配置, 人类可读, # 注释)                      │
 │    initialConcentrations / meteo / constraints/                       │
 │    bc / photolysis / photolysis-rates_MCM / emissions / dilution      │
 │    drydep / wetdep / scenarios / model.parameters                     │
 │    （机制 .fac 在 mechanism/，经 --mech 直引唯一真源）                │
 └────────────────────────┬───────────────────────────────────────────────┘
-                         │  src/cfgbuild.py (校验+归一, 全过才写出)
+                         │  inputproc/cfgbuild.py (校验+归一, 全过才写出)
                          ▼
               runtime.dat / runtime_v3.dat (Fortran 顺序表控, 零文本解析)
                          │  modules/runtime_dat_mod.f90 (纯数据消费端)
@@ -530,7 +542,7 @@ f_CO  → CO             f_CH4 → CH4        另: jfac 乘 J 通道, dt 加 TEM
     │
     ▼ 统一输出: <pref>_conc.csv + <pref>_irr.csv
     │
- diagnostics/  [纯函数诊断库]
+ analysis_lib/  [纯函数诊断库]
    indicators.py (12 指标引擎) + diagnostics.py (load/ipr_from_fac) + csvfloat.py
     │
  experiments/run/*.py + figures/*.py  [业务层/可视化]
@@ -540,8 +552,8 @@ f_CO  → CO             f_CH4 → CH4        另: jfac 乘 J 通道, dt 加 TEM
 
 | 语言 | 模块 | 职责 | 为什么是它 |
 |---|---|---|---|
-| **Python** | `src/cfgbuild.py` | 配置编译（12 类→平面文件） | 文本校验/正则/单位换算/跨文件一致性 |
-| **Python** | `diagnostics/` `experiments/run/` `tests/` | 诊断/实验/测试 | 数据分析生态 |
+| **Python** | `inputproc/cfgbuild.py` | 配置编译（12 类→平面文件） | 文本校验/正则/单位换算/跨文件一致性 |
+| **Python** | `analysis_lib/` `experiments/run/` `tests/` | 诊断/实验/测试 | 数据分析生态 |
 | **Fortran** | 三求解核 + runtime_dat_mod | 刚性 ODE 积分 + 物理层 | 编译性能 + CVODE/KPP 生态 |
 | **C** | CVODE 库 | BDF/Newton 数值后端 | SUNDIALS 是 C 库 |
 | **Shell** | Makefile + tests/smoke | 构建编排 | 通用构建语言 |
@@ -591,7 +603,7 @@ f_CO  → CO             f_CH4 → CH4        另: jfac 乘 J 通道, dt 加 TEM
 ### 4.2 配置编译器处理链
 
 ```
-input_v3/ (12 类文本)
+configs/ (12 类文本)
   │ ① .fac → 物种表 + 命名速率 + 反应行      ⑥ BC → 常数/序列
   │ ② 光解表 → l/m/n (D→E 记法)             ⑦ 排放 → 日型
   │ ③ photolysis.config → J 映射            ⑧ 沉降/稀释 → 速率参数
@@ -645,7 +657,7 @@ RO2 = CH3O2 ;                       ← 过氧池 (可选)
 **四类全量约定**（机制速率 molec/cm³/s / Fortran 硬编码清单 / 内部计算量 /
 ⚠ PPB 因子固定 1atm·298.15K 的 ~1–2%/5K 口径差）：
 - 摘要版：[`OPERATIONS_MANUAL.md §2b`](docs/OPERATIONS_MANUAL.md)
-- **完整版（逐子量 + 换算公式 + 硬编码登记）：[`UNITS.md`](UNITS.md)**
+- **完整版（逐子量 + 换算公式 + 硬编码登记）：[`UNITS.md`](docs/UNITS.md)**
 
 ---
 
@@ -699,7 +711,7 @@ CVODE fcmix BDF+Newton → 解析 Jacobian → 拐点韧性重启（FCVREINIT �
 
 诊断层由**两个库**组成，职责分离：
 
-### 6.1 `diagnostics/indicators.py` —— 路线无关指标引擎（主力）
+### 6.1 `analysis_lib/indicators.py` —— 路线无关指标引擎（主力）
 
 ```python
 route_indicators(prefix, fac_path)      # → dict: 12 个指标 (窗口均值)
@@ -712,7 +724,7 @@ Mechanism(fac_path)                     # 机制解析器 (.fac → 物种/NOy�
 - **NOy 自动判定**：从 `.fac` 的 `FORMULA` 段取含 N 物种（N₂O₅ 计双 N）——新 N 物种零改动接入
 - **指标全集**：FNR / H₂O₂:HNO₃ / O₃:NOy / HCHO:NOy / O₃:NOz / NOy / L_NOx·Q⁻¹ / P(H₂O₂):P(HNO₃) / OPE + 午后口径
 
-### 6.2 `diagnostics/diagnostics.py` —— CSV 读取与六账积分（底层）
+### 6.2 `analysis_lib/diagnostics.py` —— CSV 读取与六账积分（底层）
 
 ```python
 load(prefix)                # → (h, C(T,ns), irr_h, I(T,nr))  自动适配任意 ns/nr
@@ -722,7 +734,7 @@ _fix_fortran_exp(tok)       # gfortran 三位指数(8.27-108) → 标准记法
 ```
 
 **注意**：`load` 返回的 `C` 已剥去 `h` 列，因此按表头名索引时需 `chdr.index(sp) - 1`
-（`experiments/ipr_closure_check.py` 与 `ipr_irr5.py` 均按此约定）。
+（`experiments/post/ipr_closure_check.py` 与 `ipr_irr5.py` 均按此约定）。
 
 > ⚠ **R12 勘误**：本节旧版曾列出 `indicators(C)` / `irr_integrate` / `irr_key_processes` /
 > `families` / `chem_ledger` / `report` 六个函数——**它们已在诊断层重构中删除**，
@@ -751,7 +763,7 @@ _fix_fortran_exp(tok)       # gfortran 三位指数(8.27-108) → 标准记法
 
 FAC-V3 单项（判据：log 含 ok + O₃ 末列非零）。KPP 冒烟已随 KPP 路线退役移除。
 
-### 7.2 功能 —— 62/62 PASS（12 族 FT-\*）
+### 7.2 功能 —— 67/67 PASS（13 族 FT-\*）
 
 FT-CFG（配置编译 + runtime_v3.dat 逐字节比对）/ CFGSPEC（配置规格负测试）/
 DAYS（`--days` 覆盖不改文件）/ **FREEZE（冻结版规格：.fac↔README↔评估报告三向一致，111sp/203rx）**/
@@ -764,7 +776,7 @@ OPE 谷 3.832——机制/求解器改动造成的数值漂移被 make test 直�
 
 ### 7.3 `make test` 全链
 
-`functional(62/62, 含批量契约与体制诊断断言) → element_audit(203/203) → mcm_compare(8.9%)`
+`functional(67/67, 含批量契约、SPINUP 窗口与体制诊断断言) → element_audit(203/203) → mcm_compare(8.9%)`
 
 ---
 
@@ -782,7 +794,7 @@ OPE 谷 3.832——机制/求解器改动造成的数值漂移被 make test 直�
 | **指示因子-屋脊（V2.4+）** | 屋脊 fnox=2.28；L_NOx/Q 穿 0.5 于 1.52→2.28；OPE 谷 2.28 | run_B / make batch |
 | **IPR 闭合** | 各物种中位 1.004–1.007（内步梯形） | ipr_closure_check |
 | **IPR↔IRR 一致** | O₃ 逐小时最大相对差 0.000% | hourly_pa |
-| **OSSE 技能（实验 F）** | 地面同化 HCHO RMSE +27%；卫星反演 E_NOx×1.34 → NO₂ RMSE +74% | obs_osse |
+| **OSSE 技能（实验 F）** | 地面同化 HCHO RMSE +27%（τ=2h，站点 nudging 通路） | run_F |
 | **跨求解器双胞胎** | fac_v3 vs batch 六账占比逐项一致；IPR↔IRR 0.000% | ipr_irr5 |
 | fac_v3 性能 | ≈2.6 s / 4802 步 / 零重启（5 天 111 物种 V2.5+，run_A 实测） | 实验 A |
 | 屋脊（V2.1 教学机制历史值） | fnox≈1.5 处 29→12.6 ppb | batch_v3 |
@@ -823,7 +835,7 @@ OPE 谷 3.832——机制/求解器改动造成的数值漂移被 make test 直�
 | B5 响应面并行 | **已落地** | fac_batch_omp |
 | B1 垂直多层 | 未做 | 3-5 层箱 + 层间扩散 |
 | B3 浓度约束 | 未做 | 任意物种观测序列约束（机制检验） |
-| B4 伴随灵敏度 ∂O₃/∂kᵢ | 未做 | 不确定度传播 |
+| ~~B4 伴随灵敏度 ∂O₃/∂kᵢ~~ | **明确不做（2026-10-27）** | 0-D 无真伴随 |
 | B6 netCDF I/O | **已落地** | `make nc`（`modules/nc_output.py`，CSV→NETCDF4；需 conc+irr 配对） |
 
 ---
@@ -846,7 +858,7 @@ OPE 谷 3.832——机制/求解器改动造成的数值漂移被 make test 直�
 
 ### 10a.2 runtime.dat 全通路
 
-`input_v3/` → cfgbuild → `runtime_v3.dat` → `runtime_dat_mod.f90`（318 行纯数据模块）
+`configs/` → cfgbuild → `runtime_v3.dat` → `runtime_dat_mod.f90`（318 行纯数据模块）
 全消费：真光解（SZA+MCM l/m/n+JFAC）、时变气象（插值外延端值）、**BLH 膨胀稀释**
 （中心差分 dlnH/dt）、排放日型（BOX sin²/FLAT）、干沉（vd/BLH）湿沉（a·R^b）、
 BC 松弛、情景因子（排放组×JFAC×ΔT）。顺带修复 cfgbuild 两处存量 bug
@@ -942,15 +954,15 @@ fvoc=1 切面经典 **O₃–NOx 屋脊**：29 ppb（fnox≈1.5）→12.6；FNR 
   MCM 真实机制全支持（越界修复的根因）。
 
 ### 载体修复
-- gfortran 3 位指数省略 E 的遗留格式（`8.27280-108`）→ diagnostics/nc_output
+- gfortran 3 位指数省略 E 的遗留格式（`8.27280-108`）→ analysis_lib/nc_output
   健壮解析。
 
 
 ## 10d. 指示因子屋脊实验（ridge5，2026-10-25；**历史记录**：当时五路线口径，现役三路线）
 
-`experiments/ridge5.py`（图 `experiments/fig_ridge5.py` → `figures/ridge5_routes.png`）：
+`run_C_ridge.py`（屋脊跨路线 CSV，绘图由 `experiments/viz/` 承担）：
 f_NOx ∈ [0.03, 31.6] 对数 15 点 × fvoc=1，四条可实验路线（fac_v3 与 batch 同机制不重复），
-指示因子由**路线无关引擎** `diagnostics/indicators.py` 从 CSV 契约 + FORMULA 段（M3 收益：
+指示因子由**路线无关引擎** `analysis_lib/indicators.py` 从 CSV 契约 + FORMULA 段（M3 收益：
 NOy 物种自动判定）后处理——batch 之外的路线零 Fortran 改动即可实验。
 
 | 路线 | 情景空间 | O₃屋脊 fnox* | 最一致指示因子 (偏差) |
@@ -998,12 +1010,12 @@ NOy 物种自动判定）后处理——batch 之外的路线零 Fortran 改动�
 - **四份文档分工**：README（项目是什么）→ docs/OPERATIONS_MANUAL（架构+速查）→
   docs/EXPERIMENTS_GUIDE（实验怎么做，手把手）→ figures/README（机制图集+七机制对比）。
   环境资料（ENVIRONMENT + check_env.sh）在 `environment/`。
-- **`templates/` 五类输入模板**（格式说明内嵌文件头）：
+- **`docs/templates/` 五类输入模板**（格式说明内嵌文件头）：
   ① `emissions_inventory.template`（排放清单：物种/molec·cm⁻³·s⁻¹/BOX·FLAT 日型）；
   ② `surface_o3_station.template`（地面 O₃ 站点：ppb 序列 → bc 张弛 nudging）；
   ③ `surface_aqi_station.template`（**常规 AQI 监测站点**：HJ 193 多污染物宽表
   μg/m³ → 拆分转换表 → ppb；O₃/NO₂/SO₂/CO 可接入，PM 不接入，NO 为差折算不接入，
-  NO₂ 建议弱 τ 或走排放反演）；
+  NO₂ 建议弱 τ 或调 NOx 排放）；
   ④ `surface_voc_station.template`（地面 VOCs 组份：一站一物种 + PAMS-57 映射注记——
   HCHO/ISOP/MVK/MACR/CH₃CHO 直接入，苯系物无芳烃化学不接入）；
   ⑤ `satellite_column.template`（卫星柱浓度：TROPOMI 存档格式 + 离线转换约定——
@@ -1013,24 +1025,21 @@ NOy 物种自动判定）后处理——batch 之外的路线零 Fortran 改动�
   → runtime.dat → fac_v3，O₃ 被张弛拉至 39 ppb（无约束 17.9）✓。
 - **IPR 精确累积收尾**：fac_v3 的 `<pref>_ipr.csv` 升级为 **ONE_STEP 内步梯形
   精确时间积分**（每行 = 小时窗积分，molec/cm³），消除小时快照对大项对消预算的
-  混叠；分解完备性检验 `experiments/ipr_closure_check.py` 全物种比值 **1.01–1.02**
+  混叠；分解完备性检验 `experiments/post/ipr_closure_check.py` 全物种比值 **1.01–1.02**
   （均匀 +2% 为内步梯形与积分器内部求积口径差）。快照路线（fac_run/kpp/mcm）
   保留小时快照口径（混叠局限已文档化）。
 
 
 ## 10f. 观测约束 OSSE 实验（2026-10-26）
 
-`experiments/obs_osse.py`——双胞胎观测系统模拟实验：真值运行（NOx/ISOP 排放 ×1.4）
+`experiments/run/run_F_osse.py`——双胞胎观测系统模拟实验：真值运行（NOx/ISOP 排放 ×1.4）
 采样加噪 → 三类观测文件（地面 O₃ 站点 / VOCs 组份站点 / 卫星转化 NO₂）→ 基础配置
-约束运行 → 技能指标。三条同化通路按物理语义分立：
+约束运行 → 技能指标。两条同化通路按物理语义分立：
 
 - **站点 nudge（O₃/HCHO/ISOP）**：τ ∈ {2,6,24,72h} 扫描——**全部劣于自由运行**
   （O₃ RMSE 1.25 → 最优 2.10；HCHO 0.08 → 0.30），且强度越大越差。机理：O₃/NO₂
   受光稳态支配，直接 nudge 被动物种使其与前体物脱耦——约束对抗化学。旧设计
   （卫星 NO₂ 直接强 nudge）曾致 h→1e-79 崩溃（PSS 破坏），已按正确通路重构。
-- **卫星 NO₂ → 自上而下排放反演**：E_NOx ×= mean(obs)/mean(free)——NO₂ RMSE
-  **0.20 → 0.04 (+82%)**，且 O₃ 连带改善（1.25 → 1.07）：反演修正成因（排放），
-  效益外溢到未同化物种。
 - **IPR B 账同化倾向**：τ=6h 约束运行 O₃ B=+4.4e6/s（占过程总账 2%）、HCHO 13%、
   ISOP 1%——同化强度的过程级度量。首窗垃圾值缺陷（ipr_w 未初始化）已修复。
 
@@ -1044,7 +1053,7 @@ adjustment）一致，在 ozone_lab 得到定量实证。
 
 ## 10g. 逐小时过程分析（hourly PA，2026-10-26）
 
-`experiments/hourly_pa.py`（图 `figures/hourly_pa.png`）——fac_v3 的 CMAQ-PA 式
+`run_G_consist.py`——fac_v3 的 CMAQ-PA 式
 逐小时过程分析，数据为 ONE_STEP 内步梯形**精确小时窗积分**（IPR 74×6 + IRR 131 反应，
 两独立累积路径）。**本轮修复两项真实缺陷**：
 
@@ -1062,30 +1071,9 @@ adjustment）一致，在 ozone_lab 得到定量实证。
 预算可见卤素通道（r53 Cl+O₃）。
 
 
-## 10h. 排放+观测灵敏性/伴随分析（sens_adj，2026-10-26）
-
-`experiments/sens_adj.py`——OAT 排放扰动（9 物种 ±10%，config 级）→ 观测雅可比
-（4 物种×6 时刻 24 维）→ 截断 SVD 线性化反演 vs OSSE 真值；跨路线斜率一致性；
-真速率灵敏度（.fac 拷贝→mechc→重建→±5% 中心差分，**取代 rate_sensitivity.py
-的硬编码假实现**——env 变量从未消费的占位输出）。
-
-**发现**：
-1. **雅可比结构**：NO 列范数 8.15 支配（NOx 主导 O₃），SO₂/DMS 0.15/0.19（硫化学
-   不触 O₃）✓；
-2. **可辨识性受限**：观测雅可比条件数 1311，截断后仅 1/9 模态可反演——NO 恢复
-   57% (0.23/0.4)，ISOP/NO₂ 与 NO 响应近共线不可分。**排放反演需要更丰富的观测
-   向量**（物种×时刻多样性）或先验正则化；
-3. **跨路线斜率**：fac_v3 OAT 局部 (±10%) 6.4 vs batch 网格弦 (0.675→1.0125) 8.7
-   ppb/unit——27% 偏差符合 O₃–NOx 曲线凸性（弦>局部），非错误；
-4. **真速率灵敏度谱**：J<1> 光解 +0.283 / KCH4OH +0.206 / KHO2NO +0.119 /
-   KO3NO −0.138（唯一负值，滴定）/ KCOOH +0.028——符号量级全物理合理；
-5. **存量确认**：SO₂ 排放不在任何情景缩放组（分组遗漏，schema 级修复待定）；
-   排放组映射双实现（runtime_dat_mod/batch_mod）当前一致（一致性风险已记录）。
-
-
 ## 10i. 情景矩阵实验（scen5，2026-10-26；**历史记录**：标题沿用旧口径）
 
-`experiments/scen5.py`——8 情景 × 5 路线的 O₃max 响应矩阵（`output/scen5/`）。
+`run_I_scenario_matrix.py`——多情景 × 多路线的 O₃max 响应矩阵（`output/run_I/`）。
 情景集：BAU/LNNOX(0.3)/HVOC(×3)/ISOPX(0.5+2.0)/HOT(+5K)/CLOUD(0.6)/IC×2/BG+50%。
 
 **方向一致性**：LNNOX/HVOC 全 5 路线同向 ✓；ISOPX 4/5——**mcm 反向 (+10.1%)**：
@@ -1103,40 +1091,6 @@ MCM 城市配置 NOx 排放高 7 倍 → NOx 饱和区，减氮+增挥解除滴�
 （initialConcentrations.config / bc.config），情景表 schema 扩展待定；
 三路径排放缩放一致性验证通过（情景表 19.83 / config 19.83 / batch 网格 19.81）。
 
-
-## 10j. 机制 V2.2：VOC 降解谱 + 支撑化学补全（2026-10-26）
-
-针对外审第二层（VOC 降解谱）与第三层（支撑化学）缺口：**+14 物种/+22 反应 →
-74sp/131rx**（元素审计 131/131 全绿）。VOC 降解谱按 CB6/RADM2 集总思路补全：
-OLE（烯烃，含 O₃ 臭氧化通道）、ALK（C2⁺ 烷烃）、ARO1/ARO2（甲苯/二甲苯，开环
-产物回灌既有 MGLY/CH₃CO₃→PAN 链）、KET（酮）、GLY（乙二醛）；支撑化学补
-PNA（HOx/NOx 温度计）、N₂O₅ 白天光解、OH+HNO₃ 暗再循环、ISOPBO₂+CH₃O₂ 交叉。
-ALDX 取消（CH₃CHO 升格为 ALD2 集总目标，排放映射覆盖）；萜烯维持单点省略。
-
-**OH 反应性覆盖校准**（核心验收）：扩链前三大类全缺（0%）→ 校准后
-**烯烃+芳香族+烷烃合计 ~26%**（燃烧/溶剂/交通燃料端实质入池）；
-残余与文献带的偏差（OVOC 34% 偏高、CO 12% 偏低）为 5 天箱体二次 HCHO
-累积的结构性特征（稀释 24h 已缓解、无法完全消除——如实文档化）。
-**工程修复**：情景分组单源化（grpvoc 双实现收敛 + SO₂ 顺带归组）、
-NO₂→PSS 破坏崩溃、dilution 24h 通风（二次累积上限机制）。
-
-**影响**：O₃max 基线 28.7 → 132 ppb（@fnox 2.28 屋脊）——中国东部城市夏季
-污染episode 量级（此前 28.7 偏 clean）；哨兵 4 金值重标定（132.10/93.68/3.539/
-6.487）；L_NOx/Q 带宽扩至 [0,1.5]（饱和区合法 >1）。六实验重跑中（本节更新时
-batch/FT 已重跑，ridge5/scen5/OSSE/sens_adj 按手册命令可复现，数值结论待复核）。
-
-
-## 10k. 15sp 层整体退役（2026-10-26）
-
-fac_run + kpp_run + ozone.fac + fac2kpp + KPP 工具链成对退役（无归档，知情决策）。
-**路线 5→3**（fac_v3/fac_batch_omp/mcm_run）；KPP 外部依赖移除（依赖缩至
-gfortran/Python/CVODE）；FT 瘦身 22→10 项并新增 IPR 分解完备性检查
-（比值 1.021 ✓，补偿退役的物理层逐过程检验）。**代价（知情）**：异求解器互证
-（CVODE vs Rosenbrock）永久消失——67sp 的正确性主张现为文献速率+元素审计+
-预算闭合+体制合理性四层，化学产率独立验证（MCM 显式对照）为最深缺口。
-连带清理：diagnostics.py 六个 15sp 死函数、species_constraint.py 孤儿、
-cfg_audit.c 孤儿。**实验脚本全部改腿并实跑验证**（ridge5 2 腿/scen5 3 腿/
-ipr_irr5 3 路线/sens_adj 3 节）。
 
 ## 10b. 数值攻坚史（14 坑实录）
 
@@ -1159,7 +1113,7 @@ ipr_irr5 3 路线/sens_adj 3 节）。
 
 ## 11. 已知限制与勘误
 
-### 11.0 自纠自查轮记录（2026-10-26，详见 docs/OPERATIONS_MANUAL 附录 A）
+### 11.0 自纠自查轮记录（2026-10-26 轮次；原始记录已清理，可查 git 历史 c4bafc3 之前版本）
 
 - **第一轮·口径同步**（11 项）：退役口径统一至三路线、死常量/死函数清理、孤儿文件删除。
 - **第二轮·外部 4 表项核实**：NOy 权重表 13→17 物种（PNA/RONO₂/OLENIT/TERPNIT 补齐，
@@ -1168,7 +1122,7 @@ ipr_irr5 3 路线/sens_adj 3 节）。
 - **第三轮·汇完备性**（新工具：物种死端检查器）：9 个"只耗不产"=排放初级物种（正常）；
   7 个"只产不耗"中 6 个由 drydep 沉降正常闭合；**抓到真 bug OLEOOH 零汇**（化学零损耗
   + drydep 漏配 → 5 天单调涨 66%）→ 补 `OLEOOH 0.5 on`，IPR 沉降账 −3.7e10 验证生效。
-- **第五轮·数据链路与 mtime 陷阱**：确认四层链路（templates 格式合同 → **input_v3/ 真数据源**
+- **第五轮·数据链路与 mtime 陷阱**：确认四层链路（templates 格式合同 → **configs/ 真数据源**
   → runtime_v3.dat 编译产物 → Fortran 唯一读）；补 3 个可跑的观测约束样例
   （`bc_O3_demo` / `bc_HCHO_demo` / `bc_NO2_sat_demo`）；修 **mtime 同秒陷阱**（改 config 又改回
   → make 误判 up-to-date → runtime.dat 保留中间值 → 无声出错）：Makefile 的
@@ -1185,9 +1139,9 @@ ipr_irr5 3 路线/sens_adj 3 节）。
 | # | 旧说法 | 源码/实跑实况 |
 |---|---|---|
 | 1 | 冒烟"三实现各跑基线"4/4 | **实为 3 项：FAC/KPP/V3，EBI 不在冒烟**（smoke_test.sh 两处 `smoke` 调用 + V3 段；实跑 3/3） |
-| 2 | — | **`input_v3/mechanism_3_full_chain.fac` 是过时副本**（52sp 旧版，缺 O1D 修复）；真编译源=`mechanism/mechanism_3_full_chain.fac`（Makefile gen_v3）。建议删除副本或加同步检查 |
+| 2 | — | **`configs/mechanism_3_full_chain.fac` 是过时副本**（52sp 旧版，缺 O1D 修复）；真编译源=`mechanism/mechanism_3_full_chain.fac`（Makefile gen_v3）。建议删除副本或加同步检查 |
 | 3 | 功能测试计数口径多变（16/16 → 22/22 → 10/10 → 该轮 24/24） | 该轮实跑 24/24（含 R10-R13 七条防线断言 + sat2surf 5 项）；**现版 62/62（12 族 FT-\*），见 §7.2** |
-| 4 | conc/irr"5 天全程" | **只写末 24 h**（`step>=nsteps-24`）；全程 O₃max 走 stdout |
+| 4 | conc/irr 输出窗口 | 由 `MODEL` 第 6 值（SPINUP 天数）控制：`step>=nspin`；0=全程逐时。batch 仍固定末 24h 窗口 |
 | 5 | `ipr_from_fac` 读 FAC ipr 文件 | **返回 None 占位**（六本账实现在 fac_v3 resid 内嵌；教学版无独立 ipr 文件） |
 | 6 | FNR 阈值方向 | 标准 Sillman/Tonnesen-Dennis 惯例：**FNR<1 → VOC-limited；>2 → NOx-limited**（源码 diagnostics.py:37 行内注释与版本 I 图曾写反，以本表为准） |
 
@@ -1216,6 +1170,6 @@ ipr_irr5 3 路线/sens_adj 3 节）。
 - **操作手册（架构与速查）**: [docs/OPERATIONS_MANUAL.md](docs/OPERATIONS_MANUAL.md)
 - **实验操作指南（手把手级）**: [docs/EXPERIMENTS_GUIDE.md](docs/EXPERIMENTS_GUIDE.md)
 - **实验运行脚本（类 run.cctm.csh，只跑模拟+CSV）**: [experiments/run/README.md](experiments/run/README.md) —— 九个实验 A–I，`run_all.py` 一键全跑
-- **可输入物种全表（111 物种 × 5 通道）**: [templates/SPECIES_INPUT_MATRIX.md](templates/SPECIES_INPUT_MATRIX.md)
+- **可输入物种全表（111 物种 × 5 通道）**: [templates/SPECIES_INPUT_MATRIX.md](docs/templates/SPECIES_INPUT_MATRIX.md)
 - **运行环境与依赖清单 + 混合语言分工**: [ENVIRONMENT.md](environment/ENVIRONMENT.md)（Python/conda、编译器、CVODE、依赖分层、从零复现、`environment/check_env.sh` 体检；**§6b 每语言实现哪些模块/文件/职责**）
 - **机制图集与七机制对比**: `figures/README.md`（**本地文件，不入库**；图由 `figures/gen_all.py` 与 `gen_cartoon.py` 重生成）

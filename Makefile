@@ -38,15 +38,15 @@ facsimile_impl/gen_v3/oz_mech.f90: mechanism/mechanism_3_full_chain.fac facsimil
 # 导致 runtime.dat 保留中间值, 模拟结果无声出错(实测复现)。
 # cfgbuild 幂等 + 极快, 强制重建是更安全的默认。
 #
-# 模拟天数: 用 DAYS= 临时覆盖, 不改 input_v3/model.parameters 文件
+# 模拟天数: 用 DAYS= 临时覆盖, 不改 configs/model.parameters 文件
 #   make runtime_v3.dat DAYS=3      # 本次只跑 3 天
 #   make run DAYS=1 SCEN=SCEN_BAU   # 编译+跑一步到位
 DAYS ?=
-_CFGBUILD = $(PY) src/cfgbuild.py input_v3 runtime_v3.dat \
+_CFGBUILD = $(PY) inputproc/cfgbuild.py configs runtime_v3.dat \
             --mech mechanism/mechanism_3_full_chain.fac \
             $(if $(DAYS),--days $(DAYS),)
 
-runtime_v3.dat: FORCE $(wildcard input_v3/* input_v3/constraints/*) src/cfgbuild.py
+runtime_v3.dat: FORCE $(wildcard configs/* configs/constraints/*) inputproc/cfgbuild.py
 	@$(_CFGBUILD)
 
 FORCE:
@@ -73,14 +73,14 @@ nc:
 	$(PY) modules/nc_output.py $(NC_SRC) $(NC_OUT)
 
 # 注: figures/ 整个目录不入库（.gitignore）。新克隆后该目标会提示自备脚本。
+# 绘图脚本已入库 experiments/viz/；输出 PNG/PDF 仍进 figures/（该目录不入库）
+# gen_all.py / gen_cartoon.py（9+9 张教学图集）仍在本地 figures/，不入库
 figures: output/batch_v3_indicators.csv
-	@test -f figures/fig_indicators_ridge.py || { \
-	  echo "[figures] 缺少 figures/ 目录（该目录不入库，仅本地保留）"; \
-	  echo "          需要本地自备: fig_indicators_ridge.py / fig_response_v3.py /"; \
-	  echo "                        gen_all.py / gen_cartoon.py"; \
-	  exit 1; }
-	cd figures && $(PY) fig_indicators_ridge.py ../output/batch_v3_indicators.csv indicators_vs_ridge.png
-	cd figures && $(PY) fig_response_v3.py ../output/batch_v3_indicators.csv response_surface_v3.png
+	@test -f experiments/viz/fig_indicators_ridge.py || { \
+	  echo "[figures] 缺少 experiments/viz/ 绘图脚本（应随仓库提供）"; exit 1; }
+	@mkdir -p figures
+	cd experiments/viz && $(PY) fig_indicators_ridge.py ../../output/batch_v3_indicators.csv ../../figures/indicators_vs_ridge.png
+	cd experiments/viz && $(PY) fig_response_v3.py ../../output/batch_v3_indicators.csv ../../figures/response_surface_v3.png
 
 # ---------- MCM 对照路线 (29sp CH4 子集, 独立子树) ----------
 mcm_city/gen/oz_mech.f90: mcm_city/input/mechanism_mcm_ch4.fac facsimile_impl/mechc.py
@@ -120,19 +120,19 @@ functional: all smoke
 #   · 9×9 响应面 + 体制诊断 → make batch（同一命令）+ experiments/run/run_B_surface.py
 #   · 81 案例契约/屋脊/FNR/L_NOx-Q/OPE 断言 → tests/functional_test.py 已全覆盖
 test: functional
-	$(PY) audit/element_audit.py mechanism/mechanism_3_full_chain.fac
-	$(PY) audit/mcm_compare.py --quiet
+	$(PY) mechanism/audit/element_audit.py mechanism/mechanism_3_full_chain.fac
+	$(PY) mechanism/audit/mcm_compare.py --quiet
 
 # 仅比对 MCM 速率系数（快速，不跑仿真）
 mcmcheck:
-	$(PY) audit/mcm_compare.py
+	$(PY) mechanism/audit/mcm_compare.py
 
 # ── 安全清理变体（做实验期间用这两个，别用 make clean）──
 # clean-build: 只删编译产物与生成码，保留 output/ 里所有实验结果
 clean-build:
 	cd facsimile_impl && rm -f *.o *.mod fac_v3 fac_batch_omp \
 	  gen/oz_mech.* gen_v3/oz_mech.* gen_v3/oz.reac gen_v3/oz.prod gen_v3/*.mod
-	rm -f modules/rad_photol_demo modules/*.mod audit/*.dylib
+	rm -f modules/rad_photol_demo modules/*.mod mechanism/audit/*.dylib
 	cd mcm_city && rm -f *.o *.mod mcm_run gen/*.mod gen/oz_mech.f90 \
 	  gen/oz.reac gen/oz.prod
 	find . -name __pycache__ -type d -exec rm -rf {} + 2>/dev/null || true
@@ -146,7 +146,7 @@ clean-output:
 clean:
 	cd facsimile_impl && rm -f *.o *.mod fac_v3 fac_batch_omp \
 	  gen/oz_mech.* gen_v3/oz_mech.* gen_v3/oz.reac gen_v3/oz.prod gen_v3/*.mod
-	rm -f modules/rad_photol_demo modules/*.mod audit/*.dylib
+	rm -f modules/rad_photol_demo modules/*.mod mechanism/audit/*.dylib
 	cd mcm_city && rm -f *.o *.mod mcm_run gen/*.mod gen/oz_mech.f90 \
 	  gen/oz.reac gen/oz.prod mcm_city_*.csv
 	rm -f *.nc output/*.nc

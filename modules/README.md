@@ -125,7 +125,7 @@ make nc NC_SRC=output/run_A/BAU NC_OUT=output/BAU.nc
 | 定位 | B2「在线光解」原型的实现（Beer-Lambert + 太阳天顶角 + 云光学厚度） |
 | CLI | `rad_photol lat doy cloud_tau` → 输出 7 个 J 值逐时 |
 | 与主链关系 | **无**。主链用 `photolysis-rates_MCM` 的 `l/m/n` 参数化（`eval_J`） |
-| 保留理由 | `meteo.config` 的 `RADIAT` 字段是**为它预留的**（见 [UNITS.md §8](../UNITS.md)）；将来若要接真实辐射传输，这是起点 |
+| 保留理由 | `meteo.config` 的 `RADIAT` 字段是**为它预留的**（见 [UNITS.md §8](../docs/UNITS.md)）；将来若要接真实辐射传输，这是起点 |
 
 ⚠ **`RADIAT` 当前无消费者**：`meteo.config` 接受并读入，但没有代码用它。
 `cfgbuild` 在你填非 0 值时打印警告。这是已知的、有意保留的空位。
@@ -140,7 +140,7 @@ make nc NC_SRC=output/run_A/BAU NC_OUT=output/BAU.nc
 | 场景 | 改哪个 | 风险 |
 |---|---|---|
 | 加新物理过程（如非均相） | `chem_phys_mod.f90` | 高——两条路线同时受影响，必须重跑全部哨兵 |
-| 改输入段格式 | `runtime_dat_mod.f90` + `src/cfgbuild.py`（**必须成对改**） | 高——段不匹配会 FATAL |
+| 改输入段格式 | `runtime_dat_mod.f90` + `inputproc/cfgbuild.py`（**必须成对改**） | 高——段不匹配会 FATAL |
 | 新物种参与情景缩放 | `runtime_dat_mod.f90` 的 `build_groups()` | 中——`FT-SYNC` 守卫会抓漏配 |
 | 新物种 ATOL 分档 | `chem_phys_mod.f90` 的 `tune_atol_by_name()` | 低——只影响步数，不影响解 |
 | CSV 转 netCDF 格式 | `nc_output.py` | 低 |
@@ -157,5 +157,5 @@ make nc NC_SRC=output/run_A/BAU NC_OUT=output/BAU.nc
 |---|---|
 | [ops manual §0.4](../docs/OPERATIONS_MANUAL.md) | 目录职责与编译边界 |
 | [ENVIRONMENT.md §6b](../environment/ENVIRONMENT.md) | 逐文件行数 / 角色 / 混合语言分工 |
-| [UNITS.md §8](../UNITS.md) | `RADIAT` 无消费者说明 |
+| [UNITS.md §8](../docs/UNITS.md) | `RADIAT` 无消费者说明 |
 | [EXPERIMENTS_GUIDE §3](../docs/EXPERIMENTS_GUIDE.md) | 12 类配置的逐段解读（对应 `runtime_dat_mod` 的读取逻辑） |

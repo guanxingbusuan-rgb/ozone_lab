@@ -14,10 +14,10 @@
 |---|---|---|
 | 机制 | `mechanism/mechanism_3_full_chain.fac`（111sp/198rx） | `mcm_city/input/mechanism_mcm_ch4.fac`（29sp/71rx） |
 | 生成码 | `facsimile_impl/gen_v3/` | **`mcm_city/gen/`（自己的）** |
-| 输入 | `runtime_v3.dat`（由 `input_v3/` 编译） | **不读任何 runtime 文件**，全部硬编码在 `mcm_driver.f90` |
+| 输入 | `runtime_v3.dat`（由 `configs/` 编译） | **不读任何 runtime 文件**，全部硬编码在 `mcm_driver.f90` |
 | 共享模块 | `modules/runtime_dat_mod.f90` + `chem_phys_mod.f90` | **完全不用**（自带 `mcm_mod`） |
 | 构建 | `make all` | **`make mcm`（独立目标）** |
-| 气象/排放/沉降 | `input_v3/*.config` 可配 | **源码里写死** |
+| 气象/排放/沉降 | `configs/*.config` 可配 | **源码里写死** |
 
 代码级验证（零引用）：
 
@@ -131,7 +131,7 @@ make mcm          # = 生成 gen/oz_mech.f90 + 编译 mcm_run
 |---|---|
 | 排放/IC/沉降/气象全部写死 | 保持官方机制的"纯参照"定位 |
 | 只有 29 物种 | MCM CH₄ 子集范围；无 ISOP 化学 |
-| 无 runtime 通路 | 不与 `input_v3/` 耦合，避免配置漂移影响参照系 |
+| 无 runtime 通路 | 不与 `configs/` 耦合，避免配置漂移影响参照系 |
 | 光解仅 12 槽位 | 子集机制的槽位需求 |
 | 情景只能表达 fnox/fvoc | 无 CO/CH₄/JFAC/ΔT 轴（对应 `run_I` 里标 `—` 的格点） |
 

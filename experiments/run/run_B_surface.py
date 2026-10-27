@@ -21,7 +21,7 @@ import sys
 import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from _common import (ROOT, require_prereq, out_dir, run_batch, read_table,
+from _runner import (ROOT, require_prereq, out_dir, run_batch, read_table,
                      write_csv, manifest, summary_table, log, col)
 
 INDICATORS = ["O3max", "O3mean", "FNR_mean", "H2O2HNO3", "O3NOy", "HCHONOy",

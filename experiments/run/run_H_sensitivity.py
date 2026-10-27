@@ -7,7 +7,7 @@ run_H_sensitivity.py —— 实验 H：OAT 敏感性（**不含伴随反演**，
 并给出每个参数的**归一化灵敏度** S = (ΔO3max/O3max)/(ΔE/E)。
 
 ⚠ 本脚本**不做反演**（SVD 反演另属伴随/反演类，未包含）。
-   若要反演，见 experiments/sens_adj.py ②段。
+   伴随/反演已移除（2026-10-27：0-D 无真伴随，明确不做）。
 
 输出:
   output/run_H/jacobian.csv         J: 观测维 × 参数（中心差分）
@@ -23,12 +23,12 @@ import sys
 import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from _common import (ROOT, require_prereq, out_dir, run_fac_v3, clone_input,
+from _runner import (ROOT, require_prereq, out_dir, run_fac_v3, clone_input,
                      read_table, col, write_csv, manifest, summary_table, log)
 
 # OAT 扰动的排放物种（覆盖主要源类）
 # V2.4: 原 9 个 + 新增 10 个排放类（长链烷烃/乙烯/内烯烃/高级醛/甲酚/倍半萜/醇/醚/酯）
-# 分组含义见 input_v3/emissions.config 与 templates/SPECIES_INPUT_MATRIX.md
+# 分组含义见 configs/emissions.config 与 docs/templates/SPECIES_INPUT_MATRIX.md
 EMIT = [
     # 无机 + 一次醛
     "NO", "NO2", "CO", "HCHO",

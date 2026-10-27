@@ -89,7 +89,7 @@ make clean-build   # 清二进制+生成码，保留 output/
 ```
 
 改 `.fac` / `modules/*.f90` / 本目录 `.f90` 任一，`make` 会按依赖自动重编；
-**只改 `input_v3/` 数据不需要重编**（`runtime_v3.dat` 是纯数据，cfgbuild 0.4 s 重出）。
+**只改 `configs/` 数据不需要重编**（`runtime_v3.dat` 是纯数据，cfgbuild 0.4 s 重出）。
 
 ## 7. 相关目录
 
@@ -97,5 +97,5 @@ make clean-build   # 清二进制+生成码，保留 output/
 |---|---|
 | `modules/` | 共享物理/数据层（两二进制都编译它） |
 | `mcm_city/` | 独立对照子树（MCM 官方 29sp，零代码耦合） |
-| `src/cfgbuild.py` | 上游：12 类配置 → `runtime_v3.dat` |
+| `inputproc/cfgbuild.py` | 上游：12 类配置 → `runtime_v3.dat` |
 | `tests/` | 下游：两个二进制的契约与金值哨兵 |

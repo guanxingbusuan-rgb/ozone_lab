@@ -5,7 +5,7 @@ run_A_scenarios.py —— 实验 A：单箱基线与六情景政策沙盘（只�
 
 输入假设: runtime_v3.dat 已编译完成（本脚本不调 cfgbuild）
 输出:
-  output/run_A/<SCEN>_conc.csv     逐时 74 物种（末 24 h）
+  output/run_A/<SCEN>_conc.csv     spin-up 后逐时 111 物种
   output/run_A/<SCEN>_irr.csv      131 反应小时窗积分
   output/run_A/<SCEN>_ipr.csv      六账小时窗积分
   output/run_A/summary.csv         情景汇总（O3max/末24h均值/关键物种/nst/耗时）
@@ -19,7 +19,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from _common import (ROOT, require_prereq, out_dir, run_fac_v3, last24_mean,
+from _runner import (ROOT, require_prereq, out_dir, run_fac_v3, last24_mean,
                      write_csv, manifest, summary_table, log, SCEN_ALL)
 
 

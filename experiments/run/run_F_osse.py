@@ -21,7 +21,7 @@ import sys
 import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from _common import (ROOT, require_prereq, out_dir, run_fac_v3, clone_input,
+from _runner import (ROOT, require_prereq, out_dir, run_fac_v3, clone_input,
                      read_table, col, write_csv, manifest, summary_table, log, PY)
 
 OBS_SPECIES = ["O3", "HCHO", "ISOP"]
@@ -129,7 +129,7 @@ def main(argv):
         best[sp] = min(cand, key=lambda x: x[1])
     log("\n  最优 τ: " + " · ".join(f"{sp}={best[sp][0]}h (RMSE {best[sp][1]:.2f})"
                                    for sp in OBS_SPECIES))
-    log("  注: NO2 未纳入站点约束 —— 其受光稳态支配，强 nudging 会破坏 PSS（见 obs_osse.py 通路③）")
+    log("  注: NO2 未纳入站点约束 —— 其受光稳态支配，强 nudging 会破坏 PSS；NO₂ 若必须约束：弱 τ + 卫星转换序列，勿强 nudge")
 
     mp = manifest(d, "F_osse", {"noise": noise, "taus_h": TAUS_H,
                                 "obs_species": OBS_SPECIES,

@@ -23,7 +23,7 @@ import sys
 import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from _common import (ROOT, require_prereq, out_dir, run_fac_v3, run_mcm,
+from _runner import (ROOT, require_prereq, out_dir, run_fac_v3, run_mcm,
                      write_csv, manifest, summary_table, log, last24_mean, SCEN_ALL)
 
 # mcm_run 只支持排放缩放（fnox/fvoc），无 JFAC/DT —— 仅映射可比情景

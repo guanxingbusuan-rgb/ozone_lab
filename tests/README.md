@@ -28,11 +28,12 @@
 |---|---|---|
 | `FT-CFG` (2) | 编译期负向：未知物种拒绝 / 气象序列拒绝浓度单位指令 | 未知物种曾运行期才炸；`# unit: ppb` 写进气象文件会静默 ×2.46e10 |
 | `FT-MP` (2) | `model.parameters` 拒绝 dtout=0 / days=0 / 缺行 / 非数值 | 旧版零校验，除零后照样打印 ok 并出空 CSV |
-| `FT-DAYS` (2) | `--days` 覆盖生效且**不改** model.parameters 文件 | 天数覆盖与文件配置混淆 |
+| `FT-DAYS` (3) | `--days` 覆盖生效且**不改** model.parameters 文件；MODEL 行含 SPINUP | 天数覆盖与文件配置混淆 |
+| `FT-SPINUP` (4) | SPINUP=0 全程落盘 / 0.5 天窗口 / ≥天数被拒 / IPR-IRR 同步 | 输出窗口闸门回归 |
 | `FT-PHOT` (2) | 光解 LAT/DOY 真正生效（夏至 vs 冬至 O₃ 差 >20 ppb） | DOY 解析判据 `nt>=4` 永假，换季节静默无效 |
 | `FT-SAT` (2) | sat2surf 卫星转换端到端 + 两法互证 | 旧公式漏 ×1e9，差 9 个量级 |
 | `FT-SYNC` (4) | 扩机制 8 处同步：无死端 / NOy 表与 indicators 一致 / 排放物种已分组 / ATOL 覆盖度 | 扩物种漏配 → 链条空转或情景失效 |
-| `FT-CFGSPEC` (2) | input_v3 无失效物种名 / 无"只产不耗无物理汇"死端 | GLY 等稳定产物漏干沉（实测高估 32–49%） |
+| `FT-CFGSPEC` (2) | configs 无失效物种名 / 无"只产不耗无物理汇"死端 | GLY 等稳定产物漏干沉（实测高估 32–49%） |
 | `FT-FREEZE` (8) | 冻结版规格：.fac 计数=声明、README 同步、V25_PLAN/teaching 已删、mcm_city 有定位文档 | 冻结后文档漂移 |
 | `FT-GIT` (1) | **output/ 无任何文件被 git 跟踪**且已被 ignore | 防实验产物误入库 |
 | `FT-TPL` (1) | templates 全部"原样可用"（无缺 `#` 的说明行） | 4 个模板第 2 行缺 # → 用户照抄即崩 |
@@ -70,9 +71,9 @@ SENT = [  # (fnox, CSV列, 期望值, 容差)
 ## 5. 与质检体系的关系
 
 ```
-audit/element_audit.py   元素守恒（机制静态）      ┐
-audit/mcm_compare.py     系数 vs MCM（机制静态）    ├─ make test
+mechanism/audit/element_audit.py   元素守恒（机制静态）      ┐
+mechanism/audit/mcm_compare.py     系数 vs MCM（机制静态）    ├─ make test
 tests/smoke_test.sh      能跑（运行时冒烟）         │
 tests/functional_test.py 契约+哨兵（运行时回归）    ┘
-experiments/run/run_D    六账闭合（科学性，实验层）
+experiments/run/run_D_ipr  六账账本（科学性，实验层）
 ```

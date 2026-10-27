@@ -11,7 +11,7 @@
 ## 1. 与 output/ 和 figures/ 的关系（重要）
 
 ```
-input_v3/ ──cfgbuild──> runtime_v3.dat ──fac_v3/fac_batch_omp/mcm_run──> output/run_X/*.csv
+configs/ ──cfgbuild──> runtime_v3.dat ──fac_v3/fac_batch_omp/mcm_run──> output/run_X/*.csv
                                                                               │
                                                                               ▼
                                                                     figures/*.py （绘图，读 CSV）
@@ -55,15 +55,23 @@ OZONE_OUT=$HOME/ozone_results python experiments/run/run_all.py
 | `run_A_scenarios.py` | 六情景单箱政策沙盘 | runtime_v3.dat | `<SCEN>_{conc,irr,ipr}.csv` + `summary.csv` | ~3 s |
 | `run_B_surface.py` | O₃–NOx–VOC 响应面（4D） | runtime_v3.dat | `batch.csv`（24 列）+ **17 个 `indicator_matrix_*.csv`** + `slices.csv` | ~15 s |
 | `run_C_ridge.py` | 屋脊跨路线/跨机制对比 | runtime + mcm_run | `ridge_batch.csv` `ridge_mcm.csv` `ridge_compare.csv` | ~16 s |
-| `run_D_process.py` | IPR 六账 + IRR 反应级诊断 | runtime | `ipr_ledger.csv`（74 物种×6账）`closure.csv` `irr_top.csv` | ~1 s |
+| `run_D_ipr.py` | **IPR 六账过程账本** | runtime | `ipr_ledger.csv`（长表：逐小时 × 111 物种 × 6 账，单文件） | ~1 s |
 | `run_E_indicators.py` | 指示因子（12 指标） | 任意已有前缀 | `<tag>_indicators.csv` `_timeseries.csv` `compare.csv` | <1 s |
 | `run_F_osse.py` | 观测系统模拟实验 | runtime | `obs_samples.csv` `skill_rmse.csv` `skill_delta.csv` + τ 扫描输出 | ~4 s |
-| `run_G_hourlyPA.py` | 逐小时过程 + IPR↔IRR 互证 | runtime | `hourly_ledger.csv` `hourly_share.csv` `hourly_rxn_top.csv` `consistency.csv` | ~1 s |
+| `run_D_irr.py` | **IRR 反应级归因**（物种参数化，默认 O3） | runtime + 计量表 | `irr_top.csv` `hourly_rxn_top.csv` | ~1 s |
+| `run_G_consist.py` | **IPR↔IRR 双路径互证**（物种参数化） | runtime | `consistency.csv` | ~1 s |
 | `run_H_sensitivity.py` | OAT 敏感性（±10%，18 次） | runtime | `jacobian.csv` `sensitivity.csv` `oat_runs.csv` | ~11 s |
 | `run_I_scenario_matrix.py` | 情景 × 路线矩阵 | runtime + mcm_run | `matrix_o3max.csv` `matrix_delta.csv` `direction.csv` | ~4 s |
 | `run_M_met_series.py` | **气象观测序列驱动 + 单变量归因** | runtime + `met_*_demo.txt` | `summary.csv` `attribution.csv` `o3_timeseries.csv` | ~6 s |
 
-**总驱动**：`run_all.py`（全跑 78 s，顺序 A→B→D→G→E→F→H→M→I→C）
+**总驱动**：`run_all.py`（全跑 ~78 s，顺序 A→B→D→R→G→E→F→H→M→I→C）
+
+**D/R/G 的拆分逻辑**（2026-10 起按依赖解耦）：
+`run_D_ipr` 只读 `_ipr.csv` 一个文件（过程账本，长表逐小时×全物种；占比%与全程总量可由表内重算，闭合校验方法见旧版 `ipr_closure_check.py`）；
+`run_D_irr` 只读 `_irr.csv`+`gen_v3/oz.reac|oz.prod` 计量表（反应归因，物种可为机制中任意一个）；
+`run_G_consist` 是唯一同时读两份 CSV 的脚本——"IPR vs IRR 一致性"必须两边都在，这是设计使然。
+`run_D_ipr`/`run_D_irr` 均**不写 manifest.json**，自跑 BAU 的原始模拟输出落 /tmp 读完即删——产物目录只留分析 CSV（前者 1 个，后者 2 个）。
+`run_G_consist` 是唯一同时读两份 CSV 的脚本——"IPR vs IRR 一致性"必须两边都在，这是设计使然。
 
 ---
 
@@ -83,7 +91,7 @@ OZONE_OUT=$HOME/ozone_results python experiments/run/run_all.py
 每条 121 点（0–120 h 逐时），样例含一段冷槽阵雨 + 一天云盖，方便看到效果。
 
 ```bash
-# 改 input_v3/meteo.config（末尾已备好注释块）
+# 改 configs/meteo.config（末尾已备好注释块）
 # 然后：
 make runtime_v3.dat
 python experiments/run/run_M_met_series.py
@@ -116,7 +124,9 @@ python experiments/run/run_A_scenarios.py              # 六情景全跑
 python experiments/run/run_A_scenarios.py BAU LNNOX    # 指定情景
 python experiments/run/run_B_surface.py 13             # 13×13 网格
 python experiments/run/run_B_surface.py 9 0.6,0.8,1.0  # 加光解维
-python experiments/run/run_D_process.py output/run_A/BAU   # 复用已有输出
+python experiments/run/run_D_ipr.py output/run_A/BAU       # IPR 账本，复用已有输出
+python experiments/run/run_D_irr.py HCHO                   # IRR 归因，指定物种
+python experiments/run/run_G_consist.py PAN output/run_A/BAU  # 互证，指定物种
 python experiments/run/run_H_sensitivity.py 5          # ±5% 扰动
 python experiments/run/run_M_met_series.py             # 气象序列对照（10 个 run）
 python experiments/run/run_M_met_series.py --const-only  # 只跑常数基准
@@ -152,7 +162,7 @@ $FC -O2 -ffree-line-length-none -J gen -I gen gen/oz_mech.f90 mcm_driver.f90 -o 
 
 | 文件类型 | 格式 | 典型用法 |
 |---|---|---|
-| `*_conc.csv` | 首列 `h`（小时）+ 74 物种列（molec/cm³，末 24 h） | `pandas.read_csv` → 除以 2.46e10 得 ppb |
+| `*_conc.csv` | 首列 `h`（步序号=小时@dtout=3600）+ 111 物种列（molec/cm³，SPINUP 后全部逐时） | `pandas.read_csv` → 除以 2.46e10 得 ppb |
 | `*_irr.csv` | `h` + `r1..r131`（小时窗**积分**，非速率） | 反应级归因 |
 | `*_ipr.csv` | `h` + 74 物种 × 6 账（`P L E D B X`，小时窗积分） | 过程级归因 |
 | `indicator_matrix_*.csv` | 行=fnox、列=fvoc 的二维矩阵 | 直接 `plt.contourf` |
@@ -165,15 +175,9 @@ $FC -O2 -ffree-line-length-none -J gen -I gen gen/oz_mech.f90 mcm_driver.f90 -o 
 
 ---
 
-## 7. 与旧脚本的关系
+## 7. 与旧脚本的关系（2026-10-27 决议：旧入口已删除）
 
-| 旧脚本（`experiments/*.py`） | 与 run/ 的关系 |
-|---|---|
-| `obs_osse.py` | 实验 F 的**发现版**（含更多分析输出），`run_F_osse.py` 是其"只落 CSV"精简版 |
-| `ridge5.py` / `fig_ridge5.py` | C 的旧版（五路线口径）+ 绘图 |
-| `scen5.py` | I 的旧版（五路线口径） |
-| `sens_adj.py` | H 的旧版，**额外含 SVD 反演**（run_H 按需求不含反演） |
-| `ipr_closure_check.py` / `ipr_irr5.py` / `hourly_pa.py` | D/G 的旧版（含终端报告） |
-
+旧入口 `ridge5/scen5/ipr_irr5/hourly_pa/sens_adj/obs_osse` 已全部移除——
+经逐项核查，其功能由 `run/` 全覆盖（跨求解器/五路线历史口径随路线退役一并废止；
+原始脚本可查 git 历史）。诊断职能在 `experiments/post/`，绘图在 `experiments/viz/`。
 **新脚本（run/）的设计目标**：统一输出目录、统一 CSV 契约、无绘图、幂等、可批量。
-旧脚本保留不动（有各自的终端报告与历史口径）。

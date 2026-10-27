@@ -68,7 +68,7 @@ conda 基座  : $HOME/miniconda3
 
 | 包 | 用在哪 | 必需性 |
 |---|---|---|
-| **numpy** | `src/cfgbuild.py`（校验/换算）、`diagnostics/*`、全部实验脚本 | 硬 |
+| **numpy** | `inputproc/cfgbuild.py`（校验/换算）、`analysis_lib/*`、全部实验脚本 | 硬 |
 | **matplotlib** | `figures/*.py`（9 张机制图）、`experiments/fig_*.py`、`make figures` | 半硬 |
 | scipy | 部分实验（插值/统计/优化） | 可选 |
 | netCDF4 | `modules/nc_output.py`（CSV→netCDF 转换） | 可选 |
@@ -203,7 +203,7 @@ make -j4 && make install
 |---|---|
 | `kpp_impl/` 目录 | **已删除**（2026-10 轮） |
 | Makefile 中的 KPP 目标 | **已移除**（`grep kpp Makefile` 无输出） |
-| `src/fac2kpp.py` | 脚本保留（历史工具，不被 make 调用） |
+| ~~`fac2kpp.py`~~ | **已随 KPP 路线退役删除**（2026-10，无归档、知情决策） |
 | `~/soft/src/KPP-3.2.0` | 磁盘上仍在，但**构建不用** |
 | `bison`/`flex` | 仅 KPP 代码生成时需要；现未使用 |
 
@@ -214,7 +214,7 @@ make -j4 && make install
 | KPP | 3.2.0 | `~/soft/src/KPP-3.2.0` |
 | **bison** | **3.0+** | ⚠ **系统 `/usr/bin/bison` 只有 2.3，太老**，需 `brew install bison` 并在 PATH 前置 |
 | flex | 2.6.4+ | 系统版本够用 |
-| gfortran | 13.2.0 | KPP 生成码有 5 处需补丁适配，见 `src/fac2kpp.py` 注释 |
+| gfortran | 13.2.0 | KPP 生成码有 5 处需补丁适配（fac2kpp.py 已随路线退役删除，补丁清单见 git 历史 / OPERATIONS_MANUAL 10k） |
 
 ---
 
@@ -266,9 +266,9 @@ libquadmath.0.dylib
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │ Python (33 个 .py)  ——  前端 + 后端分析 + 可视化                 │
-│   src/          配置编译 / 机制编译 / C 后端 / 卫星转换          │
-│   diagnostics/  指示因子与过程诊断（纯函数，只吃 CSV）           │
-│   experiments/  经典脚本 8 个 + run/ 批量入口（实验 A–I）        │
+│   inputproc/    配置编译 / 卫星转换 (机制编译 mechc 在 facsimile_impl) │
+│   analysis_lib/  指示因子与过程诊断（纯函数，只吃 CSV）           │
+│   experiments/  run/ 入口 + post/viz（A–I + M；旧入口已删）         │
 │   tests/        功能测试（62 断言）                              │
 │   figures/      9+9 张机制图生成                                 │
 │   modules/      nc 输出（唯一的 Python-in-modules）              │
@@ -310,9 +310,9 @@ libquadmath.0.dylib
 
 | 文件 | 行数 | 角色 | 做什么 |
 |---|---|---|---|
-| **`src/cfgbuild.py`** | 518 | **配置编译器（唯一前端入口）** | 读 12 类人类可读配置 → 校验（物种/单位/单调/点数/槽位）→ 写 `runtime_v3.dat`（Fortran 唯一输入）。支持 `--days/--dtout` 覆盖。**运行时零文本解析的秘密全在这里** |
+| **`inputproc/cfgbuild.py`** | 518 | **配置编译器（唯一前端入口）** | 读 12 类人类可读配置 → 校验（物种/单位/单调/点数/槽位）→ 写 `runtime_v3.dat`（Fortran 唯一输入）。支持 `--days/--dtout` 覆盖。**运行时零文本解析的秘密全在这里** |
 | ~~`src/mechc_c.py`~~ | ~~112~~ | ~~机制→C 代码生成~~ | **已删除（2026-10）**：零消费者、不在构建链、无测试 |
-| **`src/sat2surf.py`** | 282 | 卫星数据转换器 | TROPOMI 柱浓度 → 地表等效 ppb 序列（直观法主准则 + QA 过滤 + BLH 插值 + 点数抽稀） |
+| **`inputproc/sat2surf.py`** | 282 | 卫星数据转换器 | TROPOMI 柱浓度 → 地表等效 ppb 序列（直观法主准则 + QA 过滤 + BLH 插值 + 点数抽稀） |
 
 #### B. 机制编译器（`facsimile_impl/mechc.py`，1 个）
 
@@ -320,26 +320,25 @@ libquadmath.0.dylib
 |---|---|---|---|
 | **`facsimile_impl/mechc.py`** | 180 | **FACSIMILE→Fortran 编译器** | 解析 `.fac` 的物种表/速率名/反应行 → 生成 `gen_v3/oz_mech.f90`（含 `ns/nr/nq` 常量、`update_rates` 速率函数）+ `oz.reac`/`oz.prod` 计量表。V2.5 硬化：`!` 注释剥离 + 未知物种令牌硬失败（防化学计量静默损坏）。**改机制 → 它重跑 → gfortran 重编**，这是"机制即代码"的实现 |
 
-#### C. 诊断与分析（`diagnostics/`，3 个）
+#### C. 诊断与分析（`analysis_lib/`，3 个）
 
 | 文件 | 行数 | 角色 | 做什么 |
 |---|---|---|---|
-| **`diagnostics/indicators.py`** | 196 | **路线无关指示因子引擎** | 12 指标（FNR/L_NOx·Q⁻¹/OPE…）；从 `.fac` 的 FORMULA 段自动判定 NOy；两套预算表（Q×6、产率）在初始化期解析为索引 |
-| `diagnostics/diagnostics.py` | 70 | CSV 读入与 IPR 解析 | `load()`（读 conc/irr）、`ipr_from_fac()`（六账梯形积分） |
-| `diagnostics/csvfloat.py` | 50 | 数值解析共享件 | 处理 gfortran 的 `8.27280-108` 三位指数省略 E 的坑（R13） |
+| **`analysis_lib/indicators.py`** | 196 | **路线无关指示因子引擎** | 12 指标（FNR/L_NOx·Q⁻¹/OPE…）；从 `.fac` 的 FORMULA 段自动判定 NOy；两套预算表（Q×6、产率）在初始化期解析为索引 |
+| `analysis_lib/diagnostics.py` | 70 | CSV 读入与 IPR 解析 | `load()`（读 conc/irr）、`ipr_from_fac()`（六账梯形积分） |
+| `analysis_lib/csvfloat.py` | 50 | 数值解析共享件 | 处理 gfortran 的 `8.27280-108` 三位指数省略 E 的坑（R13） |
 
-#### D. 实验脚本（`experiments/`，经典 8 个 + `run/` 批量入口）
+#### D. 实验脚本（`experiments/`，run/ 入口 + post/viz）
 
 | 文件 | 行数 | 角色 |
 |---|---|---|
-| `experiments/obs_osse.py` | 212 | F：观测约束 OSSE（真值→采样→同化→技能） |
-| `experiments/scen5.py` | 187 | I：情景 × 路线响应矩阵 |
-| `experiments/sens_adj.py` | 176 | H：OAT 灵敏度 + 截断 SVD |
-| `experiments/ridge5.py` | 143 | C：屋脊跨路线对比 |
-| `experiments/ipr_irr5.py` | 140 | D：多路线 IPR/IRR 对照 |
-| `experiments/hourly_pa.py` | 129 | G：逐小时过程分析 |
-| `ipr_closure_check.py` | — | D-1：六账闭合校验 |
-| `experiments/fig_ridge5.py` | 54 | C 的绘图 |
+| `experiments/run/run_I_scenario_matrix.py` | 118 | I：情景 × 路线响应矩阵 |
+| ~~`experiments/sens_adj.py`~~ | — | **已删除（2026-10-27）**：伴随/反演明确不做；OAT 由 `run_H_sensitivity.py` 承担 |
+| `experiments/run/run_C_ridge.py` | 101 | C：屋脊跨路线对比 |
+| `experiments/run/run_D_ipr.py` / `run_D_irr.py` | I：IPR/IRR 对照（拆分双入口） |
+| `experiments/run/run_G_consist.py` | G：IPR↔IRR 互证 |
+| `experiments/post/ipr_closure_check.py` | — | D-1：六账闭合校验 |
+| `experiments/viz/fig_ridge5.py` | 54 | C 的绘图 |
 | **`experiments/run/`**（11 个） | — | **A–I 九实验的"只跑+落 CSV"批量入口**（统一输出目录/CSV 契约，见 [../experiments/run/README.md](../experiments/run/README.md)） |
 
 #### E. 测试与可视化（`tests/` + `figures/`）
@@ -399,11 +398,11 @@ libquadmath.0.dylib
 | `.fac`（1 个在役） | `mechanism/mechanism_3_full_chain.fac` | **机制唯一事实源 · V2.5+ 冻结版**（111sp/203rx） |
 | `.fac`（1 个参考） | `mechanism/reference/mcm_v3.3.1_export.fac` | MCM v3.3.1 官方导出（5832sp/17224rx，系数比对基准） |
 | `.fac`（1 个对照） | `mcm_city/input/mechanism_mcm_ch4.fac` | MCM CH₄ 子集 29sp/71rx（独立子树，见 [mcm_city/README.md](../mcm_city/README.md)） |
-| `.config`（9 个） | `input_v3/*.config` | 12 类配置中的生效部分（人类可读） |
-| `.template`（6 个） | `templates/*.template` | **格式合同**（程序零直读） |
-| `.txt`（序列） | `input_v3/constraints/*.txt` | 观测/气象时间序列（`met_*_demo.txt` 6 条气象样例 + `bc_*_demo.txt` 3 条约束样例） |
+| `.config`（9 个） | `configs/*.config` | 12 类配置中的生效部分（人类可读） |
+| `.template`（6 个） | `docs/templates/*.template` | **格式合同**（程序零直读） |
+| `.txt`（序列） | `configs/constraints/*.txt` | 观测/气象时间序列（`met_*_demo.txt` 6 条气象样例 + `bc_*_demo.txt` 3 条约束样例） |
 | `.dat`、`.csv` | `runtime_v3.dat`、`output/*` | 编译产物 / 实验产物（`output/` 已 gitignore） |
-| `.md`（17 个） | 根：README / UNITS；`docs/`：EXPERIMENTS_GUIDE / OPERATIONS_MANUAL；`environment/`：本文；`templates/`：SPECIES_INPUT_MATRIX；各子目录 README（mechanism / experiments/run / diagnostics / audit / tests / src / modules / facsimile_impl / mcm_city / figures） | 文档体系 |
+| `.md`（17 个） | `docs/`：OPERATIONS_MANUAL / EXPERIMENTS_GUIDE / **UNITS** / **templates/**(7 文件)；`environment/`：本文；根：README；各子目录 README（mechanism / experiments / analysis_lib / tests / inputproc / configs / modules / facsimile_impl / mcm_city） | 文档体系 |
 
 ### 6b.6b 模型维度澄清：0-D 箱 + 参数扫描 ≠ 空间网格
 
@@ -432,7 +431,7 @@ libquadmath.0.dylib
 | 12 类配置 → `runtime_v3.dat` | 纯文本平面文件（Fortran 顺序表控读） | Python 擅长文本/校验/单位换算；Fortran 不该做正则和容错 |
 | `.fac` → `oz_mech.f90` | 生成 Fortran 源码（含速率函数 + 计量表） | 机制是"代码"：把化学式编译成可内联的 Fortran，比解释执行快 1–2 个量级 |
 | Fortran → CSV | `<pref>_conc.csv` + `_irr.csv` + `_ipr.csv` | 无二进制依赖，Python 可直接分析；也便于人工检查 |
-| CSV → 指标/图 | `diagnostics/` + `figures/` | 数据分析与绘图是 Python 生态的强项 |
+| CSV → 指标/图 | `analysis_lib/` + `figures/` | 数据分析与绘图是 Python 生态的强项 |
 | Fortran → CVODE | fcmix（`FCVODE`）或 C API（`CVode`） | 求解器本体是 C；两条路径分别服务"易用"与"并行" |
 
 **一句话总括**：**Python 管"数据怎么说"，Fortran 管"方程怎么算"，C 管"底层怎么解 + 独立怎么验"，Shell 管"什么时候谁该重跑"。**
@@ -511,7 +510,7 @@ make test        # 冒烟 1/1 → 功能 62/62 → 审计 203/203
 pip install scipy netCDF4 pillow fonttools
 python figures/gen_all.py       # 9 张 SCI 版机制图
 python figures/gen_cartoon.py   # 9 张漫画版
-python experiments/ridge5.py    # 屋脊跨路线对比
+python experiments/run/run_C_ridge.py    # 屋脊跨路线对比
 ```
 
 ---
@@ -581,5 +580,5 @@ flex      2.6.4 (/usr/bin)               [同上]
 | [README.md](../README.md) | 项目总览、路线清单 |
 | [EXPERIMENTS_GUIDE.md](../docs/EXPERIMENTS_GUIDE.md) | 实验操作（环境章节见 §1） |
 | [OPERATIONS_MANUAL.md](../docs/OPERATIONS_MANUAL.md) | 架构、速查、编译边界 |
-| [UNITS.md](../UNITS.md) | 单位与换算参考 |
-| [templates/SPECIES_INPUT_MATRIX.md](../templates/SPECIES_INPUT_MATRIX.md) | 111 物种 × 5 通道可输入矩阵 |
+| [UNITS.md](../docs/UNITS.md) | 单位与换算参考 |
+| [templates/SPECIES_INPUT_MATRIX.md](../docs/templates/SPECIES_INPUT_MATRIX.md) | 111 物种 × 5 通道可输入矩阵 |

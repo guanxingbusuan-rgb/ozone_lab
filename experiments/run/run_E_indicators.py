@@ -4,7 +4,7 @@
 run_E_indicators.py —— 实验 E：指示因子工具箱（12+ 指标，任意路线通用，无绘图）
 
 对指定前缀（fac_v3 / batch / mcm 输出）批量计算指示因子，落 CSV。
-**不做反演**（反演见 run_H）。
+**不做反演**（伴随/反演已移除，明确不做）。
 
 输出:
   output/run_E/<tag>_indicators.csv    窗口均值指标（12 个）
@@ -20,10 +20,10 @@ import sys
 import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from _common import (ROOT, require_prereq, out_dir, write_csv, manifest,
+from _runner import (ROOT, require_prereq, out_dir, write_csv, manifest,
                      summary_table, log)
 
-sys.path.insert(0, os.path.join(ROOT, "diagnostics"))
+sys.path.insert(0, os.path.join(ROOT, "analysis_lib"))
 from indicators import Mechanism, route_indicators, route_timeseries
 
 MECH = os.path.join(ROOT, "mechanism", "mechanism_3_full_chain.fac")
@@ -47,7 +47,13 @@ def analyze(pref, tag, d, mech):
 
 
 def main(argv):
-    prefs = argv[1:] or [os.path.join("output", "run_D", "BAU")]
+    if argv[1:]:
+        prefs = argv[1:]
+    else:   # 默认复用 run_A 的 BAU（run_D_ipr 现不落原始模拟输出）
+        prefs = [p for p in (os.path.join("output", "run_A", "BAU"),
+                             os.path.join("output", "run_D", "BAU"))
+                 if os.path.exists(f"{p}_conc.csv")][:1] or \
+               [os.path.join("output", "run_A", "BAU")]
     log(f"═══ 实验 E：指示因子（{len(prefs)} 个前缀）═══")
     require_prereq()
     d = out_dir("run_E")

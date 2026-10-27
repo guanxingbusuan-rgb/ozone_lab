@@ -95,7 +95,7 @@ program fac_v3
     real(8) :: Y(ns), T, TOUT, RTOL, ATOL(ns), ROUT(10), RPAR, dum(ns)
     real(8) :: t_prev, dt_s
     integer(8) :: NEQ8, IOUT(25), IPAR
-    integer :: IER, step, nsteps, u1, u2, u3, mxsteps, isc, ios, k, j
+    integer :: IER, step, nsteps, nspin, u1, u2, u3, mxsteps, isc, ios, k, j
     character(len=128) :: a1, pref, rtfile
     real(8) :: tstart, tend, o3max
     integer :: iO3v
@@ -138,6 +138,13 @@ program fac_v3
     iO3v = spidx("O3")
     o3max = 0.0d0
     nsteps = nint(days*86400.0d0/dtout)
+    ! spin-up 闸门: step < nspin 只积分不落盘 (spinup_cfg 单位=天, 0=全落盘)
+    nspin = nint(spinup_cfg*86400.0d0/dtout)
+    if (nspin >= nsteps) then
+        print '(A,F4.1,A,F4.1,A)', "FAC-V3 FATAL: spin-up (", spinup_cfg, &
+            " d) >= 模拟天数 (", days, " d) → 无任何输出行"
+        stop 1
+    end if
     open (newunit=u1, file=trim(pref)//"_conc.csv", status="replace")
     open (newunit=u2, file=trim(pref)//"_irr.csv", status="replace")
     open (newunit=u3, file=trim(pref)//"_ipr.csv", status="replace")
@@ -199,7 +206,7 @@ program fac_v3
         end if
         call resid_ipr(TOUT, Y, dum)
         o3max = max(o3max, Y(iO3v))
-        if (step >= nsteps - 24) then
+        if (step >= nspin) then
             write (u1, '(I5)', advance="no") step
             call write_species_row(u1, Y)
             write (u2, '(I5)', advance="no") step

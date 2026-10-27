@@ -29,7 +29,7 @@ import sys
 import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from _common import (ROOT, INPUT, PY, CFGBUILD, MECH, require_prereq, out_dir,
+from _runner import (ROOT, INPUT, PY, CFGBUILD, MECH, require_prereq, out_dir,
                      run_fac_v3, clone_input, read_table, col, write_csv,
                      manifest, summary_table, log, run)
 
@@ -96,7 +96,7 @@ def main(argv):
     for k, rel, unit, desc in VARS:
         p = os.path.join(INPUT, rel)
         if not os.path.exists(p):
-            log(f"✗ 缺少样例序列 {rel} —— 请先确认 input_v3/constraints/ 完整")
+            log(f"✗ 缺少样例序列 {rel} —— 请先确认 configs/constraints/ 完整")
             return 1
         t, v = read_series_raw(p)
         raw[k] = (t, v)
@@ -118,7 +118,7 @@ def main(argv):
     h_axis = None
     for name, series_vars in runs:
         dst = os.path.join(d, f"in_{name}")
-        rt = clone_input(dst)              # 复制 input_v3 并用原 meteo 编译一次
+        rt = clone_input(dst)              # 复制 configs 并用原 meteo 编译一次
         write_meteo(dst, series_vars, means)   # 改成本 run 的气象驱动
         run([PY, CFGBUILD, dst, rt, "--mech", MECH])   # 内容变了 → 必须重编
 
@@ -188,7 +188,7 @@ def main(argv):
                    "design": "同一120h均值、只改时间结构的对照"},
                   products)
     log(f"\n产物: {os.path.relpath(d, ROOT)}/  ({len(products)} 个 CSV + manifest.json)")
-    log("提示: o3_timeseries.csv 可直接喂 matplotlib; 站点格式见 input_v3/constraints/met_*_demo.txt")
+    log("提示: o3_timeseries.csv 可直接喂 matplotlib; 站点格式见 configs/constraints/met_*_demo.txt")
     return 0
 
 

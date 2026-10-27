@@ -9,7 +9,7 @@
 > |---|---|
 > | 版本 | **V2.5+ 冻结版**（2026-10-27，不再迭代） |
 > | 规模 | **111 物种 / 203 反应 / 45 个光解槽位 / 127 个命名速率** |
-> | 元素审计 | **203/203 PASS**（`audit/element_audit.py`）；V2.4 新增 67 条与 V2.5 新增 4 条**全部精确平衡** |
+> | 元素审计 | **203/203 PASS**（`mechanism/audit/element_audit.py`）；V2.4 新增 67 条与 V2.5 新增 4 条**全部精确平衡** |
 > | MCM 一致性 | **48 条可比对，最大偏差 8.9%**（32 无机 + 16 集总映射；34 条产物一致者偏差 0.0%） |
 > | 生成码 | `facsimile_impl/gen_v3/ozone_mech.f90`（`mechc.py` 编译） |
 > | 承载路线 | `fac_v3`（单箱深度）+ `fac_batch_omp`（批量广度），共享同一生成码 |
@@ -85,7 +85,7 @@ NOx–O₃–HOx–ROx 三大循环 + 生物源/人为 VOC 降解 + 夜间化学
 ### 2.1b MCM v3.3.1 官方系数对齐（2026-10-26，V2.4 内修订）
 
 官方导出已入库 `mechanism/reference/mcm_v3.3.1_export.fac`（5832sp/17224rx）。
-新增工具 `audit/mcm_compare.py` 做逐反应系数校验（按反应物集合匹配，
+新增工具 `mechanism/audit/mcm_compare.py` 做逐反应系数校验（按反应物集合匹配，
 同集合多分支求和，集总化差异单列不判 FAIL）。**已接入 `make test`**。
 
 **结果：可比对 32 条纯无机反应，最大偏差 428% → 6.2%。**
@@ -137,8 +137,8 @@ NOx–O₃–HOx–ROx 三大循环 + 生物源/人为 VOC 降解 + 夜间化学
 | # | 位置 | 做什么 | 漏掉的后果 | 本项目实测 |
 |---|---|---|---|---|
 | 1 | `mechanism/*.fac` | `VARIABLE` 加物种、`FORMULA` 加分子式、写反应 | 编译失败或 ns 错位 | ✓ 111/203 |
-| 2 | `input_v3/emissions.config` | 若有**一次排放**，加基线+日型 | **新物种恒为 0**，链条空转 | ✓ 15→25 物种 |
-| 3 | `input_v3/drydep.config` | 若无**气相化学汇**，必须给 vd | **无界累积**（死端） | ✓ +29（含 CSLNIT/SESQCHO 两个真死端） |
+| 2 | `configs/emissions.config` | 若有**一次排放**，加基线+日型 | **新物种恒为 0**，链条空转 | ✓ 15→25 物种 |
+| 3 | `configs/drydep.config` | 若无**气相化学汇**，必须给 vd | **无界累积**（死端） | ✓ +29（含 CSLNIT/SESQCHO 两个真死端） |
 | 4 | `modules/runtime_dat_mod.f90` `build_groups()` | 若属 NOx/VOC/CO/CH₄ 排放组 | 情景缩放不生效（HVOC 白做） | ✓ +10 物种 |
 | 5 | `facsimile_impl/fac_batch_omp.f90` `noy_add()` | 若含氮（NOy 家族） | 氮守恒不变量算错、NOy 指标偏低 | ✓ 17→25 |
 | 6 | `modules/chem_phys_mod.f90` `tune_atol_by_name()` | 若浓度 >1e9（约 40 ppb） | 步数爆炸（精度过剩） | ✓ 19→52 |
@@ -151,9 +151,9 @@ NOx–O₃–HOx–ROx 三大循环 + 生物源/人为 VOC 降解 + 夜间化学
 > （检查"只产不耗且无干沉/湿沉/排放"的死端物种）。
 
 **两个"不需要改"的地方**（V2.4 实测确认）：
-- `diagnostics/indicators.py` 的 NOy 定义**自动**从 FORMULA 段读含 N 物种
+- `analysis_lib/indicators.py` 的 NOy 定义**自动**从 FORMULA 段读含 N 物种
   （实测识别 25 个，与 batch 硬编码表逐项一致）→ 这是 M3 单一事实源的收益。
-- `input_v3/initialConcentrations.config` 与 `bc.config` **不需要**加新物种：
+- `configs/initialConcentrations.config` 与 `bc.config` **不需要**加新物种：
   二次产物从 0 起步是正确的；背景空气里不该有这些一次 VOC 的边界浓度。
 
 **自动检测死端的脚本**（扩物种后建议跑一次）：
@@ -167,9 +167,9 @@ gen = "facsimile_impl/gen_v3"
 lost = set()
 for row in open(gen + "/oz.reac"):
     lost |= {int(x) for x in row.split()[1:]}
-em = {sp.index(l.split()[0]) + 1 for l in open("input_v3/emissions.config")
+em = {sp.index(l.split()[0]) + 1 for l in open("configs/emissions.config")
       if l.split("#")[0].split() and l.split()[0] in sp}
-dry = {sp.index(l.split()[0]) + 1 for l in open("input_v3/drydep.config")
+dry = {sp.index(l.split()[0]) + 1 for l in open("configs/drydep.config")
        if len(l.split("#")[0].split()) >= 3 and l.split()[2] == "on"
        and l.split()[0] in sp}
 dead = [sp[i-1] for i in range(1, len(sp)+1) if i not in lost and i not in em and i not in dry]
@@ -806,7 +806,7 @@ Cl + CH₄/HCHO → HCl + … ;  HCl + OH → Cl              再生
 ## 6. 光解方案
 
 **机制共 26 条光解反应、占用 25 个不同槽位（最高槽号 J45）**，参数来自
-`input_v3/photolysis-rates_MCM`（MCM 官方表，18 槽）或 `photolysis.config` 的 JMAP 直达值（7 槽）。
+`configs/photolysis-rates_MCM`（MCM 官方表，18 槽）或 `photolysis.config` 的 JMAP 直达值（7 槽）。
 
 | 槽位 | 反应 | l [s⁻¹] | m | n | 参数来源 |
 |---|---|---|---|---|---|
@@ -917,7 +917,7 @@ KMT11（OH+HNO₃，K1+K2 双通道）、KFPAN/KBPAN（PAN 生成/热解）。
 
 ## 8. 元素配平方法论
 
-### 8.1 审计器设计（`audit/element_audit.py`）
+### 8.1 审计器设计（`mechanism/audit/element_audit.py`）
 
 - 逐反应检验 **C/H/N/O/S/Cl/Br** 七元素平衡
 - 储库物种（H₂O / O₂ / CO₂ / H₂ / M / N₂）**自动推断**两侧需求，但**限定物理方向**：
@@ -1060,7 +1060,7 @@ RADM2 (63sp) ── CB6R3 (82sp) ── MOZART-4 (85sp) ── 本机制 (111sp)
 
 ⚠ **ppb 换算因子固定 1 atm / 298.15 K（2.46e10）**——非标准 T/P 下模型内实际
 混合比有 ~1.1%/5 K 偏差（MCM/AtChem2 同款约定，化学一致性不受影响，仅"ppb 标签"为近似）。
-完整单位手册见 [`../UNITS.md`](../UNITS.md)。
+完整单位手册见 [`../docs/UNITS.md`](../docs/UNITS.md)。
 
 ---
 
@@ -1073,13 +1073,13 @@ RADM2 (63sp) ── CB6R3 (82sp) ── MOZART-4 (85sp) ── 本机制 (111sp)
 vim mechanism/mechanism_3_full_chain.fac
 
 # ② 元素审计（必须 PASS 才能继续）
-python3 audit/element_audit.py mechanism/mechanism_3_full_chain.fac
+python3 mechanism/audit/element_audit.py mechanism/mechanism_3_full_chain.fac
 #    → 期望 "全部 N 反应元素守恒 PASS"
 
 # ③ 若改了物种：补配置（IC/排放/沉降/组映射）
-#    - input_v3/initialConcentrations.config（可选）
-#    - input_v3/emissions.config（若该物种有排放）
-#    - input_v3/drydep.config（若需要沉降汇，尤其：无气相汇的产物）
+#    - configs/initialConcentrations.config（可选）
+#    - configs/emissions.config（若该物种有排放）
+#    - configs/drydep.config（若需要沉降汇，尤其：无气相汇的产物）
 #    - modules/runtime_dat_mod.f90 的 build_groups（若参与情景缩放）
 #    - 若带 N：facsimile_impl/fac_batch_omp.f90 的 noy_add（氮守恒不变量会抓）
 

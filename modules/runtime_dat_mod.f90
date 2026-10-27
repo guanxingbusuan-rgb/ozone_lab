@@ -15,6 +15,7 @@ module runtime_dat_mod
     character(len=16) :: sp_name(ns)
     real(8) :: y0(ns)
     real(8) :: days, dtout, rtol_cfg, atol_cfg
+    real(8) :: spinup_cfg = 0.0d0   ! MODEL 第 6 值(可选): 不落盘的 spin-up 时长[天]; 缺省 0=全落盘
     real(8) :: met_c(NMET) = (/298.15d0, 1013.25d0, 50.0d0, 0.0d0, 1000.0d0, 0.0d0, 1.0d0/)
     integer :: met_s(NMET) = 0
     real(8) :: tau_mix = 86400.0d0, bc_c(ns)
@@ -97,6 +98,7 @@ contains
                 case ("MODEL")
                     days = num(tok(2)); dtout = num(tok(3))
                     rtol_cfg = num(tok(4)); atol_cfg = num(tok(5))
+                    if (nt >= 6) spinup_cfg = num(tok(6))   ! 旧 runtime.dat 无此值 → 0(全落盘)
                 case ("DIL")
                     sec = "DIL"
                 case ("PHOT")

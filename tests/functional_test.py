@@ -9,7 +9,7 @@ import numpy as np
 
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(HERE)
-sys.path.insert(0, "diagnostics")
+sys.path.insert(0, "analysis_lib")
 import re
 import shutil
 import tempfile
@@ -25,17 +25,17 @@ PPB = 2.46e10
 FS = np.array([0.3, 0.45, 0.67, 1.0, 1.5, 2.0, 2.5, 2.8, 3.0])
 
 # ================= 编译期负向用例 =================
-# 用完整的 input_v3 做底（保证能走到物种校验那一步），只注入一个假物种。
+# 用完整的 configs 做底（保证能走到物种校验那一步），只注入一个假物种。
 # 旧写法只复制一个 .fac 到空目录 → cfgbuild 先因缺 photolysis.config 崩溃，
 # returncode 非 0 就"PASS"，其实从未校验过物种 —— 假绿。现改为断言错误信息本身。
 bad_dir = tempfile.mkdtemp()
-for f in os.listdir("input_v3"):
-    p = os.path.join("input_v3", f)
+for f in os.listdir("configs"):
+    p = os.path.join("configs", f)
     if os.path.isfile(p):
         shutil.copy(p, bad_dir)
-shutil.copytree("input_v3/constraints", os.path.join(bad_dir, "constraints"))
+shutil.copytree("configs/constraints", os.path.join(bad_dir, "constraints"))
 open(os.path.join(bad_dir, "initialConcentrations.config"), "a").write("XXX_UNKNOWN 1.0e9\n")
-r = subprocess.run([PY, "src/cfgbuild.py", bad_dir, "/tmp/bad_rt.dat", "--mech",
+r = subprocess.run([PY, "inputproc/cfgbuild.py", bad_dir, "/tmp/bad_rt.dat", "--mech",
                     "mechanism/mechanism_3_full_chain.fac"],
                    capture_output=True, text=True)
 _out = (r.stdout or "") + (r.stderr or "")
@@ -45,17 +45,17 @@ shutil.rmtree(bad_dir, ignore_errors=True)
 
 # 反向守卫: 气象序列若误写浓度单位指令, 必须报错而非静默 ×2.46e10
 bad_dir = tempfile.mkdtemp()
-for f in os.listdir("input_v3"):
-    p = os.path.join("input_v3", f)
+for f in os.listdir("configs"):
+    p = os.path.join("configs", f)
     if os.path.isfile(p):
         shutil.copy(p, bad_dir)
-shutil.copytree("input_v3/constraints", os.path.join(bad_dir, "constraints"))
+shutil.copytree("configs/constraints", os.path.join(bad_dir, "constraints"))
 with open(os.path.join(bad_dir, "meteo.config"), "w") as _f:
     _f.write("TEMP = file:constraints/met_TEMP_demo.txt\n"
              "BLH  = file:constraints/met_BLH_demo.txt\n")
 _metp = os.path.join(bad_dir, "constraints/met_TEMP_demo.txt")
 open(_metp, "w").write("# unit: ppb\n" + open(_metp).read())
-r = subprocess.run([PY, "src/cfgbuild.py", bad_dir, "/tmp/bad_rt2.dat", "--mech",
+r = subprocess.run([PY, "inputproc/cfgbuild.py", bad_dir, "/tmp/bad_rt2.dat", "--mech",
                     "mechanism/mechanism_3_full_chain.fac"],
                    capture_output=True, text=True)
 _out = (r.stdout or "") + (r.stderr or "")
@@ -105,11 +105,11 @@ _eq = _tf.mkdtemp(prefix="r11eq_")
 for _f in ("emissions.config", "initialConcentrations.config", "meteo.config",
            "photolysis.config", "photolysis-rates_MCM", "bc.config", "drydep.config",
            "wetdep.config", "dilution.config", "scenarios.config", "model.parameters"):
-    _sh.copy(f"{HERE2}/../input_v3/{_f}", f"{_eq}/{_f}")
-_sh.copytree(f"{HERE2}/../input_v3/constraints", f"{_eq}/constraints")
+    _sh.copy(f"{HERE2}/../configs/{_f}", f"{_eq}/{_f}")
+_sh.copytree(f"{HERE2}/../configs/constraints", f"{_eq}/constraints")
 _m = open(f"{_eq}/meteo.config").read().replace("JFAC   = 1.0", "JFAC   = 0.8")
 open(f"{_eq}/meteo.config", "w").write(_m)
-subprocess.run([PY, f"{HERE2}/../src/cfgbuild.py", _eq, f"{_eq}/rt.dat",
+subprocess.run([PY, f"{HERE2}/../inputproc/cfgbuild.py", _eq, f"{_eq}/rt.dat",
                 "--mech", f"{HERE2}/../mechanism/mechanism_3_full_chain.fac"],
                capture_output=True)
 def _o3max_csv(p):
@@ -157,7 +157,7 @@ check("R13 输出格式无三位无E指数 (ES15.5E3)", _bad_fmt == 0,
 
 # R13 解析健壮性: csvfloat 必须能吃四种形态
 import sys as _sys3
-_sys3.path.insert(0, f"{HERE2}/../diagnostics")
+_sys3.path.insert(0, f"{HERE2}/../analysis_lib")
 from csvfloat import fix_fortran_exp as _fx3
 _cases = [("3.07932-174", 3.07932e-174), ("-9.75647-278", -9.75647e-278),
           ("5.00000E-99", 5.0e-99), ("1.00000+200", 1.0e200)]
@@ -170,11 +170,11 @@ _eq16 = _tf16.mkdtemp(prefix="r16mode_")
 for _f in ("emissions.config","initialConcentrations.config","meteo.config",
            "photolysis.config","photolysis-rates_MCM","bc.config","drydep.config",
            "wetdep.config","dilution.config","scenarios.config","model.parameters"):
-    _sh16.copy(f"{HERE2}/../input_v3/{_f}", f"{_eq16}/{_f}")
-_sh16.copytree(f"{HERE2}/../input_v3/constraints", f"{_eq16}/constraints")
+    _sh16.copy(f"{HERE2}/../configs/{_f}", f"{_eq16}/{_f}")
+_sh16.copytree(f"{HERE2}/../configs/constraints", f"{_eq16}/constraints")
 _pc = open(f"{_eq16}/photolysis.config").read().replace("MODE = MCM", "MODE = DIRECT")
 open(f"{_eq16}/photolysis.config", "w").write(_pc)
-subprocess.run(["python3", f"{HERE2}/../src/cfgbuild.py", _eq16, f"{_eq16}/rt.dat",
+subprocess.run(["python3", f"{HERE2}/../inputproc/cfgbuild.py", _eq16, f"{_eq16}/rt.dat",
                 "--mech", f"{HERE2}/../mechanism/mechanism_3_full_chain.fac"],
                capture_output=True)
 def _o3_of(pref):
@@ -269,11 +269,11 @@ check("L_NOx/Q ∈ [0,1.8] 全格点 (NOx 饱和区合法 >1)", all(0 <= x <= 1.
 # ================= FT-SAT: sat2surf 卫星转换器 (量纲 bug 防线) =================
 print("== FT-SAT sat2surf 卫星柱→表面 ppb 转换 ==")
 import importlib.util as _ilu
-_spec = _ilu.spec_from_file_location("sat2surf", os.path.join(HERE, "src", "sat2surf.py"))
+_spec = _ilu.spec_from_file_location("sat2surf", os.path.join(HERE, "inputproc", "sat2surf.py"))
 _s2s = _ilu.module_from_spec(_spec); _spec.loader.exec_module(_s2s)
 
 # ① 内置自检 (3 组已知值 + 两法互证 + 旧式反证)
-_r = subprocess.run([sys.executable, "src/sat2surf.py", "--selftest"],
+_r = subprocess.run([sys.executable, "inputproc/sat2surf.py", "--selftest"],
                     capture_output=True, text=True)
 check("sat2surf 内置自检 (3 组已知值/两法互证/旧式反证)", _r.returncode == 0,
       _r.stdout.strip().splitlines()[-1] if _r.stdout else "")
@@ -299,7 +299,7 @@ try:
         "2024-06-02T13:30  3.8e16  0.88\n"
         "2024-06-03T13:30  5.1e16  0.40\n")     # 第 3 条 QA<0.75 应被剔除
     _surf = os.path.join(_tmp, "surf.txt")
-    _r = subprocess.run([sys.executable, "src/sat2surf.py", _raw, _surf],
+    _r = subprocess.run([sys.executable, "inputproc/sat2surf.py", _raw, _surf],
                         capture_output=True, text=True)
     _lines = [l for l in open(_surf) if l.strip() and not l.startswith("#")]
     _ok_tool = _r.returncode == 0 and len(_lines) == 2      # QA 剔除后 2 点
@@ -308,13 +308,13 @@ try:
 
     # 接入 cfgbuild
     _inp = os.path.join(_tmp, "input")
-    shutil.copytree("input_v3", _inp)
+    shutil.copytree("configs", _inp)
     shutil.copy(_surf, os.path.join(_inp, "constraints", "sat_NO2.txt"))
     open(os.path.join(_inp, "bc.config"), "w").write(
         "TAU_MIX = 21600\nO3 = 6.2e11\nCO = 1.5e12\nCH4 = 4.5e13\n"
         "NO2 = file:constraints/sat_NO2.txt\n")
     _rt = os.path.join(_tmp, "rt.dat")
-    _r2 = subprocess.run([sys.executable, "src/cfgbuild.py", _inp, _rt,
+    _r2 = subprocess.run([sys.executable, "inputproc/cfgbuild.py", _inp, _rt,
                           "--mech", "mechanism/mechanism_3_full_chain.fac"],
                          capture_output=True, text=True)
     _txt = open(_rt).read() if os.path.exists(_rt) else ""
@@ -342,7 +342,7 @@ try:
         "2024-06-01T13:30  8.5e15  0.88\n"
         "2024-06-02T13:30  1.8e16  0.86\n")
     _surf_h = os.path.join(_tmp, "hcho_surf.txt")
-    _r3 = subprocess.run([sys.executable, "src/sat2surf.py", _raw_h, _surf_h],
+    _r3 = subprocess.run([sys.executable, "inputproc/sat2surf.py", _raw_h, _surf_h],
                          capture_output=True, text=True)
     _lh = [l for l in open(_surf_h) if l.strip() and not l.startswith("#")]
     _vh = [float(l.split()[1]) for l in _lh]
@@ -360,7 +360,7 @@ try:
         _f.write("2026-07-01T12:00 3.8e16 0.95\n")
         _f.write("2026-07-01T13:00 7.6e16 0.95\n")
     _dv = os.path.join(_tmp, "diverge.txt")
-    _r4 = subprocess.run([sys.executable, "src/sat2surf.py", _demo_raw,
+    _r4 = subprocess.run([sys.executable, "inputproc/sat2surf.py", _demo_raw,
                           _dv, "--scale-height-km", "2.0"],
                          capture_output=True, text=True)
     _dv_txt = open(_dv).read() if os.path.exists(_dv) else ""
@@ -379,7 +379,7 @@ try:
 
     # ⑥ 选择性输入: 极简配置 (IC 3 个/排放 2 个/沉降 2 个/BC 1 个) 必须能跑
     _mn = os.path.join(_tmp, "minimal")
-    shutil.copytree("input_v3", _mn)
+    shutil.copytree("configs", _mn)
     open(os.path.join(_mn, "initialConcentrations.config"), "w").write(
         "O3 3.0e11 cm3\nNO 5.0e8 cm3\nCO 2.0e12 cm3\n")
     open(os.path.join(_mn, "emissions.config"), "w").write(
@@ -392,7 +392,7 @@ try:
         "TEMP = 298.15\nPRES = 1013.25\nRH = 60\nBLH = 1000.0\n"
         "RAIN = 0.0\nJFAC = 1.0\n")
     _mrt = os.path.join(_tmp, "minimal_rt.dat")
-    _r5 = subprocess.run([sys.executable, "src/cfgbuild.py", _mn, _mrt,
+    _r5 = subprocess.run([sys.executable, "inputproc/cfgbuild.py", _mn, _mrt,
                           "--mech", "mechanism/mechanism_3_full_chain.fac"],
                          capture_output=True, text=True)
     _r6 = subprocess.run([os.path.join(HERE, "facsimile_impl", "fac_v3"),
@@ -411,7 +411,7 @@ try:
         open(os.path.join(_em, _f), "w").write("")
     open(os.path.join(_em, "bc.config"), "w").write("TAU_MIX = 86400\n")
     _ert = os.path.join(_tmp, "empty_rt.dat")
-    _r7 = subprocess.run([sys.executable, "src/cfgbuild.py", _em, _ert,
+    _r7 = subprocess.run([sys.executable, "inputproc/cfgbuild.py", _em, _ert,
                           "--mech", "mechanism/mechanism_3_full_chain.fac"],
                          capture_output=True, text=True)
     _r8 = subprocess.run([os.path.join(HERE, "facsimile_impl", "fac_v3"),
@@ -425,18 +425,18 @@ try:
 finally:
     shutil.rmtree(_tmp, ignore_errors=True)
 
-# ================= FT-CFG: runtime.dat 与 input_v3 一致性 (mtime 陷阱防线) =================
+# ================= FT-CFG: runtime.dat 与 configs 一致性 (mtime 陷阱防线) =================
 print("== FT-CFG runtime_v3.dat 与配置一致性 ==")
 # 陷阱: 同一秒内改配置又改回 → make 误判 up-to-date → runtime.dat 保留中间值
 # 防线: 用 cfgbuild 重新生成一份到临时文件, 与仓库内 runtime_v3.dat 逐字节比对
 _tmp_rt = os.path.join(tempfile.mkdtemp(), "rt_check.dat")
 try:
-    _rc = subprocess.run([sys.executable, "src/cfgbuild.py", "input_v3", _tmp_rt,
+    _rc = subprocess.run([sys.executable, "inputproc/cfgbuild.py", "configs", _tmp_rt,
                           "--mech", "mechanism/mechanism_3_full_chain.fac"],
                          capture_output=True, text=True)
     _fresh = open(_tmp_rt).read() if os.path.exists(_tmp_rt) else ""
     _repo = open("runtime_v3.dat").read() if os.path.exists("runtime_v3.dat") else ""
-    check("runtime_v3.dat 与 input_v3 当前内容一致 (非陈旧)",
+    check("runtime_v3.dat 与 configs 当前内容一致 (非陈旧)",
           _rc.returncode == 0 and _fresh == _repo,
           "逐字节一致" if _fresh == _repo else "⚠ 仓库内 runtime_v3.dat 陈旧, 请 make runtime_v3.dat")
 finally:
@@ -453,11 +453,11 @@ try:
     for _doy in (172, 355):
         _d = os.path.join(_phot_tmp, f"d{_doy}")
         os.makedirs(_d)
-        for _f in os.listdir("input_v3"):
-            _p = os.path.join("input_v3", _f)
+        for _f in os.listdir("configs"):
+            _p = os.path.join("configs", _f)
             if os.path.isfile(_p):
                 shutil.copy(_p, _d)
-        shutil.copytree("input_v3/constraints", os.path.join(_d, "constraints"))
+        shutil.copytree("configs/constraints", os.path.join(_d, "constraints"))
         # 高纬才拉得开差距: lat=60 的冬至接近极夜
         # 只改 LAT/DOY 两行, 保留 JMAP 等其余行 (否则光解槽位校验会报缺参)
         _ph = os.path.join(_d, "photolysis.config")
@@ -471,7 +471,7 @@ try:
                 _lines.append(_ln)
         open(_ph, "w").writelines(_lines)
         _rt = os.path.join(_phot_tmp, f"rt{_doy}.dat")
-        _rc = subprocess.run([sys.executable, "src/cfgbuild.py", _d, _rt,
+        _rc = subprocess.run([sys.executable, "inputproc/cfgbuild.py", _d, _rt,
                               "--mech", "mechanism/mechanism_3_full_chain.fac"],
                              capture_output=True, text=True)
         _pref = os.path.join(_phot_tmp, f"o{_doy}")
@@ -504,13 +504,13 @@ try:
         _d = os.path.join(_mp_tmp, "d")
         shutil.rmtree(_d, ignore_errors=True)
         os.makedirs(_d)
-        for _f in os.listdir("input_v3"):
-            _p = os.path.join("input_v3", _f)
+        for _f in os.listdir("configs"):
+            _p = os.path.join("configs", _f)
             if os.path.isfile(_p):
                 shutil.copy(_p, _d)
-        shutil.copytree("input_v3/constraints", os.path.join(_d, "constraints"))
+        shutil.copytree("configs/constraints", os.path.join(_d, "constraints"))
         open(os.path.join(_d, "model.parameters"), "w").write(_body)
-        _r = subprocess.run([sys.executable, "src/cfgbuild.py", _d,
+        _r = subprocess.run([sys.executable, "inputproc/cfgbuild.py", _d,
                              os.path.join(_mp_tmp, "rt.dat"), "--mech",
                              "mechanism/mechanism_3_full_chain.fac"],
                             capture_output=True, text=True)
@@ -658,7 +658,7 @@ check("modules/ 有职责说明文档（含核心/预留区分）",
       and "预留钩子" in open("modules/README.md").read(),
       "已标注 2 核心 + 1 工具 + 1 预留")
 
-# FT-CFGSPEC: input_v3 配置与机制物种的一致性
+# FT-CFGSPEC: configs 配置与机制物种的一致性
 _mech_spec = re.search(r"(?m)^VARIABLE\s*\n(.*?);", _mech_txt, re.S)
 _sp_list = _mech_spec.group(1).replace(";", " ").split() if _mech_spec else []
 _sp_set = set(_sp_list)
@@ -675,11 +675,11 @@ def _cfg_keys(path):
 _bad_cfg = []
 for _f in ("bc.config", "emissions.config", "drydep.config", "wetdep.config",
            "initialConcentrations.config"):
-    _ks = _cfg_keys(f"input_v3/{_f}") - {"TAU_MIX", "DIL"}
+    _ks = _cfg_keys(f"configs/{_f}") - {"TAU_MIX", "DIL"}
     _unknown = sorted(_ks - _sp_set)
     if _unknown:
         _bad_cfg.append(f"{_f}: {_unknown}")
-check("input_v3 各配置无失效物种名", not _bad_cfg,
+check("configs 各配置无失效物种名", not _bad_cfg,
       "; ".join(_bad_cfg) if _bad_cfg else "5 个配置全部只含机制物种")
 
 # ② 正向: 有化学产物的稳定物种必须有物理汇（干沉或湿沉或排放）
@@ -692,9 +692,9 @@ for _l in _rx_lines:
     _lhs, _rhs = _eq.split("=")
     _consumed |= set(re.findall(r"[A-Z][A-Za-z0-9]*", _lhs))
     _produced |= set(re.findall(r"[A-Z][A-Za-z0-9]*", _rhs))
-_dry = {k for k in _cfg_keys("input_v3/drydep.config") if k in _sp_set}
-_wet = {k for k in _cfg_keys("input_v3/wetdep.config") if k in _sp_set}
-_emis = {k for k in _cfg_keys("input_v3/emissions.config") if k in _sp_set}
+_dry = {k for k in _cfg_keys("configs/drydep.config") if k in _sp_set}
+_wet = {k for k in _cfg_keys("configs/wetdep.config") if k in _sp_set}
+_emis = {k for k in _cfg_keys("configs/emissions.config") if k in _sp_set}
 _no_sink = [s for s in _sp_list
             if s in _produced and s not in _consumed
             and s not in _dry and s not in _wet and s not in _emis]
@@ -711,15 +711,15 @@ try:
     import shutil as _sh
     _ud = os.path.join(_unit_tmp, "in")
     os.makedirs(_ud)
-    for _f in os.listdir("input_v3"):
-        _p = os.path.join("input_v3", _f)
+    for _f in os.listdir("configs"):
+        _p = os.path.join("configs", _f)
         if os.path.isfile(_p):
             _sh.copy(_p, _ud)
-    _sh.copytree("input_v3/constraints", os.path.join(_ud, "constraints"))
+    _sh.copytree("configs/constraints", os.path.join(_ud, "constraints"))
     open(os.path.join(_ud, "initialConcentrations.config"), "w").write(
         "NO   5.0e8   cm3\nNO2  8.13   ppb\nO3   300    ppb\nHCHO 0.002  ppm\n")
     _urt = os.path.join(_unit_tmp, "rt.dat")
-    _ur = subprocess.run([sys.executable, "src/cfgbuild.py", _ud, _urt,
+    _ur = subprocess.run([sys.executable, "inputproc/cfgbuild.py", _ud, _urt,
                           "--mech", "mechanism/mechanism_3_full_chain.fac"],
                          capture_output=True, text=True)
     _txt = open(_urt).read() if os.path.exists(_urt) else ""
@@ -739,7 +739,7 @@ finally:
 
 # FT-TPL: 模板文件必须"原样可用"（每行非数据部分都以 # 开头）
 _tpl_bad = []
-for _tp in sorted(__import__("pathlib").Path("templates").glob("*.template")):
+for _tp in sorted(__import__("pathlib").Path("docs/templates").glob("*.template")):
     _in_data = False
     for _i, _ln in enumerate(_tp.read_text().splitlines(), 1):
         _st = _ln.strip()
@@ -758,7 +758,7 @@ for _tp in sorted(__import__("pathlib").Path("templates").glob("*.template")):
         if not _is_data:
             _tpl_bad.append(f"{_tp.name}:{_i} '{_st[:40]}'")
 check("templates 全部原样可用 (无缺 # 前缀的说明行)", not _tpl_bad,
-      f"{len(list(__import__('pathlib').Path('templates').glob('*.template')))} 个模板通过"
+      f"{len(list(__import__('pathlib').Path('docs/templates').glob('*.template')))} 个模板通过"
       if not _tpl_bad else f"缺#: {_tpl_bad[:3]}")
 
 check("scan_suite.py 已删除（职能已并入 make batch + run_B + 本测试）",
@@ -799,9 +799,9 @@ try:
     _lost = set()
     for _row in open("facsimile_impl/gen_v3/oz.reac"):
         _lost |= {int(x) for x in _row.split()[1:]}
-    _em = {_sp.index(_l.split()[0]) + 1 for _l in open("input_v3/emissions.config")
+    _em = {_sp.index(_l.split()[0]) + 1 for _l in open("configs/emissions.config")
            if _l.split("#")[0].split() and _l.split()[0] in _sp}
-    _dry = {_sp.index(_l.split()[0]) + 1 for _l in open("input_v3/drydep.config")
+    _dry = {_sp.index(_l.split()[0]) + 1 for _l in open("configs/drydep.config")
             if len(_l.split("#")[0].split()) >= 3 and _l.split()[2] == "on"
             and _l.split()[0] in _sp}
     _dead = [_sp[i-1] for i in range(1, len(_sp)+1)
@@ -812,7 +812,7 @@ try:
     # ② NOy: batch 硬编码表 与 indicators 自动判定 必须一致
     _batch_src = open("facsimile_impl/fac_batch_omp.f90").read()
     _batch_noy = set(re.findall(r'noy_add\("([^"]+)"', _batch_src))
-    sys.path.insert(0, "diagnostics")
+    sys.path.insert(0, "analysis_lib")
     from indicators import _parse_fac as _pf
     _, _auto_noy, _ = _pf("mechanism/mechanism_3_full_chain.fac")
     _auto = set(_auto_noy)
@@ -824,7 +824,7 @@ try:
     # ③ build_groups: 所有 emissions.config 里的排放物种必须被分到某个组
     #    (否则 HVOC 等情景不缩放它)
     _rt = os.path.join(_sync_tmp, "rt.dat")
-    _rr = subprocess.run([sys.executable, "src/cfgbuild.py", "input_v3", _rt,
+    _rr = subprocess.run([sys.executable, "inputproc/cfgbuild.py", "configs", _rt,
                           "--mech", "mechanism/mechanism_3_full_chain.fac"],
                          capture_output=True, text=True)
     _groups = {"NO", "NO2"}
@@ -837,7 +837,7 @@ try:
     for _t in re.findall('"([A-Za-z0-9_]+)"', _blk):
         _groups.add(_t)
     _groups |= {"CO", "CH4"}
-    _emis_sp = {_l.split()[0] for _l in open("input_v3/emissions.config")
+    _emis_sp = {_l.split()[0] for _l in open("configs/emissions.config")
                 if _l.split("#")[0].split() and _l.split()[0] in _sp}
     _ungrouped = sorted(_emis_sp - _groups)
     check("所有排放物种都在 build_groups 中 (情景缩放可达)", not _ungrouped,
@@ -858,7 +858,7 @@ _days_tmp = tempfile.mkdtemp()
 try:
     _rt5 = os.path.join(_days_tmp, "rt5.dat")
     _rt3 = os.path.join(_days_tmp, "rt3.dat")
-    _base = [sys.executable, "src/cfgbuild.py", "input_v3",
+    _base = [sys.executable, "inputproc/cfgbuild.py", "configs",
              "--mech", "mechanism/mechanism_3_full_chain.fac"]
     _r5 = subprocess.run(_base[:3] + [_rt5] + _base[3:],
                          capture_output=True, text=True)
@@ -876,22 +876,85 @@ try:
           _r3.returncode == 0 and _m3 and float(_m3[1]) == 3.0,
           f"MODEL {_m3[1] if _m3 else '?'} 天")
     check("--days 不改 model.parameters 文件本身",
-          "5.0" in open("input_v3/model.parameters").readline(),
+          "5.0" in open("configs/model.parameters").readline(),
           "文件首行仍为 5.0")
+    check("MODEL 行含 SPINUP 第 6 值 (=2 天，configs 缺省)",
+          len(_m5) >= 6 and float(_m5[5]) == 2.0,
+          f"MODEL 第6值={_m5[5] if len(_m5) >= 6 else '缺'}")
     # 天数变了必须真的影响输出行数 (否则覆盖是假的)
     _o3 = os.path.join(_days_tmp, "o3")
     _r = subprocess.run([os.path.abspath("facsimile_impl/fac_v3"), "SCEN_BAU",
                          _o3, os.path.abspath(_rt3)],
                         capture_output=True, text=True, cwd="facsimile_impl")
     _lines = open(_o3 + "_conc.csv").read().strip().splitlines()
-    _last_h = int(_lines[-1].split(",")[0])          # h 列 = 步序号
-    _rows = len(_lines) - 1
-    # 3 天 = 72 步 → 末步序号必须是 72（5 天则是 120）。窗口恒为末 24 步 → 25 行
-    check("--days 3 输出末步序号=72 且窗口 25 行",
-          _r.returncode == 0 and _last_h == 72 and _rows == 25,
-          f"末 h={_last_h}, {_rows} 行")
+    _hvals = [int(l.split(",")[0]) for l in _lines[1:]]   # h 列 = 步序号
+    _rows = len(_hvals)
+    # 3 天 = 72 步, SPINUP=2 天 = 48 步 → 落盘 step 48..72 共 25 行
+    check("--days 3 输出 from h=48 (spin-up 后) 到 h=72 共 25 行",
+          _r.returncode == 0 and _hvals[0] == 48 and _hvals[-1] == 72
+          and _rows == 25,
+          f"h={_hvals[0]}..{_hvals[-1]}, {_rows} 行")
 finally:
     shutil.rmtree(_days_tmp, ignore_errors=True)
+
+# ================= FT-SPINUP: SPINUP 闸门 (丢弃前 N 天, 其余逐时落盘) =================
+print("== FT-SPINUP SPINUP 丢弃天数驱动输出窗口 ==")
+_spin_tmp = tempfile.mkdtemp()
+try:
+    def _build_and_run(_days, _spinup):
+        _d = os.path.join(_spin_tmp, f"d{_days}_s{_spinup}")
+        os.makedirs(_d)
+        for _f in os.listdir("configs"):
+            _p = os.path.join("configs", _f)
+            if os.path.isfile(_p):
+                shutil.copy(_p, _d)
+        shutil.copytree("configs/constraints", os.path.join(_d, "constraints"),
+                        dirs_exist_ok=True)
+        open(os.path.join(_d, "model.parameters"), "w").write(
+            f"{_days}\n3600.0\n1.0e-6\n1.0e3\n{_spinup}\n")
+        _rt = os.path.join(_spin_tmp, f"rt_{_days}_{_spinup}.dat")
+        _rb = subprocess.run([sys.executable, "inputproc/cfgbuild.py", _d, _rt,
+                              "--mech", "mechanism/mechanism_3_full_chain.fac"],
+                             capture_output=True, text=True)
+        if _rb.returncode != 0:
+            return _rb, None, None
+        _o = os.path.join(_spin_tmp, f"o_{_days}_{_spinup}")
+        _rr = subprocess.run([os.path.abspath("facsimile_impl/fac_v3"), "SCEN_BAU",
+                              _o, os.path.abspath(_rt)],
+                             capture_output=True, text=True, cwd="facsimile_impl")
+        if _rr.returncode != 0:
+            return _rr, None, None
+        _hs = [int(l.split(",")[0]) for l in
+               open(_o + "_conc.csv").read().strip().splitlines()[1:]]
+        return _rr, _hs, _o
+
+    # ① SPINUP=0 → 全部逐时落盘 (1 天 = 24 行, h=1..24)
+    _r, _hs, _o = _build_and_run(1, 0)
+    check("SPINUP=0 输出全程逐时 (24 行, h=1..24)",
+          _r.returncode == 0 and _hs == list(range(1, 25)),
+          f"{len(_hs) if _hs else '?'} 行, h={_hs[0] if _hs else '?'}..{_hs[-1] if _hs else '?'}")
+    if _o:
+        _ipr_h = [int(l.split(",")[0]) for l in
+                  open(_o + "_ipr.csv").read().strip().splitlines()[1:]]
+        _irr_h = [int(l.split(",")[0]) for l in
+                  open(_o + "_irr.csv").read().strip().splitlines()[1:]]
+        check("SPINUP=0 时 IPR/IRR 与 conc 行数一致 (同步落盘)",
+              _ipr_h == _hs and _irr_h == _hs,
+              f"ipr={len(_ipr_h)}, irr={len(_irr_h)}, conc={len(_hs)}")
+
+    # ② SPINUP=0.5 天 = 12 步 → 落盘 h=12..24 共 13 行
+    _r, _hs, _o = _build_and_run(1, 0.5)
+    check("SPINUP=0.5 天输出 h=12..24 共 13 行",
+          _r.returncode == 0 and _hs == list(range(12, 25)),
+          f"{len(_hs) if _hs else '?'} 行, h={_hs[0] if _hs else '?'}..{_hs[-1] if _hs else '?'}")
+
+    # ③ SPINUP ≥ 天数 → cfgbuild 编译期拒绝
+    _r, _hs, _o = _build_and_run(1, 1)
+    check("SPINUP ≥ 天数 被 cfgbuild 拒绝",
+          _r.returncode != 0 and "SPINUP" in (_r.stdout + _r.stderr),
+          "编译期拒绝")
+finally:
+    shutil.rmtree(_spin_tmp, ignore_errors=True)
 
 # 收尾: 清掉本测试写到 /tmp 的固定产物 (避免每次跑 test 都留垃圾)
 import glob as _glob_clean

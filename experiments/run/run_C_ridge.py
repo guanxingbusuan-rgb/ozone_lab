@@ -22,7 +22,7 @@ import sys
 import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from _common import (ROOT, require_prereq, out_dir, run_batch, run_mcm, read_table,
+from _runner import (ROOT, require_prereq, out_dir, run_batch, run_mcm, read_table,
                      write_csv, manifest, summary_table, log, col, last24_mean)
 
 FN_DEFAULT = np.logspace(-1.0, 1.0, 13)

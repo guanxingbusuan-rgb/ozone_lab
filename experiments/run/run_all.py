@@ -18,10 +18,11 @@ run_all.py —— 全部实验运行总驱动（类似 CMAQ 的 run.cctm.csh 角
   output/run_A/  六情景单箱（summary.csv + 各情景三件 CSV）
   output/run_B/  响应面（batch.csv + 19 个 indicator_matrix_*.csv + slices.csv）
   output/run_C/  跨路线屋脊（ridge_batch/mcm/compare.csv）
-  output/run_D/  IPR/IRR 过程诊断（ipr_ledger/closure/irr_top.csv）
+  output/run_D_ipr/  IPR 六账账本（ipr_ledger.csv：长表 逐小时×全物种×6账）
+  output/run_D_irr/  IRR 反应级归因（irr_top/hourly_rxn_top.csv，物种参数化）
   output/run_E/  指示因子（12 指标 + 对比）
   output/run_F/  OSSE（obs_samples/skill_rmse/skill_delta.csv）
-  output/run_G/  逐小时过程（hourly_ledger/share/rxn_top/consistency.csv）
+  output/run_G_consist/  IPR↔IRR 互证（consistency.csv，物种参数化）
   output/run_H/  OAT 敏感性（jacobian/sensitivity.csv）
   output/run_I/  情景矩阵（matrix_o3max/delta/direction.csv）
   output/run_M/  气象序列驱动（summary/attribution/o3_timeseries.csv）
@@ -35,22 +36,23 @@ import subprocess
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
-from _common import ROOT, OUTROOT, PY, log, ensure_dir
+from _runner import ROOT, OUTROOT, PY, log, ensure_dir
 
 EXPERIMENTS = {
     "A": ("run_A_scenarios.py", "六情景单箱基线/政策沙盘"),
     "B": ("run_B_surface.py", "O3–NOx–VOC 响应面（4D 参数扫描）"),
     "C": ("run_C_ridge.py", "屋脊跨路线/跨机制对比"),
-    "D": ("run_D_process.py", "IPR 六账 + IRR 反应级过程诊断"),
+    "D": ("run_D_ipr.py", "IPR 六账过程账本（逐小时 × 全物种）"),
+    "R": ("run_D_irr.py", "IRR 反应级归因（物种参数化）"),
     "E": ("run_E_indicators.py", "指示因子工具箱（12 指标）"),
     "F": ("run_F_osse.py", "观测系统模拟实验 OSSE"),
-    "G": ("run_G_hourlyPA.py", "逐小时过程分析 + IPR↔IRR 互证"),
+    "G": ("run_G_consist.py", "IPR↔IRR 双路径互证（物种参数化）"),
     "H": ("run_H_sensitivity.py", "OAT 敏感性（±10% 中心差分）"),
     "I": ("run_I_scenario_matrix.py", "情景 × 路线矩阵 + 方向一致性"),
     "M": ("run_M_met_series.py", "气象观测序列驱动（站点逐时）+ 单变量归因"),
 }
 
-ORDER = ["A", "B", "D", "G", "E", "F", "H", "M", "I", "C"]   # C 依赖 B，放最后
+ORDER = ["A", "B", "D", "R", "G", "E", "F", "H", "M", "I", "C"]   # C 依赖 B，放最后
 
 
 def main(argv):
@@ -59,7 +61,7 @@ def main(argv):
         log("实验清单:")
         for k in sorted(EXPERIMENTS):
             log(f"  {k}  {EXPERIMENTS[k][1]:36s}  → experiments/run/{EXPERIMENTS[k][0]}")
-        log("\n注: 未包含『伴随/反演』（按需求排除；另见 experiments/sens_adj.py）")
+        log("\n注: 『伴随/反演』已移除（2026-10-27：0-D 无真伴随，SVD 不可辨识，sens_adj.py 已删除）")
         return 0
 
     todo = [a.upper() for a in args] or ORDER

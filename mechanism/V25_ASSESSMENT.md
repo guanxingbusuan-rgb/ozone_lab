@@ -163,7 +163,7 @@ V2.5+ 有 20 个单产物反应对应 MCM 多分支，**全部为已声明的集
 | 来源 | 覆盖 | 说明 |
 |---|---|---|
 | MCM v3.3.1 官方速率 | 34 条热反应逐字 + 2 条光解形状族 | 核心无机 + CH₄/醛/酮链 |
-| MCM v3.3.1 光解表 | 18 个在用槽的 l/m/n | `input_v3/photolysis-rates_MCM` |
+| MCM v3.3.1 光解表 | 18 个在用槽的 l/m/n | `configs/photolysis-rates_MCM` |
 | V2.5 新增 MCM 专属速率 | KO3HO2 / KO3OH / KIOLENO3（+ ETH-NO₃ 内联） | 补缺口，逐字一致 |
 | JPL/IUPAC（与 MCM 同源） | KMT03/04/07/08/11 Troe 逐字 | 夜化学 |
 | JMAP 文献正午值 | 7 个自定义槽（N₂O₅/卤素） | MCM 无基准，声明为文献量级 |
@@ -176,8 +176,8 @@ V2.5+ 有 20 个单产物反应对应 MCM 多分支，**全部为已声明的集
 
 | 关卡 | 内容 | 状态 |
 |---|---|---|
-| `python audit/element_audit.py` | 203/203 每反应 C/H/N/O/S/Cl/Br 配平 | ✅ |
-| `python audit/mcm_compare.py` | 48 条速率比对（32 无机 + 16 映射）+ 文档漂移检查 | ✅ 8.9% |
+| `python mechanism/audit/element_audit.py` | 203/203 每反应 C/H/N/O/S/Cl/Br 配平 | ✅ |
+| `python mechanism/audit/mcm_compare.py` | 48 条速率比对（32 无机 + 16 映射）+ 文档漂移检查 | ✅ 8.9% |
 | `make test` | 62 项功能测试（FT-FREEZE/CFG/DAYS/MECHK/PHOT/SYNC/UNIT 等 12 族） | ✅ |
 | 光解槽位语义 | 本报告 §2.2 逐槽核对（代理映射 + 储库排除） | ✅ 0 错位 |
 | `run_all.py` | A–I 十实验端到端 | ✅ |
