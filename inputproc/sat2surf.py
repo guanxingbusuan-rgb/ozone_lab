@@ -54,7 +54,7 @@ import sys, re, argparse
 from datetime import datetime, timedelta
 
 # R13: PPB 常量单源 (与 cfgbuild/unit_factor 一致)
-# 稳健导入: 直接用脚本路径时 sys.path[0] 已是 src/; 但被 importlib/其它 cwd 加载时
+# 稳健导入: 直接用脚本路径时 sys.path[0] 已是 inputproc/; 但被 importlib/其它 cwd 加载时
 # 需要显式把本文件所在目录加入 sys.path, 否则 ModuleNotFoundError。
 import os as _os
 _HERE = _os.path.dirname(_os.path.abspath(__file__))

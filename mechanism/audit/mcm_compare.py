@@ -10,9 +10,9 @@ mcm_compare.py —— 与 MCM v3.3.1 官方导出逐反应比对速率系数
   (T=298.15 K, M=2.46e19 molec/cm3) 下计算两边速率常数并报告相对偏差。
 
 用法:
-  python audit/mcm_compare.py                      # 全部报告，按偏差排序
-  python audit/mcm_compare.py --threshold 0.05     # 只显示 >5% 偏差
-  python audit/mcm_compare.py --quiet              # 仅汇总（供 CI）
+  python mechanism/audit/mcm_compare.py                      # 全部报告，按偏差排序
+  python mechanism/audit/mcm_compare.py --threshold 0.05     # 只显示 >5% 偏差
+  python mechanism/audit/mcm_compare.py --quiet              # 仅汇总（供 CI）
 
 退出码: 0 = 最大偏差 < 阈值; 1 = 存在超阈值项（便于接入 make test）
 
@@ -38,6 +38,16 @@ M_REF = 2.46e19
 O2_REF = 0.2095 * M_REF
 N2_REF = 0.7805 * M_REF
 H2O_REF = 0.0          # 干燥，避免水汽增强因子掩盖主参数差异
+
+# 集总物种 → MCM 代表分子（单一事实源：mcm_compare 关口② 与 jslot_audit 共用）
+LUMP_MAP = {
+    "ALK": "C3H8", "OLE": "C3H6", "ARO1": "TOLUENE", "ARO2": "MXYL",
+    "KET": "CH3COCH3", "TERP": "APINENE", "SESQ": "BCARY",
+    "ISOP": "C5H8", "CH4": "CH4", "LALK": "NC6H14",
+    "ETH": "C2H4", "IOLE": "CBUT2ENE", "ALD2": "C2H5CHO",
+    "MEOH": "CH3OH", "ETOH": "C2H5OH", "ESTER": "ETHACET",
+    "MGLY": "MGLYOX", "GLY": "GLYOX",
+}
 
 
 # ══════════════════ .fac 解析 ══════════════════
@@ -168,32 +178,9 @@ def main(argv=None):
     for rate, lhs, rhs in mcm_rx:
         midx[lhs].append((rate, rhs))
 
-    # 集总类/本项目特有物种：不在 MCM 里，跳过
-    LUMP = {
-        "OLE", "OLERO2", "OLEOOH", "ALK", "ALKRO2", "ALKOOH",
-        "ARO1", "ARO1O2", "ARO2", "ARO2O2", "KET", "KETRO2",
-        "GLY", "PNA", "RONO2", "OLENIT",
-        "TERP", "TERPRO2", "TERPOOH", "TERPNIT", "TERPCHO",
-        "CSL", "CSLRO2", "CSLOOH", "CSLNIT", "TOLOOH", "XYLOOH",
-        "LALK", "LALKRO2", "LALKOOH", "LALKNIT",
-        "MEOH", "ETOH", "MTBE", "MTBERO2", "MTBEOOH", "MTBENIT",
-        "ESTER", "ESTERO2", "ESTEROOH", "ESTERNIT",
-        "SESQ", "SESQRO2", "SESQOOH", "SESQNIT", "SESQCHO",
-        "ETH", "ETHO2", "ETHOOH", "ETHNIT",
-        "ALD2", "ALD2O2", "ALD2OOH", "PPAN",
-        "IOLE", "IOLERO2", "IOLEOOH", "IOLENIT",
-    }
-    # 集总物种 → MCM 代表分子（用于"跨机制可映射比对"）
-    # 这是第二道关口：纯无机比对只覆盖 57 条，集总物种的速率曾被漏查，
+    # 第二道关口用模块级 LUMP_MAP（集总物种 → MCM 代表分子）：
+    # 纯无机比对只覆盖 57 条，集总物种的速率曾被漏查，
     # 实测抓出 9 处错误（SESQ+O3 偏慢 100x、MGLY+OH 漏 EXP 项偏慢 7x 等）。
-    LUMP_MAP = {
-        "ALK": "C3H8", "OLE": "C3H6", "ARO1": "TOLUENE", "ARO2": "MXYL",
-        "KET": "CH3COCH3", "TERP": "APINENE", "SESQ": "BCARY",
-        "ISOP": "C5H8", "CH4": "CH4", "LALK": "NC6H14",
-        "ETH": "C2H4", "IOLE": "CBUT2ENE", "ALD2": "C2H5CHO",
-        "MEOH": "CH3OH", "ETOH": "C2H5OH", "ESTER": "ETHACET",
-        "MGLY": "MGLYOX", "GLY": "GLYOX",
-    }
     PHOT = re.compile(r"^J<\d+>$")
 
     rows, struct, skipped = [], [], 0

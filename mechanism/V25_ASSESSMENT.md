@@ -51,6 +51,9 @@
 **不变量**：机制占用的每个 MCM 编号槽位，其反应物 ⊆ MCM 官方该槽分子集合
 （集总物种经代表分子映射后判定）。J15/J16/J22/J24 等空出槽位不再引用。
 
+> 本节结论已于 2026-10-27 由人工核对固化为可执行断言
+> `mechanism/audit/jslot_audit.py`（四条不变量 + 负向验证），接入 `make test` / `make jcheck`。
+
 ### 2.3 GLY（乙二醛）光解三分支——与 MCM 逐条对应
 
 | 槽位 | 产物 | MCM 正午占比 | 本机制 |
@@ -178,22 +181,13 @@ V2.5+ 有 20 个单产物反应对应 MCM 多分支，**全部为已声明的集
 |---|---|---|
 | `python mechanism/audit/element_audit.py` | 203/203 每反应 C/H/N/O/S/Cl/Br 配平 | ✅ |
 | `python mechanism/audit/mcm_compare.py` | 48 条速率比对（32 无机 + 16 映射）+ 文档漂移检查 | ✅ 8.9% |
-| `make test` | 62 项功能测试（FT-FREEZE/CFG/DAYS/MECHK/PHOT/SYNC/UNIT 等 12 族） | ✅ |
-| 光解槽位语义 | 本报告 §2.2 逐槽核对（代理映射 + 储库排除） | ✅ 0 错位 |
-| `run_all.py` | A–I 十实验端到端 | ✅ |
+| `python mechanism/audit/jslot_audit.py` | 光解槽位语义：18 个 MCM 官方槽逐槽 ⊆ 判定 + 7 个自定义槽白名单封闭 + JMAP 死参数 + README 52 行一致 | ✅ 0 错位 |
+| `make test` | 71 项功能测试（FT-FREEZE/CFG/DAYS/MECHK/PHOT/SYNC/UNIT 等 14 族）+ 上述三个审计 | ✅ |
+| `run_A..run_M` | 逐入口端到端（无中央 run_all） | ✅ |
 
-> 注意：`mcm_compare.py` 目前**不覆盖**光解槽位语义（热反应专用）；换槽操作需按
-> README §6 语义表人工复核。将其固化为第三审计维度是低成本加固项（见 §8）。
+> `mcm_compare.py` 是热反应专用，**不覆盖**光解槽位语义（`J` 值不参与速率求值，
+> 借错槽它无感）。该维度已由 `jslot_audit.py` 固化并接入 `make test` / `make jcheck`，
+> 换槽操作不再需要人工按 §2.2 语义表复核。固化过程实测抓出 `mechanism/README.md`
+> 2 处 V2.5 迁槽遗留（§5 反应表 J22→J34、J13→J14），已修正。
 
 ---
-
-## 8. 后续升级候选（V2.6 预备——均非正确性问题，按需触发）
-
-| 项 | 触发条件 | 规模 |
-|---|---|---|
-| Criegee 显式化 | 转向夜间自由基 / OH 来源专项研究（夜间 OH 100% 依赖产率法） | +4sp/+8rx |
-| CH₃OOH 60/40 分支 | 需精确二次 HCHO 产率 | +1rx |
-| 甲苯酚/提氢分支（MCM 18%/7%） | 芳香 SOA / 酚类谱研究 | +2sp/+3rx |
-| DMS→SO₂ 支路 | 海洋硫化学专项 | +2sp/+4rx |
-| N₂O₅ 非均相（γ·Sₐ） | 接入气溶胶模块 | 需表面积输入 |
-| mcm_compare 增加槽位语义维度 | 任何换槽/加光解反应之前（防错槽复发） | 工具改造 |

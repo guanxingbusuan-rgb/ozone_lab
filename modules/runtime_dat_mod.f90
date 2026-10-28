@@ -64,7 +64,7 @@ contains
 
     subroutine read_runtime(path)
         character(len=*), intent(in) :: path
-        character(len=4096) :: line   ! V2.3: 74 物种 BC 行 ~1117 字符 > 旧 1024
+        character(len=4096) :: line   ! V2.5+: 111 物种 BC 行 ~1670 字符 > 旧 1024
         character(len=32) :: tok(NTOK), sec
         integer :: u, ios, nt, i, k, idx, isc, iser, nscen_expect
 

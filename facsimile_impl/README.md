@@ -57,7 +57,8 @@ gen_v3/oz.prod       ← 每反应的产物索引+计量系数表
 
 ```bash
 ./fac_batch_omp <ng≤32> <out.csv> <runtime.dat> [jfac列表] [dt列表]
-# 例: ./fac_batch_omp 9 ../output/batch_v3_indicators.csv ../runtime_v3.dat 0.6,1.0 0,5
+# 低层调试例: ./fac_batch_omp 9 ../output/debug/batch.csv ../runtime_v3.dat 0.6,1.0 0,5
+# 正式 B 入口: python experiments/run/run_B_surface.py 9
 ```
 
 | 特性 | 说明 |
@@ -65,7 +66,9 @@ gen_v3/oz.prod       ← 每反应的产物索引+计量系数表
 | 网格 | fnox×fvoc 各 ng 点（0.3×1.5^i）× jfac × ΔT，最多 262,144 箱 |
 | 并行 | OpenMP `collapse(2)` + `schedule(dynamic)`；**案例间并行，单箱内仍单线程** |
 | C API | `cvode_c_mod.f90`：fcmix 用 COMMON 块存指针 → 单进程只能 1 个 CVODE 问题；C API 每线程独立 mem 才能并行 |
-| 输出 | 24 列指示因子（含 `_pm` 午后口径）+ `_ipr.csv` + `_irr.csv`（每案例一行窗口均值） |
+| 输出 | 24 列指示因子（含 `_pm` 午后口径）+ `_ipr.csv` + `_irr.csv`（每案例一行末 24 步均值；**不落全时间序列**）。统计窗 = **末 24 个输出步**（`O3max` 等不是 8h 日最大）。列契约不变；下游只把**官方 5 族 + NOy** 当判据（见 `README.md` §6.3），`O3NOy`/`HCHONOy`/`O3NOz` 为备用扩展。结束时打印 `失败 N / 降级 K`：**降级 = 已有统计但窗口不完整**（调用方应记录） |
+| 侧车坐标 | `<outf>_irr.csv` 的前 4 列（fnox/fvoc/jfac/dt）在 **2026-10-29 之前**因循环变量复用被写错（`fnox` 恒为同一个值；r1..r203 数值本身正确、行序与主 CSV 对齐）。已修复；**旧归档的 batch `_irr.csv` 已删除**（无任何代码消费，重跑自动重建）。fac_v3 的 `<pref>_irr.csv`（`h,r1..` 格式）从未受影响 |
+| spin-up | 读取 `spinup_cfg`；要求 post-spinup ≥24 步，否则 FATAL；聚合窗口不混入 spin-up |
 | 在线守卫 | 氮守恒不变量（每线程首快照自检）+ `nfail>0` → FATAL 退出 |
 | 预算表 | `batch_budget_init` 启动期解析 Q/L_NOx/产率索引，失败硬停 |
 

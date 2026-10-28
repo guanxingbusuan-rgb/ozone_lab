@@ -44,14 +44,9 @@ output/
 outp_*.csv
 *.nc
 
-# ── 机制图与绘图脚本（整个目录不入库）──
-# 该目录含 40 张图（PNG 330dpi + PDF 矢量，约 23 MB）+ 4 个生成脚本
-# + 1 份逐图教学手册。体积以二进制图为主，故整体排除，本地保留。
-# 需要时本地重生成:
-#   python figures/gen_all.py      # 9 张 SCI 版机制图 A–I
-#   python figures/gen_cartoon.py  # 9 张漫画场景版 comic_A–I
-#   make figures                   # 2 张工程图（读 output/batch_v3_indicators.csv）
-figures/
+# ── 图件输出 ──
+# 工程图：output/*.png（随 output/ 忽略；脚本在 experiments/viz/，可用 make figures 重生成）
+# 机制图：docs/figures/*.pdf|png（静态归档，入库；教学手册 docs/figures/README.md）
 
 # ── 系统/编辑器杂物 ──
 # .DS_Store 无斜杠前缀 → 匹配任意层级（含 mechanism/.DS_Store）

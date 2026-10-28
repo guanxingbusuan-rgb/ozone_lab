@@ -3,10 +3,10 @@
 !   输入: runtime.dat (12 类配置, cfgbuild 编译) — 全功能消费:
 !     真光解 (SZA + MCM l/m/n) / 时变气象 (T,P,RH,BLH,RAIN) /
 !     时变边界层 (膨胀稀释) / 排放日型 / 干湿沉降 / BC 松弛 / 情景因子
-!   求解: CVODE BDF + DENSE (74 物种稠密直接法; 批量并行版同为 DENSE,
+!   求解: CVODE BDF + DENSE (111 物种稠密直接法; 批量并行版同为 DENSE,
 !         并行只发生在案例之间, 单箱内部仍单线程)
-!   输出: <pref>_conc.csv (74 物种全列) + <pref>_irr.csv (131 反应 IRR)
-!         + <pref>_ipr.csv (74 物种 × 6 账 P/L/E/D/B/X 小时窗积分)
+!   输出: <pref>_conc.csv (111 物种全列) + <pref>_irr.csv (203 反应 IRR)
+!         + <pref>_ipr.csv (111 物种 × 6 账 P/L/E/D/B/X 小时窗积分)
 ! CLI: fac_v3 [scenario_name] [out_prefix] [runtime.dat]
 ! =====================================================================
 module facv3_mod
@@ -230,7 +230,7 @@ program fac_v3
     end do
     close (u1); close (u2); close (u3)
     call cpu_time(tend)
-    print '(A,F6.2,A,I0,A,F7.2,A)', "FAC-V3 ok (", tend - tstart, " s, nst=", IOUT(3), &
+    print '(A,F10.2,A,I0,A,F7.2,A)', "FAC-V3 ok (", tend - tstart, " CPU s, nst=", IOUT(3), &
         ", O3max=", o3max/2.46d10, " ppb)"
 contains
     subroutine ensure_dir(p)   ! mkdir -p 输出目录 (前缀含路径时)

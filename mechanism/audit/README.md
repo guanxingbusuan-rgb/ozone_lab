@@ -1,21 +1,22 @@
 # mechanism/audit/ —— 机制质检工具（与仿真解耦，可独立运行；2026-10-27 自仓库根移入 mechanism/，归属机制设计层）
 
-> **一句话**：这里回答"**机制本身对不对**"——元素守恒、系数与 MCM 官方基准的一致性。
-> 两个脚本都**不跑仿真**（秒级），都已接入 `make test`，是机制变更后的第一道闸门。
+> **一句话**：这里回答"**机制本身对不对**"——元素守恒、系数与 MCM 官方基准的一致性、光解槽位语义。
+> 三个脚本都**不跑仿真**（秒级），都已接入 `make test`，是机制变更后的第一道闸门。
 
 ---
 
-## 1. 两个脚本
+## 1. 三个脚本
 
 | 脚本 | 查什么 | 基准 | 耗时 |
 |---|---|---|---|
 | `element_audit.py` | **逐反应元素守恒**：C/H/N/O/S/Cl/Br 两侧配平 | 机制自带 FORMULA 段（单一事实源） | 0.07 s |
 | `mcm_compare.py` | **速率系数 vs MCM v3.3.1 官方导出** + 文档漂移 | `mechanism/reference/mcm_v3.3.1_export.fac` | ~3 s |
+| `jslot_audit.py` | **光解槽位语义**：机制 `J<n>` 的分子归属 vs MCM 官方该槽归属 + JMAP/README 一致性 | 同上 + `configs/photolysis.config` | ~3 s |
 
 ## 2. `element_audit.py` —— 元素守恒审计
 
 ```bash
-python audit/element_audit.py mechanism/mechanism_3_full_chain.fac   # → 198/198 PASS
+python mechanism/audit/element_audit.py mechanism/mechanism_3_full_chain.fac   # → 203/203 PASS
 ```
 
 ### 设计要点（防"假绿"的三道内建规则）
@@ -35,9 +36,9 @@ python audit/element_audit.py mechanism/mechanism_3_full_chain.fac   # → 198/1
 ## 3. `mcm_compare.py` —— MCM 系数比对（三道关口的合体）
 
 ```bash
-python audit/mcm_compare.py              # 详细报告
-python audit/mcm_compare.py --quiet      # 仅结论（make test 用）
-python audit/mcm_compare.py --threshold 0.05
+python mechanism/audit/mcm_compare.py              # 详细报告
+python mechanism/audit/mcm_compare.py --quiet      # 仅结论（make test 用）
+python mechanism/audit/mcm_compare.py --threshold 0.05
 make mcmcheck                            # 等价于详细模式
 ```
 
@@ -58,28 +59,72 @@ make mcmcheck                            # 等价于详细模式
 
 ### 已知盲区（诚实声明）
 
-- **光解**：`J<n>` 依赖光解表，无法在两机制间直接求值比对 → 本工具不覆盖。
-  光解槽位语义需对照 MCM `J<n>` 反应式人工核查
-  （2026-10 审计发现 6 处语义错位，已修复并记录于 `mechanism/V25_ASSESSMENT.md`）。
+- **光解**：`J<n>` 依赖光解表，无法在两机制间直接求值比对 → 本工具不覆盖，
+  由 `jslot_audit.py` 按**槽位语义**单独把关（见 §4）。
 - **产物分支结构**：只比总速率，不比分支拆分是否合理。
 
 **退出码**：0=全部通过，1=超阈值或有文档漂移（接入 `make test`）。
 
-## 4. 与其他目录的分工
+## 4. `jslot_audit.py` —— 光解槽位语义审计（第三维度）
+
+```bash
+python mechanism/audit/jslot_audit.py              # 详细报告（逐槽判定表）
+python mechanism/audit/jslot_audit.py --quiet      # 仅结论（make test 用）
+make jcheck                                        # 等价于详细模式
+```
+
+**为什么单独立一维**：光解的 `l/m/n` 完全由**槽号**决定，而槽号是 MCM 官方命名空间里的
+"外键"——借错槽 = 借了别的分子的 `l/m/n`。`mcm_compare.py` 比的是速率数值，`J` 值
+根本不参与求值，因此对错位**完全无感**。V2.5 曾因此迁移 7 处（2026-10 审计发现 6 处
+语义错位，记录于 `mechanism/V25_ASSESSMENT.md` §2.2）；本脚本把那次人工逐槽核对固化成断言。
+
+### 四条不变量
+
+| # | 不变量 | 抓什么错 |
+|---|---|---|
+| ① | **语义包含**：机制占用的每个 MCM 编号槽，其反应物（剔储库 + 集总映射后）⊆ MCM 官方该槽的分子集合 | 借错槽（如把 N₂O₅ 挂到 J14 = 丙醛槽） |
+| ② | **自定义槽封闭**：MCM 无对应分子的槽必须显式落在白名单 `CUSTOM`（25/26/27/28/29/30/45），且 MCM 该槽确实为空，且 JMAP 给了 `D<正午值>` | 悄悄借用 MCM 已占槽；自定义槽漏参数 |
+| ③ | **JMAP 卫生**：每个 JMAP 槽都被机制引用（无死参数），且只允许给白名单里的自定义槽 | 陈旧 JMAP 条目；手写值悄悄覆盖 MCM 官方 `l/m/n`（V2.5 前 J13 就是这样偏快 4.4×） |
+| ④ | **文档一致**：`mechanism/README.md` 每条 `J<n>` 行（§5 反应表 + §6 光解方案表）的槽号/反应物/产物/参数来源 == `.fac` 实际 | 迁槽后忘改文档（实测抓出 2 处 V2.5 遗留） |
+
+### 判定口径（防假阳/假阴的四个设计）
+
+1. 只取 MCM 中速率 token **恰为** `J<n>`（无产率乘子）的反应作为该槽官方归属——
+   MCM 大量用 `J<4>*0.14*0.4` 把 J4 的**日变化形状**借给别的分子，算进来①会退化成永真
+2. 反应物侧的 O₂/H₂O/CO₂/H₂/N₂/M 是本机制的记账储库（MCM 不写在反应物侧），
+   比对前剔除；储库表与 `element_audit.py` 共用同一份
+3. 集总名 → MCM 代表分子复用 `mcm_compare.LUMP_MAP`（单一事实源），另加光解专属代理
+   `ISOPOOH → ISOPBOOH`（MCM 六个异戊二烯-OOH 异构体全走 J41）
+4. J34/J41 是 MCM 的"通用槽"（分别归属 105 / 1201 个分子），①在那里天然宽松；
+   详细报告打印该槽分子数，让读者知道这条断言的实际强度
+
+**当前结果**：26 条光解 / 25 槽 —— 18 个 MCM 官方槽逐槽核对 **0 错位**，
+7 个自定义槽白名单封闭，README 52 行一致。
+
+**负向验证**（沙箱改 `.fac`/`photolysis.config` 实测，仓库文件未动）：N₂O₅ 挪回 J14 →
+5 处 FAIL 并指名"N₂O₅ 在 MCM 无光解"；ClO 挪到 MCM 已占的 J24 → FAIL；JMAP 加死槽 J22 →
+FAIL；JMAP 覆盖官方槽 `13=D4.0e-5`（V2.5 前的真实错法）→ ③ 与 ④ 双双 FAIL；
+README §6 槽号改错 → FAIL 并回指 `.fac` 实际槽号。
+
+**退出码**：0=全过，1=有 FAIL，2=缺输入文件。
+
+## 5. 与其他目录的分工
 
 | 问题 | 去哪 |
 |---|---|
 | "反应式配平吗？" | **本目录** `element_audit.py` |
 | "速率和 MCM 一致吗？" | **本目录** `mcm_compare.py` |
+| "光解槽号借对了吗？参数有死项吗？" | **本目录** `jslot_audit.py` |
 | "简化掉了什么、影响多大？" | `mechanism/V25_ASSESSMENT.md`（审计+评估总报告） |
-| "输出 CSV 数值对吗？" | `tests/functional_test.py`（金值哨兵+契约断言） |
-| "六账闭合吗？" | `experiments/run/run_D_ipr.py` + FT-IPR |
+| "输出 CSV 数值对吗？" | 各程序 `output/run_meta.txt` + 实测复跑（原 `tests/` 已随通用层退役） |
+| "六账闭合吗？" | `CASE-analysis/run.py` + FT-IPR |
 
-## 5. 何时跑
+## 6. 何时跑
 
 | 场景 | 命令 |
 |---|---|
-| 改了 `.fac`（任意原因） | `make test`（两个都会自动跑） |
-| 只想快速验配平 | `python audit/element_audit.py mechanism/mechanism_3_full_chain.fac` |
+| 改了 `.fac`（任意原因） | `make test`（三个都会自动跑） |
+| 只想快速验配平 | `python mechanism/audit/element_audit.py mechanism/mechanism_3_full_chain.fac` |
 | 只想查系数一致性 | `make mcmcheck` |
-| 换了 MCM 官方导出（新版本） | 替换 `mechanism/reference/` 下的文件后 `make mcmcheck` |
+| 加了/迁了光解反应，或改了 `photolysis.config` JMAP | `make jcheck` |
+| 换了 MCM 官方导出（新版本） | 替换 `mechanism/reference/` 下的文件后 `make mcmcheck && make jcheck` |

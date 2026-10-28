@@ -1,18 +1,28 @@
 ! =====================================================================
 ! fac_batch_omp.f90 —— FAC-V3 批量响应面 · OpenMP 并行 · 指示因子全家族
 !   扫描: (f_NOx × f_VOC × jfac × ΔT) 排放/气象网格 (F2: 后两维 CLI 可选)
-!   诊断: 末 24h 逐时均值 + 12–18h 午后口径 (F5, *_pm 列, Sillman 原文口径)
-!   第一类 (Sillman 1995): H2O2/HNO3, O3/NOy, HCHO/NOy, O3/NOz, NOy, FNR
-!   第二类 (过程量): Q, L_NOx/Q (Kleinman 2005), P(H2O2)/P(HNO3), OPE
+!   诊断: 末 24 步（要求 post-spinup ≥24 步）逐时均值 + 12–18h 午后口径
+!         (F5, *_pm 列, Sillman 原文口径；批量为聚合输出，不落全时间序列)
+!   ⚠ 统计窗 = **末 24 个输出步**（dtout=3600 时 = 模拟最后 1 天）：
+!     O3max/O3mean/HCHOmax/NO2mean 均为该窗内统计，**不是 8h 日最大**。
+!   官方指示因子 5 族: FNR, H2O2/HNO3, L_NOx/Q (Kleinman 2005),
+!                      P(H2O2)/P(HNO3), OPE   + 状态量 NOy
+!   备用扩展 (仍占列, 不进判据): O3/NOy, HCHO/NOy, O3/NOz
 !   IPR (F1): 每案例末 24h 窗口均值 → <outf>_ipr.csv (fnox,fvoc,jfac,dt+ns×6)
+!   状态侧车 (实验 J): <outf>_state.csv —— 同窗口内 NO2/HCHO 的**一致均值对**
+!     (全窗 + 12–18h 双口径)，供状态空间 EKMA (x=NO2, y=HCHO, 等值线=O3) 使用。
+!     主 CSV 的 HCHOmax/NO2mean 一个取极值一个取均值, 不能当两轴用。
 !   预算表: batch_budget_init 启动期解析索引 (自检硬失败); 氮守恒在线不变量
 !   物理层: chem_phys_mod 唯一实现 (A1, 与 fac_v3 共享; F3 序列 BC 在此接线)
 !   线程模型: C API 直连, 每线程独立 mem/N_Vector/user_data
-! CLI: fac_batch_omp [ng≤32] [out.csv] [runtime.dat] [jfac列表] [dt列表]
+! CLI: fac_batch_omp [ng≤32] [out.csv] [runtime.dat] [jfac列表] [dt列表] [fmin] [fmax]
+!      缺省网格 fmin=0.3, 步长比 1.5 (与历史/哨兵一致);
+!      传 fmin/fmax 可在同范围内加密 (例: 13 点 0.3–7.7 → 步长比 1.31)
 !      例: fac_batch_omp 9 ../output/b.csv ../runtime_v3.dat 0.6,1.0 0,5
+!          fac_batch_omp 13 ../output/run_J/batch.csv ../runtime_v3.dat 1.0 0.0 0.3 7.69
 ! =====================================================================
 module batch_mod
-    use iso_c_binding, only: c_double
+    use iso_c_binding, only: c_double, c_int
     use oz_mech, only: ns, nr, nq, nj, mre, mpe, update_rates
     use runtime_dat_mod
     use chem_phys_mod, only: phys_tend, eval_met_dt, eval_J_jf, NPHYS
@@ -31,6 +41,8 @@ module batch_mod
     real(8) :: po3_cf(mpe*nr), phno3_cf(mpe*nr), ph2o2_cf(mpe*nr), pnoz_cf(mpe*nr)
     integer :: spO3 = 0, spHCHO = 0, spNO2 = 0, spH2O2 = 0, spHNO3 = 0, spNO = 0
     real(8) :: wn(ns) = 0.0d0
+    integer :: ic1_mask(ns) = 0, ic2_mask(ns) = 0 ! IC 扰动物种掩膜 (a9 = ic1spec:ic2spec)
+    logical :: ic_mode = .false.                  ! IC 扰动模式开关
     logical :: ndbg_once = .true.
     !$omp threadprivate(ndbg_once)
     real(8) :: peff_last(nr)               ! diag_indicators 最近一次 peff (IRR 累积源)
@@ -40,6 +52,9 @@ module batch_mod
     type, bind(C) :: runp_t
         real(c_double) :: fnox = 1.0d0, fvoc = 1.0d0, fco = 1.0d0, fch4 = 1.0d0
         real(c_double) :: jfac = 1.0d0, dts = 0.0d0
+        ! IC 扰动模式 (实验 J --ic): 两个 IC 组的缩放因子 (O3 等因变量不缩放)
+        real(c_double) :: ic1 = 1.0d0, ic2 = 1.0d0
+        integer(c_int) :: icmode = 0
     end type
 contains
     integer function spidx_(nm)
@@ -274,12 +289,64 @@ contains
         end do
     end subroutine batch_resid
 
+    ! ---------- IC 扰动模式 (实验 J --ic / EKMA-FNR): 精确物种对 ----------
+    !   a9 = "ic1spec:ic2spec"，每个 spec 为:
+    !     物种名    → 只缩放该物种的初值 (如 "NO2"、"HCHO")
+    !     NOX       → NO + NO2 两组 (NOx 总量语义)
+    !     VOC       → 活性 VOC 组 (HCHO/CH3CHO/ISOP/MVK/MACR/MGLY)
+    !   O3 永不缩放 (因变量); 未列物种保持基线。
+    subroutine ic_spec_mask(spec, msk)
+        character(len=*), intent(in) :: spec
+        integer, intent(out) :: msk(ns)
+        integer :: i, n
+        msk = 0
+        select case (trim(spec))
+        case ("NOX", "nox")
+            do i = 1, ns
+                if (trim(sp_name(i)) == "NO" .or. trim(sp_name(i)) == "NO2") msk(i) = 1
+            end do
+        case ("VOC", "voc")
+            do i = 1, ns
+                select case (trim(sp_name(i)))
+                case ("HCHO", "CH3CHO", "ISOP", "MVK", "MACR", "MGLY"); msk(i) = 1
+                end select
+            end do
+        case default
+            do i = 1, ns
+                if (trim(sp_name(i)) == trim(spec)) msk(i) = 1
+            end do
+            n = sum(msk)
+            if (n == 0) then
+                print '(3A)', "[FATAL] IC 扰动 spec 未匹配任何机制物种: '", trim(spec), "'"
+                error stop
+            end if
+        end select
+    end subroutine ic_spec_mask
+
+    subroutine apply_ic_scale(y, rp)
+        real(8), intent(inout) :: y(ns)
+        type(runp_t), intent(in) :: rp
+        integer :: k
+        if (rp%icmode /= 1) return
+        do k = 1, ns
+            if (ic1_mask(k) == 1) then
+                y(k) = y(k)*rp%ic1
+            else if (ic2_mask(k) == 1) then
+                y(k) = y(k)*rp%ic2
+            end if
+        end do
+    end subroutine apply_ic_scale
+
     ! 情景缩放 → esc 数组 (A2: 网格语义)
     function esc_of(rp) result(esc)
         type(runp_t), intent(in) :: rp
         real(8) :: esc(ns)
         integer :: k
         esc = 1.0d0
+        if (rp%icmode == 1) then
+            esc = 0.0d0          ! IC 扰动模式 = 纯初值化学 (经典 EKMA 约定)
+            return
+        end if
         do k = 1, ns
             if (grpnox(k) == 1) esc(k) = rp%fnox
             if (grpvoc(k) == 1) esc(k) = rp%fvoc
@@ -419,41 +486,97 @@ program fac_batch_omp
     use omp_lib
     implicit none
     procedure(cvrhs_proc) :: cv_rhs
-    integer :: ng, i, j, k, nsteps, u, uipr, u3, ier, cnt, cntpm, ijm, njf, ndt, it
-    character(len=256) :: a1, outf, rtfile, a4, a5
-    real(8) :: tstart, tend, fs(32), fjs(16), dts(16), TRET
+    integer :: ng, i, j, k, nsteps, nspin, u, uipr, u3, ust, ier, cnt, cntpm, ijm, njf, ndt, it, ip1
+    integer :: iw, isp, ir, ilen             ! 侧车写出循环变量 (勿复用 i —— 曾致 IRR 坐标全错)
+    character(len=256) :: a1, outf, rtfile, a4, a5, a8, a9, a10, a6, a7
+    character(len=16) :: numbuf                ! 单个数字的临时格式 (线程私有)
+    character(len=12000) :: bufi               ! IPR 行缓冲 (线程私有, 临界区外格式化)
+    character(len=4096) :: bufr                ! IRR 行缓冲
+    real(8) :: tstart, tend, fs(64), fjs(16), dts(16), TRET, fmin, fmax, gr
     type(c_ptr), target :: mem, ny, nat
     type(runp_t), target :: rp
     real(8), pointer :: yp(:), ap(:)
-    integer(c_long) :: nst
-    integer :: nfail = 0
+    integer(c_long) :: nst, nst_acc
+    integer :: nfail = 0, nwarn = 0
     real(8) :: o3max, hchomax, no2m, o3m, dsum(15), dg(15)
-    real(8) :: dpms(15), dgpm(15)
+    ! 状态空间 EKMA 用的一致统计量 (同一窗口内各物种/过程量各自均值)
+    real(8) :: hchom, no2pm, hchopm, hno3m, h2o2m, hno3pm, h2o2pm
+    real(8) :: dpms(15)
     real(8) :: ipracc(ns, 6)
     real(8) :: irracc(nr)
-    real(8) :: O3v, HCHOv, NO2v, hh
-    integer :: iO3v, iHCHOv, iNO2v
+    real(8) :: O3v, HCHOv, NO2v, HNO3v, H2O2v, hh
+    integer :: iO3v, iHCHOv, iNO2v, iHNO3v, iH2O2v
 
     call get_command_argument(1, a1); call get_command_argument(2, outf)
     call get_command_argument(3, rtfile); call get_command_argument(4, a4)
     call get_command_argument(5, a5)
+    call get_command_argument(6, a6); call get_command_argument(7, a7)
+    call get_command_argument(8, a8); call get_command_argument(9, a9)
+    call get_command_argument(10, a10)
     if (len_trim(a1) == 0) a1 = "9"
     if (len_trim(outf) == 0) outf = "../output/batch_v3.csv"
     if (len_trim(rtfile) == 0) rtfile = "../runtime_v3.dat"
     if (len_trim(a4) == 0) a4 = "1.0"
     if (len_trim(a5) == 0) a5 = "0.0"
     read (a1, *) ng
-    do i = 1, ng
-        fs(i) = 0.3d0*1.5d0**(i - 1)
-    end do
+    ! 网格几何: 缺省保持旧网格 fmin=0.3, 步长比 1.5 (哨兵/文档兼容);
+    ! 传第 6/7 参数可指定 f 范围, 加密同范围分辨率 (实验 J: 13 点覆盖 0.3–7.7)
+    fmin = 0.3d0
+    fmax = 0.3d0*1.5d0**(ng - 1)
+    if (len_trim(a6) > 0) read (a6, *) fmin
+    if (len_trim(a7) > 0) read (a7, *) fmax
+    if (ng > size(fs)) then
+        print '(A,I0,A,I0,A)', "[FATAL] ng=", ng, " 超过网格数组上限 ", size(fs)
+        error stop
+    end if
+    if (trim(a10) == "LIN" .or. trim(a10) == "lin") then
+        ! 线性网格: f = fmin + (fmax-fmin)*(i-1)/(ng-1)
+        ! EKMA 正交扰动实验用 (0%→200% 以 5% 等距 ⇒ f=1.00→3.00, 41 点)
+        do i = 1, ng
+            fs(i) = fmin
+            if (ng > 1) fs(i) = fmin + (fmax - fmin)*dble(i - 1)/dble(ng - 1)
+            if (fs(i) <= 0.0d0) then
+                print '(A,F9.4,A)', "[FATAL] 线性网格出现非正因子 ", fs(i), " (fmin 必须 > 0)"
+                error stop
+            end if
+        end do
+    else
+        gr = 1.0d0
+        if (ng > 1) gr = (fmax/fmin)**(1.0d0/(ng - 1))
+        do i = 1, ng
+            fs(i) = fmin*gr**(i - 1)
+        end do
+    end if
     njf = split_list(a4, fjs)
     ndt = split_list(a5, dts)
+    ! 第 8 参 = 模式 (EMIS 缺省 | IC); 第 9 参 = IC 第二组 (1=VOC 2=ISOP 3=CO 4=CH4)
+    ic_mode = (trim(a8) == "IC" .or. trim(a8) == "ic")   ! a9 = "ic1spec:ic2spec"
 
     call read_runtime(trim(rtfile))
     call batch_init("gen_v3")
     call batch_budget_init()
+    if (ic_mode) then
+        ip1 = index(a9, ":")
+        if (ip1 == 0) then
+            print '(A)', "[FATAL] IC 模式第 9 参须为 'ic1spec:ic2spec' (如 NO2:HCHO / NOX:VOC)"
+            error stop
+        end if
+        call ic_spec_mask(a9(1:ip1-1), ic1_mask)
+        call ic_spec_mask(a9(ip1+1:), ic2_mask)
+        tau_mix = 1.0d30        ! IC 模式关闭 BC 张弛 (纯初值化学)
+        print '(5A,I0,A,I0,A)', "  [IC 模式] 缩放 ", trim(a9(1:ip1-1)), " × ", &
+            trim(a9(ip1+1:)), "; 排放关闭; BC 张弛关闭; 网格 ", ng, "×", ng
+    end if
     iO3v = spO3; iHCHOv = spHCHO; iNO2v = spNO2
+    iHNO3v = spHNO3; iH2O2v = spH2O2
     nsteps = nint(days*86400.0d0/dtout)
+    nspin = nint(spinup_cfg*86400.0d0/dtout)
+    if (nsteps - nspin < 24) then
+        print '(A,F5.2,A,F5.2,A)', "FAC-BATCH FATAL: post-spinup only ", &
+            (nsteps - nspin)*dtout/86400.0d0, " d (SPINUP=", spinup_cfg, &
+            " d), need >= 24 output steps for the 24-step aggregate"
+        stop 1
+    end if
     call diag_selfcheck()
 
     call cpu_time(tstart)
@@ -475,23 +598,38 @@ program fac_batch_omp
         end do
     end do
     write (uipr, *)
+    ! 状态空间 EKMA 侧车 (实验 J): 与主 CSV 同案例顺序, 每案例一行一致统计量。
+    ! 通用状态表: 物种均值 ppb + 过程量均值 molec/cm3/s, 全窗与 12–18h 双口径,
+    ! 供 --axes 任意拆分子分母构造响应面 (S2–S5)。
+    open (newunit=ust, file=trim(outf)//"_state.csv", status="replace")
+    write (ust, '(A)') "fnox,fvoc,jfac,dt,"// &
+        "NO2mean_ppb,HCHOmean_ppb,HNO3mean_ppb,H2O2mean_ppb,"// &
+        "NO2mean_pm_ppb,HCHOmean_pm_ppb,HNO3mean_pm_ppb,H2O2mean_pm_ppb,"// &
+        "Q,L_NOx,P_H2O2,P_HNO3,P_O3,P_NOz,"// &
+        "Q_pm,L_NOx_pm,P_H2O2_pm,P_HNO3_pm,P_O3_pm,P_NOz_pm,"// &
+        "O3max_ppb,O3mean_ppb,nst"
 
     !$omp parallel do private(ijm, i, j, k, it, mem, ny, nat, rp, yp, ap, TRET, nst, &
-    !$omp& ier, cnt, cntpm, o3max, o3m, hchomax, no2m, dsum, dpms, dg, dgpm, &
-    !$omp& ipracc, irracc, O3v, HCHOv, NO2v, hh) &
-    !$omp& reduction(+:nfail) schedule(dynamic) collapse(2)
+    !$omp& nst_acc, bufi, bufr, numbuf, ilen, iw, isp, ir, &
+    !$omp& ier, cnt, cntpm, o3max, o3m, hchomax, hchom, no2m, no2pm, hchopm, &
+    !$omp& hno3m, h2o2m, hno3pm, h2o2pm, dsum, dpms, dg, &
+    !$omp& ipracc, irracc, O3v, HCHOv, NO2v, HNO3v, H2O2v, hh) &
+    !$omp& reduction(+:nfail, nwarn) schedule(dynamic) collapse(2)
     do it = 1, njf*ndt
     do ijm = 1, ng*ng
         i = (ijm - 1)/ng + 1
         j = mod(ijm - 1, ng) + 1
         rp%fnox = fs(i); rp%fvoc = fs(j)
         rp%fco = 1.0d0; rp%fch4 = 1.0d0
+        rp%ic1 = fs(i); rp%ic2 = fs(j)
+        rp%icmode = merge(1_c_int, 0_c_int, ic_mode)
         rp%jfac = fjs((it - 1)/ndt + 1); rp%dts = dts(mod(it - 1, ndt) + 1)
         ny = c_nvnew(int(ns, c_long))
         nat = c_nvnew(int(ns, c_long))
         call c_f_pointer(c_nvgetarr(ny), yp, [ns])
         call c_f_pointer(c_nvgetarr(nat), ap, [ns])
         yp = y0
+        call apply_ic_scale(yp, rp)
         ap = atol_cfg
         call tune_atol_(ap)
         mem = c_cvcreate(CV_BDF, CV_NEWTON)
@@ -501,7 +639,10 @@ program fac_batch_omp
         ier = c_cvsetmaxsteps(mem, 200000_c_long)
         ier = c_cvsetmaxstep(mem, 100.0d0)
         ier = c_cvsetud(mem, c_loc(rp))
+        nst_acc = 0_c_long
         o3max = 0.0d0; o3m = 0.0d0; hchomax = 0.0d0; no2m = 0.0d0
+        hchom = 0.0d0; no2pm = 0.0d0; hchopm = 0.0d0
+        hno3m = 0.0d0; h2o2m = 0.0d0; hno3pm = 0.0d0; h2o2pm = 0.0d0
         dsum = 0.0d0; dpms = 0.0d0
         ipracc = 0.0d0
         irracc = 0.0d0
@@ -509,29 +650,77 @@ program fac_batch_omp
         do k = 1, nsteps
             ier = c_cvode(mem, dble(k)*dtout, ny, TRET, CV_NORMAL)
             if (ier /= 0) then
-                nfail = nfail + 1
-                exit
+                ! 韧性重启 (与 fac_v3 同策略): 同容差 + MAX_STEP 10 s,
+                ! 从当前状态重新初始化; 极端角点 (低 NOx 高 VOC) 收敛失败可救回
+                ier = c_cvgetnumsteps(mem, nst)
+                nst_acc = nst_acc + nst
+                call c_cvfree(c_loc(mem))
+                mem = c_cvcreate(CV_BDF, CV_NEWTON)
+                ier = c_cvinit(mem, c_funloc(cv_rhs), max(TRET, 0.0d0), ny)
+                ier = c_cvsvtol(mem, rtol_cfg, nat)
+                ier = c_cvdense(mem, int(ns, c_long))
+                ier = c_cvsetmaxsteps(mem, 200000_c_long)
+                ier = c_cvsetmaxstep(mem, 10.0d0)
+                ier = c_cvsetud(mem, c_loc(rp))
+                ier = c_cvode(mem, max(dble(k)*dtout, TRET + 1.0d0), ny, TRET, CV_NORMAL)
+                if (ier /= 0) then
+                    ! 已积累统计的案例: 降级为警告 (极端角点收敛失败, 行仍写出)
+                    if (cnt > 0) then
+                        ! 已有统计的失败: 行仍写出但窗口不完整 → 计入降级, 供调用方记录
+                        nwarn = nwarn + 1
+                        !$omp critical (warn_print)
+                        print '(2(A,F7.3),A,I0,A)', "  [警告] 案例 fnox=", rp%fnox, &
+                            " fvoc=", rp%fvoc, " 在 t=", k, " 步收敛失败 (保留已积累统计)"
+                        !$omp end critical (warn_print)
+                    else
+                        nfail = nfail + 1
+                    end if
+                    exit
+                end if
             end if
             if (k > nsteps - 24) then
                 O3v = yp(iO3v)/2.46d10; HCHOv = yp(iHCHOv)/2.46d10; NO2v = yp(iNO2v)/2.46d10
+                HNO3v = yp(iHNO3v)/2.46d10; H2O2v = yp(iH2O2v)/2.46d10
                 o3max = max(o3max, O3v); o3m = o3m + O3v
                 hchomax = max(hchomax, HCHOv); no2m = no2m + NO2v
+                hchom = hchom + HCHOv
+                hno3m = hno3m + HNO3v; h2o2m = h2o2m + H2O2v
                 call diag_indicators(dble(k)*dtout, yp, rp, dg, ipracc, .false.)
                 dsum = dsum + dg
                 irracc(1:nr) = irracc(1:nr) + peff_last(1:nr)
                 cnt = cnt + 1
                 hh = mod(dble(k)*dtout, 86400.0d0)/3600.0d0
                 if (hh >= 12.0d0 .and. hh <= 18.0d0) then
-                    call diag_indicators(dble(k)*dtout, yp, rp, dgpm, ipracc, .false., .false.)
-                    dpms = dpms + dgpm
+                    ! 同一状态: 午后口径的诊断量与全窗完全相同 → 复用 dg, 不再二次算速率
+                    dpms = dpms + dg
+                    no2pm = no2pm + NO2v; hchopm = hchopm + HCHOv
+                    hno3pm = hno3pm + HNO3v; h2o2pm = h2o2pm + H2O2v
                     cntpm = cntpm + 1
                 end if
             end if
         end do
         ier = c_cvgetnumsteps(mem, nst)
+        nst = nst_acc + nst
         call c_cvfree(c_loc(mem))
         call c_nvdestroy(ny); call c_nvdestroy(nat)
         if (cnt > 0) then
+            ! 侧车行在线程内格式化（临界区外），临界区只做整行写 —— 降低写盘串行化
+            write (bufi, '(3(F6.3, ","), F6.1)') fs(i), fs(j), rp%jfac, rp%dts
+            ilen = len_trim(bufi)
+            do isp = 1, ns
+                do iw = 1, 6
+                    write (numbuf, '(ES15.5E3)') ipracc(isp, iw)/cnt
+                    bufi(ilen + 1:ilen + 1 + len_trim(numbuf)) = ","//trim(numbuf)
+                    ilen = ilen + 1 + len_trim(numbuf)
+                end do
+            end do
+            write (bufr, '(3(F6.3, ","), F6.1)') fs(i), fs(j), rp%jfac, rp%dts
+            ilen = len_trim(bufr)
+            do ir = 1, nr
+                write (numbuf, '(ES15.5E3)') irracc(ir)/cnt
+                bufr(ilen + 1:ilen + 1 + len_trim(numbuf)) = ","//trim(numbuf)
+                ilen = ilen + 1 + len_trim(numbuf)
+            end do
             !$omp critical (csv_write)
             write (u, '(4(F6.3, ","), 4(F7.2, ","), 9(F7.3, ","), 6(F8.3, ","), I0)') &
                 fs(i), fs(j), rp%jfac, rp%dts, &
@@ -541,29 +730,30 @@ program fac_batch_omp
                 rat0(dsum(14), dsum(15)), rat0(dsum(11), dsum(12)), &
                 dpms(6)/max(cntpm, 1), dpms(1)/max(cntpm, 1), dpms(2)/max(cntpm, 1), &
                 dpms(3)/max(cntpm, 1), dpms(4)/max(cntpm, 1), dpms(5)/max(cntpm, 1), nst
-            write (uipr, '(3(F6.3, ","), F6.1)', advance="no") &
-                fs(i), fs(j), rp%jfac, rp%dts
-            do k = 1, ns
-                do i = 1, 6
-                    write (uipr, '(",", es15.5e3)', advance="no") ipracc(k, i)/cnt
-                end do
-            end do
-            write (uipr, *)
-            write (u3, '(3(F6.3, ","), F6.1)', advance="no") &
-                fs(i), fs(j), rp%jfac, rp%dts
-            do k = 1, nr
-                write (u3, '(",", es15.5e3)', advance="no") irracc(k)/cnt
-            end do
-            write (u3, *)
+            write (ust, '(4(F6.3, ","), 8(F9.4, ","), 6(ES15.5E3, ","), ' // &
+                '6(ES15.5E3, ","), 2(F9.4, ","), I0)') &
+                fs(i), fs(j), rp%jfac, rp%dts, &
+                no2m/cnt, hchom/cnt, hno3m/cnt, h2o2m/cnt, &
+                no2pm/max(cntpm, 1), hchopm/max(cntpm, 1), &
+                hno3pm/max(cntpm, 1), h2o2pm/max(cntpm, 1), &
+                dsum(10)/cnt, dsum(13)/cnt, dsum(14)/cnt, dsum(15)/cnt, &
+                dsum(11)/cnt, dsum(12)/cnt, &
+                dpms(10)/max(cntpm, 1), dpms(13)/max(cntpm, 1), &
+                dpms(14)/max(cntpm, 1), dpms(15)/max(cntpm, 1), &
+                dpms(11)/max(cntpm, 1), dpms(12)/max(cntpm, 1), &
+                o3max, o3m/cnt, nst
+            write (uipr, '(A)') trim(bufi)
+            write (u3, '(A)') trim(bufr)
             !$omp end critical (csv_write)
         end if
     end do
     end do
     !$omp end parallel do
-    close (u); close (uipr); close (u3)
+    close (u); close (uipr); close (u3); close (ust)
     call cpu_time(tend)
-    print '(A,I0,A,I0,A,F6.2,A,I0,A)', "FAC-BATCH-OMP ok (", ng*ng*njf*ndt, &
-        " 案例, 失败 ", nfail, ", ", tend - tstart, " s, 线程 ", omp_get_max_threads(), ")"
+    print '(A,I0,A,I0,A,I0,A,F10.2,A,I0,A)', "FAC-BATCH-OMP ok (", ng*ng*njf*ndt, &
+        " 案例, 失败 ", nfail, ", 降级 ", nwarn, ", ", tend - tstart, &
+        " CPU s, 线程 ", omp_get_max_threads(), ")"
     ! R11-P2: 部分格点求解失败必须让调用方 (make/CI/脚本) 看见
     if (nfail > 0) then
         print '(A,I0,A)', "[FATAL] ", nfail, " 个案例求解失败 (非全流程错误, 但结果不完整)"

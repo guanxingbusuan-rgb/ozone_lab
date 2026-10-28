@@ -9,7 +9,7 @@
 
 | 文件 | 行数~ | 定位 | 调用方 |
 |---|---|---|---|
-| `cfgbuild.py` | 500 | **配置编译器**：12 类 config + constraints → `runtime_v3.dat` | `make runtime_v3.dat`、`experiments/run/_lib.py`（F/H/M 实验变体）、`make run DAYS=` |
+| `cfgbuild.py` | 500 | **配置编译器**：12 类 config + constraints → `runtime_v3.dat` | `make runtime_v3.dat`、`experiments/run/_runner.py`（F/H/M 实验变体）、`make run DAYS=` |
 | `sat2surf.py` | 300 | **卫星柱 → 地表 ppb 转换器**（离线工具） | 手动运行；`FT-SAT` 测试 |
 
 ## 2. `cfgbuild.py` —— 配置编译器（数据链的核心枢纽）
