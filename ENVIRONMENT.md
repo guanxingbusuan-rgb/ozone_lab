@@ -104,15 +104,22 @@ bash check_env.sh     # 13 项：Python/包、编译器、二进制与动态链�
 `jslot_audit.py` 的 `photolysis.config` 来源顺序：`configs/`（已退役）→
 `CASE-analysis/config_override/` → `EKMA-emission/config_override/`。
 
+**运行期在线门（非静态审计）**：`fac_batch_omp` 每案例首个 RHS 快照检一次
+`|Σ w_N·dy/dt| ≤ 1e-4·max(L1,1)`，违例计数与求解失败计数一样 → **`stop 1`**，
+两个 EKMA 的 `run.py` 据此拒出表；当前三个存档实测均为 0 违例。
+
 ---
 
 ## 7. 输入数据硬约束（`cfgbuild.py` 编译期强制）
 
-1. 序列格式：`t[s] 值` 两列、时间严格递增、单序列 **≤128 点**；气象 + BC 共享 **8 条**序列池；
+1. 序列格式：`t[s] 值` 两列、时间严格递增、单序列 **≤128 点**；气象 + BC 共享 **40 条**序列池（NSER_MAX，容纳 26 物种同化约束）；
 2. 气象序列**禁止** `# unit:` 指令行（浓度换算因子会放大 2.46e10 倍）；
-3. 温度用 K；RH 0–100；BLH 必须 >0；IC 单位仅 `cm3|ppb|ppm`；
+3. 温度用 K；RH 0–100；**BLH 必须 >0（常数与 `file:` 序列同口径校验）**；IC 单位仅 `cm3|ppb|ppm`；
 4. `model.parameters`：天数 >0、输出步长 >0、RTOL/ATOL >0、`0 ≤ SPINUP < 天数`；
 5. 排放单位：`molec/cm3/s` 或 `ppb/h`（`# unit:` 行声明，缺省 molec/cm3/s）。
+
+输出侧的两条口径（`h` 列 = 输出步序号；`fac_v3` 账本=窗口积分 / `fac_batch_omp` 侧车=平均倾向，
+差 dtout 倍）写在根 [README.md](README.md) §6 数据契约里，跨程序比对前先看它。
 
 ---
 
@@ -120,9 +127,16 @@ bash check_env.sh     # 13 项：Python/包、编译器、二进制与动态链�
 
 | 程序 | 口径 | 参考值 |
 |---|---|---|
-| CASE-analysis | 5 天 / spinup 2 / SCEN_BAU | `nst≈4894`，O₃max ≈ 100.7 ppb，六账 111 物种 × 73 步 |
-| EKMA-FNR | 1 天 / 排放关闭 / 0–400% 归档 | O₃max 22.4–39.1 ppb |
-| EKMA-emission | 5 天 / 归档 0–400% | O₃max 37.2–229.5 ppb |
+| CASE-analysis | 4 天 / spinup 3 / SCEN_BAU / 26 物种同化 / `--per-species` | `nst≈4454`，O₃max ≈ 149.5 ppb，六账 111 物种 × 25 步，RIR 有效窗 **4–18 时**，36 次模拟 / 212.7 s（不含 `--per-species` 的一轮 ≈ 45 s） |
+| EKMA-FNR | 1 天 / 排放关闭 / SPINUP 0；**存档 = 默认 11×11 = 121 案例**（0–1000%/100%） | O₃max 34.14–119.21 ppb，失败/降级/氮守恒违例 0-0-0，墙钟 64.7 s |
+| EKMA-emission | 4 天 / SPINUP 3；**存档 = 默认 26×26 = 676 案例**（0–625%/25%，线性网格） | O₃max 15.26–281.41 ppb，基线点 77.12，失败/降级/氮守恒违例 0-0-0；耗时随负载波动（899 s / 1458 s 两轮同参数） |
+
+> 各轮的时间/网格/失败·降级·氮守恒计数以 `output/run_meta.txt` 为准。
+> 2026-10-30 重跑对照（三程序全量）：CASE 的 `case_{conc,ipr,irr}.csv` 与 `runtime_case.dat`
+> **与原存档逐字节相同**（`nst=4454 / O3max=149.49`）；FNR 归档回到 121 例、基线点 34.14；
+> emission 676 例数据行逐位不变（`ridge/derived` 连字节都一致）→ 二进制打印串改动、
+> `run.py` 捕获逻辑与逐案例守恒检查均为**数值中性**；守恒门另在 `/tmp` 沙箱用故意改错的
+> `noy_add` 权重做过负向验证（9/9 案例触发 → `[FATAL]` + `stop 1` + `run.py` rc=1 拒出表）。
 
 差异超过 ~10% 时先查机制/工具链版本与 `config_override/` 是否被改动。
 

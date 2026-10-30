@@ -80,7 +80,7 @@ NOx–O₃–HOx–ROx 三大循环 + 生物源/人为 VOC 降解 + 夜间化学
 | MCM 对照 | **48 条可比对，最大偏差 8.9%**（32 无机 + 16 集总映射；34 条产物一致者 0.0%） |
 | 生成码 | `facsimile_impl/gen_v3/oz_mech.f90` + `oz.reac/oz.prod` 计量表 |
 | 承载路线 | `fac_v3`（单箱深度）+ `fac_batch_omp`（批量广度），共享同一生成码 |
-| 冻结规则 | 任何机制设计变更 = 开启 V2.6；日常实验只改 `configs/`，不改 `.fac` |
+| 冻结规则 | 任何机制设计变更 = 开启 V2.6；日常实验只改各程序的 `config_override/`，不改 `.fac` |
 
 ### 2.1 扩物种必须同步的 8 处
 
@@ -90,23 +90,23 @@ NOx–O₃–HOx–ROx 三大循环 + 生物源/人为 VOC 降解 + 夜间化学
 | # | 位置 | 做什么 | 漏掉的后果 | 当前状态 |
 |---|---|---|---|---|
 | 1 | `mechanism/*.fac` | `VARIABLE` 加物种、`FORMULA` 加分子式、写反应 | 编译失败或 ns 错位 | ✓ 111/203 |
-| 2 | `configs/emissions.config` | 若有**一次排放**，加基线+日型 | **新物种恒为 0**，链条空转 | ✓ 25 物种 |
-| 3 | `configs/drydep.config` | 若无**气相化学汇**，必须给 vd | **无界累积**（死端） | ✓ 已配 |
+| 2 | `<程序>/config_override/emissions.config` | 若有**一次排放**，加基线+日型 | **新物种恒为 0**，链条空转 | ✓ 25 物种 |
+| 3 | `<程序>/config_override/drydep.config` | 若无**气相化学汇**，必须给 vd | **无界累积**（死端） | ✓ 已配 |
 | 4 | `modules/runtime_dat_mod.f90` `build_groups()` | 若属 NOx/VOC/CO/CH₄ 排放组 | 情景缩放不生效（HVOC 白做） | ✓ 已配 |
-| 5 | `facsimile_impl/fac_batch_omp.f90` `noy_add()` | 若含氮（NOy 家族） | 氮守恒不变量算错、NOy 指标偏低 | ✓ 25 物种 |
+| 5 | `facsimile_impl/fac_batch_omp.f90` `noy_add()` | 若含氮（NOy 家族） | 批量路线**逐案例守恒门直接 `stop 1`**；单箱路线 NOy 指标偏低 | ✓ 25 物种 |
 | 6 | `modules/chem_phys_mod.f90` `tune_atol_by_name()` | 若浓度 >1e9（约 40 ppb） | 步数爆炸（精度过剩） | ✓ 已配 |
-| 7 | `tests/functional_test.py` `SENT` | 机制改动必然改变金值 | 测试红（或更糟：假绿） | ✓ 4 值 |
-| 8 | 文档与模板表 | `SPECIES_INPUT_MATRIX` / README 计数 | 文档与实际不符 | ✓ 111 行 |
+| 7 | 参考基线（`ENVIRONMENT.md` §8） | 机制改动必然移动输出量级 | **无数值哨兵**（`tests/` 已退役）——漂移无人告知 | ✓ 3 程序实测 |
+| 8 | 文档计数 | 本 README + `ENVIRONMENT.md` 的物种/反应计数 | 文档与实际不符 | ✓ 111/203 |
 
 **补正记录**：8 处清单之外还有一类易漏项——“稳定产物缺物理汇”。
-`drydep.config` 曾漏配 GLY/CH3OOH/ALKOOH/PNA 四个稳定二次产物（矩阵均标 DRY ✓），
-实测导致 GLY 高估 32%、ALKOOH 49%。已补齐，并由 `FT-CFGSPEC` 守卫检查
-“只产不耗且无干沉/湿沉/排放”的死端物种。
+`drydep.config` 曾漏配 GLY/CH3OOH/ALKOOH/PNA 四个稳定二次产物，
+实测导致 GLY 高估 32%、ALKOOH 49%。已补齐；死端物种由下面的脚本手工筛查
+（无数值守卫，扩物种后建议跑一次）。
 
 **两个不需要改的地方**：
 - `analysis_lib/indicators.py` 的 NOy 定义**自动**从 FORMULA 段读含 N 物种
   （当前识别 25 个，与 batch 硬编码表逐项一致）——单一事实源的收益。
-- `configs/initialConcentrations.config` 与 `bc.config` **不需要**加新物种：
+- `config_override/initialConcentrations.config` 与 `bc.config` **不需要**加新物种：
   二次产物从 0 起步是正确的；背景空气里不该有这些一次 VOC 的边界浓度。
 
 **自动检测死端的脚本**（扩物种后建议跑一次）：
@@ -120,9 +120,9 @@ gen = "facsimile_impl/gen_v3"
 lost = set()
 for row in open(gen + "/oz.reac"):
     lost |= {int(x) for x in row.split()[1:]}
-em = {sp.index(l.split()[0]) + 1 for l in open("configs/emissions.config")
+em = {sp.index(l.split()[0]) + 1 for l in open("CASE-analysis/config_override/emissions.config")
       if l.split("#")[0].split() and l.split()[0] in sp}
-dry = {sp.index(l.split()[0]) + 1 for l in open("configs/drydep.config")
+dry = {sp.index(l.split()[0]) + 1 for l in open("CASE-analysis/config_override/drydep.config")
        if len(l.split("#")[0].split()) >= 3 and l.split()[2] == "on"
        and l.split()[0] in sp}
 dead = [sp[i-1] for i in range(1, len(sp)+1) if i not in lost and i not in em and i not in dry]
@@ -161,7 +161,7 @@ V2.5+ 共 **203 条反应**，按化学链分为 10 条主链 + 7 个扩展段�
 
 ## 4. 物种全表
 
-**111 个演化物种**（`VARIABLE` 段，顺序即 Fortran 索引 1–111；`runtime_v3.dat` 的 SPECIES 行同序）。
+**111 个演化物种**（`VARIABLE` 段，顺序即 Fortran 索引 1–111；`runtime_*.dat` 的 SPECIES 行同序）。
 **过氧自由基池**（`.fac` 的 `RO2 =` 声明）：`CH3O2 CH3CO3 ISOPBO2 ISOPNO3 MVKO2 MACRO2`。
 
 > 分子式来自 `.fac` 的 `FORMULA` 段（元素审计与 NOy 自动判定的单一事实源）。
@@ -699,7 +699,13 @@ Cl + CH₄/HCHO → HCl + … ;  HCl + OH → Cl              再生
 ## 6. 光解方案
 
 **机制共 26 条光解反应、占用 25 个不同槽位（最高槽号 J45）**，参数来自
-`configs/photolysis-rates_MCM`（MCM 官方表，18 槽）或 `photolysis.config` 的 JMAP 直达值（7 槽）。
+`<程序>/config_override/photolysis-rates_MCM`（MCM 官方表，18 槽）或 `photolysis.config` 的 JMAP 直达值（7 槽）。
+
+> ⚠ **`.fac` 头部第 15 行的注释**（"JMAP 仅用于表内缺失的卤素槽 25-29"）与实际不符：
+> JMAP 实为 **7 槽 = 25/26/27/28/29/30/45**（含非卤素的 N₂O₅@30 与 ClO@45）。
+> 该行属机制文件内的注释，**不改**——`.fac` 的 md5 被写进每个程序的 `run_meta.txt`
+> 作为跨轮次同一性凭据，动一个注释字符就会让现存存档的 md5 全部对不上。
+> 本表与 `jslot_audit.py` 的不变量④才是权威口径（它逐行核对 README 与 `.fac` 的光解表）。
 
 | 槽位 | 反应 | l [s⁻¹] | m | n | 参数来源 |
 |---|---|---|---|---|---|
@@ -751,7 +757,7 @@ J     = JFAC · l · cosχ^m · exp(−n/cosχ)   [s⁻¹]         (cosχ ≤ 1e
 > ⚠ **新增光解反应前必须查 `mechanism/reference/` 官方导出中该槽位的分子归属**——
 > 槽号是 MCM 官方命名空间里的"外键"，借用错槽 = 借用了别的分子的 l/m/n
 > （V2.5 曾因此迁移 7 处）。该维度已由 `mechanism/audit/jslot_audit.py` 自动断言
-> （`make jcheck`，含在 `make test` 内）：机制每个 `J<n>` 的反应物经集总映射后必须
+> （`make jcheck`）：机制每个 `J<n>` 的反应物经集总映射后必须
 > ⊆ MCM 官方该槽分子集合，MCM 无基准的槽必须落在脚本的 `CUSTOM` 白名单且配 JMAP
 > `D<正午值>`。注意 `mcm_compare.py` 是热反应专用，对错位无感——别指望它兜底。
 
@@ -821,7 +827,7 @@ KMT11（OH+HNO₃，K1+K2 双通道）、KFPAN/KBPAN（PAN 生成/热解）。
   - CO₂、H₂ **只许出现在产物侧**（不允许"用 CO₂ 当反应物配平"）
   - O₂ 反应物侧 ≤ 2.5 分子（防止用过量 O₂ 掩盖真实错误）
 - 需求出现负值或非整数/半整数 → FAIL
-- 退出码 0=全过 / 1=有失败（已接入 `make test`）
+- 退出码 0=全过 / 1=有失败
 
 ### 8.2 为什么方向限定这么重要
 
@@ -942,7 +948,7 @@ RADM2 (63sp) ── CB6R3 (82sp) ── MOZART-4 (85sp) ── 本机制 (111sp)
 
 ⚠ **ppb 换算因子固定 1 atm / 298.15 K（2.46e10）**——非标准 T/P 下模型内实际
 混合比有 ~1.1%/5 K 偏差（MCM/AtChem2 同款约定，化学一致性不受影响，仅"ppb 标签"为近似）。
-完整单位手册见 [`../docs/UNITS.md`](../docs/UNITS.md)。
+完整单位与格式硬约束见 [`../ENVIRONMENT.md`](../ENVIRONMENT.md) §7。
 
 ---
 
@@ -959,18 +965,20 @@ python3 mechanism/audit/element_audit.py mechanism/mechanism_3_full_chain.fac
 #    → 期望 "全部 N 反应元素守恒 PASS"
 
 # ③ 若改了物种：补配置（IC/排放/沉降/组映射）
-#    - configs/initialConcentrations.config（可选）
-#    - configs/emissions.config（若该物种有排放）
-#    - configs/drydep.config（若需要沉降汇，尤其：无气相汇的产物）
+#    - <程序>/config_override/initialConcentrations.config（可选）
+#    - <程序>/config_override/emissions.config（若该物种有排放）
+#    - <程序>/config_override/drydep.config（若需要沉降汇，尤其：无气相汇的产物）
 #    - modules/runtime_dat_mod.f90 的 build_groups（若参与情景缩放）
 #    - 若带 N：facsimile_impl/fac_batch_omp.f90 的 noy_add（氮守恒不变量会抓）
 
 # ④ 重编译机制 + 刷新配置
-make v3                    # mechc 重生成 gen_v3 + gfortran
-make runtime_v3.dat        # cfgbuild 刷新 SPECIES/BC/EMIS/DRY 段
+make all                     # mechc 重生成 gen_v3 + gfortran 两个二进制
+                             # runtime 由各程序 run.py 每轮自动 cfgbuild 刷新
 
-# ⑤ 回归（哨兵会拦截数值漂移）
-make test                  # FT0 双守卫 + 10 项功能测试 + 审计 + 诊断表
+# ⑤ 回归（当前无数值哨兵：tests/ 已退役，靠人工比对）
+make mcmcheck && make jcheck # 两道静态审计
+python3 mechanism/audit/element_audit.py mechanism/mechanism_3_full_chain.fac
+#    机制改动必然移动输出量级 → 与 ENVIRONMENT.md §8 参考基线逐项人工比对
 ```
 
 ### 12.2 新增一条反应的最小清单
@@ -980,8 +988,8 @@ make test                  # FT0 双守卫 + 10 项功能测试 + 审计 + 诊�
 | 在正确的段（①-⑩）加 `% <速率> : 反应物 = 产物 ;` | 段内顺序即 Fortran 反应号 |
 | 速率用命名速率（`KNAME = ...` 在速率区） | 不要写行内 `!` 注释 |
 | 元素审计 PASS | 分数系数须精确到 1/4 精度（0.145 会差 0.005） |
-| `make v3` + `make runtime_v3.dat` | FT0 会断言 nr 一致 |
-| `make test` | 哨兵可能需重标定（±10–15%） |
+| `make all` 重生成 gen_v3 | 生成码里的 `nr/ns` 必须与新 `.fac` 一致（无自动断言，人工 `grep ":: ns"` 核对） |
+| 跑一轮 CASE-analysis | 输出量级与 ENVIRONMENT.md §8 参考基线比对（**机制改动必然移动基线**） |
 | 更新本文档 §3/§5 | 文档-代码一致性 |
 
 ### 12.3 常见陷阱（全部实踩）
@@ -992,9 +1000,9 @@ make test                  # FT0 双守卫 + 10 项功能测试 + 审计 + 诊�
 | 分支用产物系数缩放 | 两通道总速率超物理 k | 用 `0.85*K` 速率缩放 |
 | 储库产物无沉降汇 | 5 天无界累积（OLEOOH 曾 +66%） | drydep.config 加行 + 刷新 runtime |
 | 新排放物种未进 build_groups | 情景缩放对它无效 | build_groups 加一行；**它是唯一组映射源，禁止在 scen_build/scen5 等处复制第二份清单**（R10-P0 教训：复制导致 6 物种漏缩） |
-| 新含 N 物种未进 noy_add | 运行期氮守恒不变量 FAIL | 加一行（权重按 N 原子数） |
-| 改了 .fac 未重编 | 跑的是旧生成码（FT0 会拦） | `make v3` |
-| 改了 drydep/排放未刷 runtime | 汇/排放不生效 | `make runtime_v3.dat` |
+| 新含 N 物种未进 noy_add | 批量路线**直接 `stop 1`**（氮守恒不变量已升级为致命门，逐案例首快照检），单箱路线 NOy 指标偏低 | 加一行（权重按 N 原子数） |
+| 改了 .fac 未重编 | 跑的是旧生成码 | `make all`（生成码与二进制一起重建） |
+| 改了 drydep/排放未生效 | 汇/排放不生效 | 重跑 `run.py`（每轮自动 cfgbuild） |
 | 反应物物种名写进速率表达式 | 浓度被乘两次 | 只写 H2O/O2/M 等环境项 |
 | **配置项存在但无消费者** | 写了却静默无效果（R16: MODE=DIRECT 曾是死开关、RADIAT 无消费者） | 每个 runtime.dat 字段必须有读取点；否则实现它/删除它/显式警告，**不允许静默存在** |
 | **乘子型参数在两条路径重复施加** | 默认值=1 时完全无害, 非 1 时静默偏离 (R11: batch jfac 被 `eval_J_jf` 与 `eval_J` 各乘一次, 差 8%) | 用**等价路径断言**守着: 两种设法的结果必须相同 |
@@ -1002,18 +1010,15 @@ make test                  # FT0 双守卫 + 10 项功能测试 + 审计 + 诊�
 ### 12.4 快速自检命令
 
 ```bash
-# 物种/反应/命名速率计数
-grep -c "^%" mechanism/mechanism_3_full_chain.fac          # → 203
-awk '/^VARIABLE/,/^FORMULA/' mechanism/mechanism_3_full_chain.fac | tr ' ' '
-' | grep -c "^[A-Z]"   # → 111
+# 物种/反应计数
+grep -c "^%" mechanism/mechanism_3_full_chain.fac                 # → 203
+awk '/^VARIABLE/{f=1;next} /^[[:space:]]*;/{f=0} f' mechanism/mechanism_3_full_chain.fac \
+  | tr -s ' \t' '\n' | grep -c '^[A-Za-z][A-Za-z0-9_]*$'            # → 111
 
-# 生成码与机制一致性（FT0 同款）
-grep ":: ns" facsimile_impl/gen_v3/oz_mech.f90             # → ns=111, nr=203
+# 生成码与机制一致性
+grep ":: ns" facsimile_impl/gen_v3/oz_mech.f90                    # → ns=111, nr=203
 
-# 死端扫描（只产不耗/只耗不产）
-python3 - <<'EOF'
-# 见 docs/OPERATIONS_MANUAL §D；或直接看 IPR 沉降账是否为 0
-EOF
+# 死端扫描（只产不耗 / 无排放无干沉）: 跑本文 §2.1 末尾的 python3 脚本
 ```
 
 ---

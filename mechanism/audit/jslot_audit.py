@@ -31,7 +31,7 @@ jslot_audit.py —— 光解槽位语义审计（机制质检第三维度）
 
 用法:
   python mechanism/audit/jslot_audit.py            # 详细报告
-  python mechanism/audit/jslot_audit.py --quiet    # 仅结论（make test 用）
+  python mechanism/audit/jslot_audit.py --quiet    # 仅结论
 退出码: 0 = 全部通过; 1 = 有 FAIL; 2 = 缺输入文件
 """
 import argparse
@@ -272,7 +272,7 @@ def main(argv=None):
     if not args.quiet:
         print("-" * 78)
         print(f"README 光解表行扫描: {len(rows)} 行（§5 反应表 + §6 光解方案表）")
-    # 失败原因与陈旧条目在 --quiet 下也要打印：make test 只留结论行不够定位问题
+    # 失败原因与陈旧条目在 --quiet 下也要打印：只留结论行不够定位问题
     for n in notes:
         print(f"  ⚠ {n}")
     if fails:

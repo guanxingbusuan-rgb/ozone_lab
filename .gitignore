@@ -25,7 +25,7 @@ mcm_city/gen/oz_mech.f90
 mcm_city/gen/oz.reac
 mcm_city/gen/oz.prod
 
-# ── 编译出的配置平面文件（由 cfgbuild.py 从 input*/ 重新生成）──
+# ── 编译出的配置平面文件（由 cfgbuild.py 从各程序 config_override/ 重新生成）──
 runtime.dat
 runtime_v3.dat
 
@@ -35,18 +35,14 @@ __pycache__/
 *.egg-info/
 .pytest_cache/
 
-# ── 运行输出（实验产物，可由 experiments/run/ 重生成）──
-# output/ = 实验 CSV 落盘目录（run_A..run_M 全部产物）
-# 是"跑出来的"再生内容，不入库。
-# (audit_reports/ 已于 2026-10-26 删除：5 份分轮报告均为 V2.3 时代过程记录，
-#  结论已 100% 合并进 AUDIT_COMPLETE.md，不再保留原始文件。)
+# ── 运行输出（三个程序各自的 output/：CSV、PNG、runtime、临时装配目录）──
+# 全部是"跑出来的"再生内容，可由各程序 run.py 重生成，不入库。
 output/
 outp_*.csv
 *.nc
 
 # ── 图件输出 ──
-# 工程图：output/*.png（随 output/ 忽略；脚本在 experiments/viz/，可用 make figures 重生成）
-# 机制图：docs/figures/*.pdf|png（静态归档，入库；教学手册 docs/figures/README.md）
+# 各程序 output/*.png（随上面的 output/ 一起忽略；脚本 = 各程序 plot.py）
 
 # ── 系统/编辑器杂物 ──
 # .DS_Store 无斜杠前缀 → 匹配任意层级（含 mechanism/.DS_Store）

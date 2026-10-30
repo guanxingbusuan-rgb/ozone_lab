@@ -16,13 +16,13 @@
 # ---- 观测来源选项 ----
 #   (a) 地面 HCHO 观测（DNPH-HPLC / PTR-MS）
 #   (b) 卫星柱浓度经 inputproc/sat2surf.py 转表面等效 ppb:
-#       python inputproc/sat2surf.py sat_HCHO.raw configs/constraints/bc_HCHO_demo.txt \
-#              --blh-file configs/constraints/met_BLH.txt
+#       python inputproc/sat2surf.py sat_HCHO.raw <程序>/config_override/constraints/bc_HCHO_demo.txt \
+#              --blh-file <程序>/config_override/constraints/met_BLH.txt
 #
 # ---- 使用步骤 ----
 #   bc.config 加行:  HCHO = file:constraints/bc_HCHO_demo.txt
-#   make runtime_v3.dat && cd facsimile_impl && \
-#     ./fac_v3 SCEN_BAU ../output/assim_hcho ../runtime_v3.dat
+#   重跑本程序 run.py，或手工: cd facsimile_impl && \
+#     ./fac_v3 SCEN_BAU ../CASE-analysis/output/assim_hcho ../CASE-analysis/output/runtime_case.dat
 #   验证: <pref>_ipr.csv 的 HCHO_B 列非零
 # =====================================================================
 # unit: ppb

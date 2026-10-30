@@ -148,7 +148,9 @@ class Mechanism:
                     break
             if self._is_lnox(lhs, rhs):
                 self.lnox_rx.append(k)
-        noz_spec = [s for s, w in self.noy_w.items() if s not in ("NO", "NO2", "N2O5")]
+        # NOz 单一定义: NOy 减去本元组（与 fac_batch_omp 的 NOz 口径一致）
+        self.nox_res = ("NO", "NO2", "N2O5")
+        noz_spec = [s for s in self.noy_w if s not in self.nox_res]
         for k in range(self.nrx):
             for isp, c in self.prod[k]:
                 if self.species[isp] in noz_spec:
@@ -261,7 +263,7 @@ def route_timeseries(pref, fac, mech=None):
     for t in range(T):
         noy = sum(w * max(C[t, idx[s]], 0.0) for s, w in m.noy_w.items() if s in idx)
         noy_arr[t] = noy
-        noz = noy - max(C[t, idx.get("NO", 0)], 0.0) - max(C[t, idx.get("NO2", 0)], 0.0)
+        noz = noy - sum(max(C[t, idx[s]], 0.0) for s in m.nox_res if s in idx)
         q, ln, ph, phn, po3, pnz = m.budgets(I[t, 1:])   # off-by-one 修复: 剥 h 列
         r = lambda a, b: a / b if b > 1e-30 else 0.0
         out["FNR"].append(r(C[t, idx["HCHO"]], C[t, idx["NO2"]]))
@@ -278,18 +280,20 @@ def route_timeseries(pref, fac, mech=None):
     return {k: np.array(v) for k, v in out.items()}
 
 
-def route_indicators(pref, fac, mech=None, pm_only=False):
+def route_indicators(pref, fac, mech=None, pm_only=False, dtout=3600.0):
     """post-spinup 全部输出行的窗口均值 (pm_only=True: 12–18h, Sillman 口径)
 
-    pm 窗口的小时取自 conc CSV 的 h 列 (h % 24; dtout=3600 时 h 即小时),
-    不假设窗口起点 —— --days 3 (窗口自 h48 起) 与默认 5 天 (h96 起) 均正确。
+    conc CSV 的 h 列是**输出步序号**（fac_v3 写 step），当地小时 =
+    h × dtout/3600 % 24，故 dtout 由调用方从 runtime 的 MODEL 行传入
+    （缺省 3600 = 逐时输出，此时 h 与小时数值相同）。
+    不假设窗口起点 —— 窗口自 h48 起还是 h96 起都正确。
     """
     ts = route_timeseries(pref, fac, mech)
     d = {}
     sel = None
     if pm_only:
         _, C = _load_csv(f"{pref}_conc.csv")     # C[:,0] = h 列 (输出步序号)
-        hrs = C[:, 0] % 24.0
+        hrs = (C[:, 0] * dtout / 3600.0) % 24.0
         sel = np.array([12.0 <= h <= 18.0 for h in hrs])
     for k, v in ts.items():
         if pm_only:

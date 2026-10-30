@@ -1,7 +1,8 @@
 # mechanism/audit/ —— 机制质检工具（与仿真解耦，可独立运行；2026-10-27 自仓库根移入 mechanism/，归属机制设计层）
 
 > **一句话**：这里回答"**机制本身对不对**"——元素守恒、系数与 MCM 官方基准的一致性、光解槽位语义。
-> 三个脚本都**不跑仿真**（秒级），都已接入 `make test`，是机制变更后的第一道闸门。
+> 三个脚本都**不跑仿真**（秒级），是机制变更后的第一道闸门；需手工运行
+> （`make mcmcheck` / `make jcheck` 覆盖后两个，第一个直接传 `.fac` 路径）。
 
 ---
 
@@ -11,7 +12,7 @@
 |---|---|---|---|
 | `element_audit.py` | **逐反应元素守恒**：C/H/N/O/S/Cl/Br 两侧配平 | 机制自带 FORMULA 段（单一事实源） | 0.07 s |
 | `mcm_compare.py` | **速率系数 vs MCM v3.3.1 官方导出** + 文档漂移 | `mechanism/reference/mcm_v3.3.1_export.fac` | ~3 s |
-| `jslot_audit.py` | **光解槽位语义**：机制 `J<n>` 的分子归属 vs MCM 官方该槽归属 + JMAP/README 一致性 | 同上 + `configs/photolysis.config` | ~3 s |
+| `jslot_audit.py` | **光解槽位语义**：机制 `J<n>` 的分子归属 vs MCM 官方该槽归属 + JMAP/README 一致性 | 同上 + `photolysis.config`（多源回退顺序见 ENVIRONMENT.md §6） | ~3 s |
 
 ## 2. `element_audit.py` —— 元素守恒审计
 
@@ -31,13 +32,13 @@ python mechanism/audit/element_audit.py mechanism/mechanism_3_full_chain.fac   #
 若 FORMULA 段里把某物种分子式写错（如 MACR 写成 C4H7O），审计会拿错式子去配平并 PASS。
 分子式本身靠 `mechanism/README.md` 的物种表人工核对。
 
-**退出码**：0=全过，1=有 FAIL（`make test` 依赖此码中断）。
+**退出码**：0=全过，1=有 FAIL（调用方按退出码判断）。
 
 ## 3. `mcm_compare.py` —— MCM 系数比对（三道关口的合体）
 
 ```bash
 python mechanism/audit/mcm_compare.py              # 详细报告
-python mechanism/audit/mcm_compare.py --quiet      # 仅结论（make test 用）
+python mechanism/audit/mcm_compare.py --quiet      # 仅结论
 python mechanism/audit/mcm_compare.py --threshold 0.05
 make mcmcheck                            # 等价于详细模式
 ```
@@ -63,13 +64,13 @@ make mcmcheck                            # 等价于详细模式
   由 `jslot_audit.py` 按**槽位语义**单独把关（见 §4）。
 - **产物分支结构**：只比总速率，不比分支拆分是否合理。
 
-**退出码**：0=全部通过，1=超阈值或有文档漂移（接入 `make test`）。
+**退出码**：0=全部通过，1=超阈值或有文档漂移。
 
 ## 4. `jslot_audit.py` —— 光解槽位语义审计（第三维度）
 
 ```bash
 python mechanism/audit/jslot_audit.py              # 详细报告（逐槽判定表）
-python mechanism/audit/jslot_audit.py --quiet      # 仅结论（make test 用）
+python mechanism/audit/jslot_audit.py --quiet      # 仅结论
 make jcheck                                        # 等价于详细模式
 ```
 
@@ -117,13 +118,13 @@ README §6 槽号改错 → FAIL 并回指 `.fac` 实际槽号。
 | "光解槽号借对了吗？参数有死项吗？" | **本目录** `jslot_audit.py` |
 | "简化掉了什么、影响多大？" | `mechanism/V25_ASSESSMENT.md`（审计+评估总报告） |
 | "输出 CSV 数值对吗？" | 各程序 `output/run_meta.txt` + 实测复跑（原 `tests/` 已随通用层退役） |
-| "六账闭合吗？" | `CASE-analysis/run.py` + FT-IPR |
+| "六账闭合吗？" | `CASE-analysis/run.py` 的 `output/ipr_ledger.csv`（逐小时 × 全物种 P/L/E/D/B/X） |
 
 ## 6. 何时跑
 
 | 场景 | 命令 |
 |---|---|
-| 改了 `.fac`（任意原因） | `make test`（三个都会自动跑） |
+| 改了 `.fac`（任意原因） | 三个都跑：`element_audit.py` + `make mcmcheck` + `make jcheck` |
 | 只想快速验配平 | `python mechanism/audit/element_audit.py mechanism/mechanism_3_full_chain.fac` |
 | 只想查系数一致性 | `make mcmcheck` |
 | 加了/迁了光解反应，或改了 `photolysis.config` JMAP | `make jcheck` |

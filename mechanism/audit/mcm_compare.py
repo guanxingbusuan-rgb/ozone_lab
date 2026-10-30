@@ -14,7 +14,7 @@ mcm_compare.py —— 与 MCM v3.3.1 官方导出逐反应比对速率系数
   python mechanism/audit/mcm_compare.py --threshold 0.05     # 只显示 >5% 偏差
   python mechanism/audit/mcm_compare.py --quiet              # 仅汇总（供 CI）
 
-退出码: 0 = 最大偏差 < 阈值; 1 = 存在超阈值项（便于接入 make test）
+退出码: 0 = 最大偏差 < 阈值; 1 = 存在超阈值项（便于调用方按码判断）
 
 注意:
   · 只比"反应物集合完全一致"的反应；集总类（OLE/ALK/ARO1/TERP…）在 MCM

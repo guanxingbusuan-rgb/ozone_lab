@@ -2,7 +2,7 @@
 # 【气象站序列样例】met_JFAC_demo.txt —— 光解衰减因子逐时观测 → meteo.config 的 JFAC
 # =====================================================================
 # 用法: meteo.config 写  JFAC = file:constraints/met_JFAC_demo.txt
-#       然后重建 runtime_v3.dat (cfgbuild 校验后在 SERIES 段登记)
+#       然后重跑本程序 run.py (cfgbuild 每轮自动重编译 runtime 并校验)
 #
 # 物理作用: 乘到所有 J 值上 (J = jfac·l·cos^m(chi)·exp(-n·sec(chi)))。
 #           JFAC=0.55 约等于厚云遮光: 光解整体减半, O3 生成链同步减弱。

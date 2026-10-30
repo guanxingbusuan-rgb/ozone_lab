@@ -8,13 +8,13 @@
 #   "钉死"在观测值上，破坏 Leith 循环（O₃+NO ⇌ NO₂+hν），导致
 #       实测崩溃：h → 1e-79，O₃ 数值失真
 #   → **正确做法：弱 τ（43200–86400 s）**，或走"自上而下排放反演"
-#     （E_NOx ×= mean(obs)/mean(free)，见 experiments/obs_osse.py 通路③）
+#     （E_NOx ×= mean(obs)/mean(free)，即"先自由运行、再按比值修排放"）
 #
 # ---- 数据来源: 卫星柱浓度转换 ----
 #   S5P TROPOMI NO2_tropo 柱 → 表面等效 ppb（工具已内置两法互证 + QA 过滤）:
-#     python inputproc/sat2surf.py configs/constraints/sat_NO2_x.raw \
-#            configs/constraints/bc_NO2_sat_demo.txt \
-#            --blh-file configs/constraints/met_BLH.txt
+#     python inputproc/sat2surf.py <程序>/config_override/constraints/sat_NO2_x.raw \
+#            <程序>/config_override/constraints/bc_NO2_sat_demo.txt \
+#            --blh-file <程序>/config_override/constraints/met_BLH.txt
 #   卫星每日一次过境 → 序列 86400 s 间隔（本样例为逐日值）
 #
 # ---- 柱量级参考（TROPOMI NO2 对流层柱）----
@@ -25,8 +25,8 @@
 # ---- 使用步骤（推荐弱 τ）----
 #   TAU_MIX = 43200        # 12h，弱约束
 #   NO2 = file:constraints/bc_NO2_sat_demo.txt
-#   make runtime_v3.dat && cd facsimile_impl && \
-#     ./fac_v3 SCEN_BAU ../output/assim_no2 ../runtime_v3.dat
+#   重跑本程序 run.py，或手工: cd facsimile_impl && \
+#     ./fac_v3 SCEN_BAU ../CASE-analysis/output/assim_no2 ../CASE-analysis/output/runtime_case.dat
 # =====================================================================
 # unit: ppb
 # source: TROPOMI NO2_tropo / BLH(1km) / 2.46e10  (sat2surf.py 直观法)

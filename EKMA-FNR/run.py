@@ -19,16 +19,21 @@ EKMA-FNR/run.py —— S2 FNR 响应面（初始 HCHO × 初始 NOx 正交扰动
   本目录 config_override/initialConcentrations.config（初始浓度），且排放关闭——
   这是 Dodge 1977 经典 EKMA 的"初始浓度空间"口径。
 
-自包含性: 本目录不 import experiments/run 任何代码；配置读取/编译/批量调用
-全部在本文件内实现。输入 = 本目录 config_override/（不回退根 configs）。
+自包含性: 本目录不 import 任何编排层代码；配置读取/编译/批量调用
+全部在本文件内实现。输入 = 本目录 config_override/（仓库无全局配置层）。
 共享依赖仅: 机制 .fac、inputproc/cfgbuild.py（编译器）、
 facsimile_impl/fac_batch_omp（执行器）、analysis_lib/csvio（CSV 读写）。
 
-输出（本目录 output/）:
-  fnr_ic_base.csv             基线初值存档
-  ekma_fnr_grid_raw.csv       fac_batch_omp 原始 24 列（n² 行）
-  ekma_fnr_grid.csv           规整表（pert_no2_pct, pert_hcho_pct, FNR_mean, O3max_ppb …）
-  run_meta.txt                运行元数据
+输出（本目录 output/，全部由本文件写出）:
+  runtime_fnr.dat                本轮有效输入记录（cfgbuild 产物）
+  fnr_ic_base.csv                基线初值存档（含每物种的缩放角色）
+  ekma_fnr_grid_raw.csv          fac_batch_omp 原始 24 列（n² 行）
+  ekma_fnr_grid_raw.csv_{ipr,irr,state}.csv   执行器侧车（**平均倾向** [molec/cm3/s]，
+                                 与 fac_v3 的窗口积分口径差 dtout 倍）
+  ekma_fnr_grid.csv              规整表（pert_hcho_pct, pert_no2_pct, 指标列, FNR_init）
+  ekma_fnr_ridge.csv             每 HCHO 列的屋脊点（NO₂ 扰动 + O3max）
+  ekma_fnr_derived.csv           PR_bau / PR_vs_baseNO2 / FNR_init_ridge 等派生量
+  run_meta.txt                   运行元数据（网格/耗时/失败/降级/氮守恒/侧车单位）
 
 用法:
   python EKMA-FNR/run.py                # 默认 0–1000% / 100%（11×11 = 121 案例）
@@ -62,7 +67,7 @@ OVERRIDE_DIR = os.path.join(HERE, "config_override")
 # ic1 轴掩膜：NOX = NO + NO₂ 同因子缩放（保持 IC 基线里的 NO₂:NO 比例不变）
 IC1_SPEC = "NOX"
 IC2_SPEC = "HCHO"
-# 本实验直接读取的输入文件（缺失即报错，不回退根 configs / 内置常量）
+# 本程序直接读取的输入文件（缺失即报错：无根配置回退、无内置常量兜底）
 REQUIRED_INPUT = ("initialConcentrations.config", "model.parameters")
 
 
@@ -142,7 +147,7 @@ def main(argv):
             print("✗ --pmax/--step 非法", file=sys.stderr)
             return 2
         if not os.path.isdir(OVERRIDE_DIR):
-            print(f"缺少完整输入目录: {OVERRIDE_DIR}（不会回退到根 configs）", file=sys.stderr)
+            print(f"缺少完整输入目录: {OVERRIDE_DIR}（本程序无全局配置回退）", file=sys.stderr)
             return 1
         miss = [f for f in REQUIRED_INPUT if not os.path.isfile(os.path.join(OVERRIDE_DIR, f))]
         if miss:
@@ -212,6 +217,7 @@ def main(argv):
     dt = None
     r = None
     nfail_txt = "沿用原 raw（--from 复用模式）"
+    guard_txt = "沿用原 raw（未跑模拟，无从判断）"
     if not from_raw:
         raw = os.path.join(OUT, "ekma_fnr_grid_raw.csv")
         print(f"═══ EKMA-FNR: {n}×{n} = {n*n} 案例  (NOx(=NO+NO₂)/HCHO 初值扰动 "
@@ -223,16 +229,24 @@ def main(argv):
         r = subprocess.run(cmd, cwd=os.path.join(ROOT, "facsimile_impl"),
                            capture_output=True, text=True)
         dt = time.time() - t0
-        tail = [l for l in r.stdout.splitlines() if "FAC-BATCH" in l or "FATAL" in l
-                or "警告" in l]
+        # 执行器的关键行一律捕获：违例原始行 [氮守恒 FAIL] 不含 FAC-BATCH/FATAL 关键词，
+        # 不显式列进过滤器就会被丢掉（计数本身已进收尾行并触发 stop 1）
+        tail = [l for l in r.stdout.splitlines()
+                if "FAC-BATCH" in l or "FATAL" in l or "警告" in l or "氮守恒" in l]
         print("  " + (" | ".join(tail) if tail else "batch done"))
-        if r.returncode != 0 and not os.path.exists(raw):
-            print(r.stdout[-800:], r.stderr[-800:], file=sys.stderr)
-            return 1
+        _mg = [l.strip() for l in r.stdout.splitlines() if "[氮守恒 FAIL]" in l]
+        guard_txt = (f"违例 {len(_mg)} 例: " + " ; ".join(_mg[:3])) if _mg else "0 违例"
         _mf = re.search(r"失败 (\d+)", r.stdout)
         _md = re.search(r"降级 (\d+)", r.stdout)
         nfail_txt = (f"失败 {_mf.group(1) if _mf else '?'} / "
                      f"降级 {_md.group(1) if _md else '?'}")
+        if r.returncode != 0:
+            print(r.stdout[-800:], r.stderr[-800:], file=sys.stderr)
+            print(f"  ✗ 批量模拟非零退出（{nfail_txt}；{guard_txt}）"
+                  f"—— 网格不完整，拒绝出表", file=sys.stderr)
+            return 1
+        if _md and int(_md.group(1)) > 0:
+            print(f"  ⚠ 有 {_md.group(1)} 个降级案例（窗口不完整）—— 已记入 run_meta")
     else:
         print(f"═══ EKMA-FNR [复用] "
               f"{os.path.relpath(raw, ROOT) if raw.startswith(ROOT) else raw}"
@@ -270,8 +284,8 @@ def main(argv):
                   f"NO₂ 扰动 0–{ux[-1]:g}% / 步长 {sx:g}% ⇒ 因子 1.00–{1.0 + ux[-1] / 100.0:.2f}"
                   f"（ic1 = NOX 组：NO 与 NO₂ 同因子，NO₂:NO 比例恒定）",
                   f"HCHO 扰动 0–{uy[-1]:g}% / 步长 {sy:g}% ⇒ 因子 1.00–{1.0 + uy[-1] / 100.0:.2f}",
-                  f"pert_hcho_pct: 初始 HCHO 相对基线 ({H0:g} ppb) 的扰动 %  ← y 轴分子",
-                  f"pert_no2_pct:  初始 NO₂ 相对基线 ({N0i:g} ppb) 的扰动 %   ← x 轴分母"
+                  f"pert_hcho_pct: 初始 HCHO 相对基线 ({H0:g} ppb) 的扰动 %  ← 横轴（VOC 轴，FNR 分子）",
+                  f"pert_no2_pct:  初始 NO₂ 相对基线 ({N0i:g} ppb) 的扰动 %   ← 纵轴（NOx 轴，FNR 分母）"
                   f"（= NOx 组因子；NO 同步缩放至同比例）",
                   f"基线来源: {base_src}（FNR_init = (1+HCHO%)/(1+NO₂%) × H0/N0）",
                   "O₃ 不缩放（因变量）；其余物种保持基线",
@@ -324,7 +338,10 @@ def main(argv):
                 f" 输入目录: {OVERRIDE_DIR}\n"
                 f" 有效输入记录: {rt}（IC/EMIS/MODEL/MET 解析值；不在 output 留配置快照目录）\n"
                 f" 排放: 关闭 | 时长: {DAYS:g} 天 | spinup: 0\n"
-                f" 失败案例: {nfail_txt}\n")
+                f" 失败案例: {nfail_txt}\n"
+                f" 氮守恒不变量: {guard_txt}\n"
+                f" 侧车单位: {os.path.basename(raw)}_ipr.csv/_irr.csv = 末 24 步**平均倾向** "
+                f"[molec/cm3/s]；fac_v3 的三件套是窗口**积分** [molec/cm3]，差 dtout 倍\n")
 
     o3 = fcol(hdr, D, "O3max")
     print(f"  网格: {len(ux)}×{len(uy)} = {len(rows)} 案例 "

@@ -9,7 +9,7 @@
 
 | 文件 | 进入二进制 | 作用 |
 |---|---|---|
-| `runtime_dat_mod.f90` | ✅ fac_v3 + fac_batch_omp | `runtime.dat` 的唯一消费端：SPECIES/IC/MET/BC/PHOT/EMIS/DRY/WET/DIL/SCEN/SERIES 解析；气象序列插值（≤128 点/序列，池上限 8）；SZA→J 参数化；情景组映射 `build_groups` |
+| `runtime_dat_mod.f90` | ✅ fac_v3 + fac_batch_omp | `runtime.dat` 的唯一消费端：SPECIES/IC/MET/BC/PHOT/EMIS/DRY/WET/DIL/SCEN/SERIES 解析；气象序列插值（≤128 点/序列，池上限 40）；SZA→J 参数化；情景组映射 `build_groups` |
 | `chem_phys_mod.f90` | ✅ fac_v3 + fac_batch_omp | 物理四账的唯一实现：① 排放（BOX/FLAT 日型 × 情景缩放）② 干+湿沉降 ③ BC 张弛 + 稀释 ④ BLH 膨胀稀释；另含按物种名的 ATOL 调优表与 `eval_J_jf`（CLI jfac × 配置 JFAC 的归一化） |
 
 Makefile 依赖（可验证）：
@@ -27,7 +27,8 @@ facsimile_impl/fac_batch_omp: ... modules/runtime_dat_mod.f90 modules/chem_phys_
    两条路线的差异只在驱动方式，不在物理。
 2. **单源组映射**：`build_groups` 是排放组（NOx / VOC / CO / CH4）的唯一事实源；
    VOC 组含 SO₂/DMS/MSA（工程既有约定，两个 EKMA 的 VNr 因此区分 group / nmv 两列）。
-3. **序列硬上限**：`NSER_MAX=8`、每序列 128 点；`cfgbuild` 编译期已拦截，运行时再校验一次。
+3. **序列硬上限**：`NSER_MAX=40`（气象 6 条 + BC 观测约束 26+ 物种，余量 8）、每序列 128 点；
+   `cfgbuild` 编译期已拦截，运行时再校验一次。
 4. **光解口径**：`eval_J_jf(t, jf_abs, …)` 以“绝对因子”为输入，内部按配置侧 JFAC
    归一化，避免 CLI 与 config 双重相乘。
 

@@ -4,7 +4,9 @@
 > 做正交扰动，跑 26×26=676 个独立 0-D 箱（4 天模拟 / 3 天 spinup），得到 O₃max 响应面与屋脊。
 >
 > ⚠ **现存归档**：`output/` 的 CSV/图 = **2026-10-29 完整运行**，默认网格 **0–625%/25%（26×26=676，4 天/3 天）**，
-> 失败 0 / 降级 0，O₃max 15.26–281.41 ppb，基线点 77.12 ppb（见 `run_meta.txt`）。
+> 失败 0 / 降级 0 / **氮守恒违例 0**，O₃max 15.26–281.41 ppb，基线点 77.12 ppb（见 `run_meta.txt`）。
+> 同参数两轮的**数据行逐位相同**（仅 OpenMP 案例完成序、以及 runtime 首行的临时装配目录名不同），
+> 故 `耗时` 随负载波动（实测 899 s 与 1458 s 两次），**不作为回归判据**；回归看数值与守恒计数。
 > §9.3/§9.4 的落点与反查算例仍引用被本次覆盖的 41×41 旧归档数值，引用前需按新 CSV 重算。
 
 ---
@@ -24,7 +26,7 @@
 
 每轮实际生效的输入以本目录 `output/runtime_emission.dat` 为准（cfgbuild 解析出的 IC/EMIS/MODEL/MET
 数值，含被实验改写为 4 天/3 天的 `model.parameters`）；输入原文就是 `config_override/` 本身。
-本实验**不读取根 `configs/`**，`output/` 里也不再有配置快照目录。
+本程序**没有任何全局配置层**（仓库里不存在根 `configs/`），`output/` 里也不留配置快照目录。
 机制与执行器路径相对仓库根，其余输入路径相对本目录。
 
 > **E_VOC 组口径**（`modules/runtime_dat_mod.f90::build_groups`，24 物种）：
@@ -50,8 +52,8 @@ EKMA-emission/
 └── output/                          （逐文件数据字典见 §7；结果产物，不是编辑入口）
     ├── runtime_emission.dat          ① 本轮有效输入记录（cfgbuild 解析出的 IC/EMIS/MODEL/MET 值）
     ├── ekma_emission_grid_raw.csv    ② fac_batch_omp 原始 24 列输出
-    ├── ekma_emission_grid_raw.csv_ipr.csv   ②a 侧车: 111 物种 × 6 过程账 窗均
-    ├── ekma_emission_grid_raw.csv_irr.csv   ②b 侧车: r1..r203 逐反应 IRR 窗均
+    ├── ekma_emission_grid_raw.csv_ipr.csv   ②a 侧车: 111 物种 × 6 过程账 窗均 [molec/cm3/s]
+    ├── ekma_emission_grid_raw.csv_irr.csv   ②b 侧车: r1..r203 逐反应 IRR 窗均 [molec/cm3/s]
     │        （⚠ 2026-10-29 已删除：旧版 batch 坐标列写错；重跑 run.py 自动重建，格式正确）
     ├── ekma_emission_grid_raw.csv_state.csv ②c 侧车: 实验 J 状态量均值对（本实验未消费，备查）
     ├── ekma_emission_grid.csv        ④ 规整主表（plot.py 唯一输入）
@@ -62,7 +64,7 @@ EKMA-emission/
 
 `config_override/` 是从历史运行输入建立、**长期保留的持久输入目录**：`run.py` 只读它，
 从不改写或删除它。保留现有基线即可直接运行，换数据就直接编辑其中的配置及 `constraints/` 文件，
-不必每轮创建目录，更不必先编辑根 `configs/`。
+不必每轮创建目录——仓库里没有需要先行编辑的全局配置层。
 
 **初次准备（与日常流程分开）**：共享内核尚未构建时，在仓库根目录 `ozone_lab/` 执行：
 
@@ -86,8 +88,8 @@ python plot.py
 两张 PNG 需另跑 `plot.py`。
 **需要保留历史 `output/` 时，先另存再运行**。本流程仍依赖完整仓库与运行环境，不能只搬走实验子目录运行（见 §6）。
 
-**注意**：`fac_batch_omp` 第 10 参 `LIN` 是本次新增的**线性网格**模式
-（缺省仍是等比网格 0.3×1.5^k，历史哨兵不变）。线性网格是"等扰动百分比"的必要条件。
+**注意**：`fac_batch_omp` 的第 10 参 `LIN` 选**线性网格**（缺省为等比 `fmin×gr^i`）。
+线性网格是"等扰动百分比"轴语义的必要条件——等比网格的步长不是等差。
 
 ---
 
@@ -101,24 +103,69 @@ python plot.py
 | 白虚线 | **屋脊**：每个 NMVOC 扰动列上 O₃max 达到峰值所对应的 NOx 扰动 |
 | 黑十字 | 基线（0%, 0%）= 本轮 `config_override/emissions.config` 的未扰动排放 |
 
+> **轴序约定**：**VOC 在横轴、NOx 在纵轴**，与 EKMA-FNR（S2）一致，两张图可并排读。
+
 **判读要点**：
-- 屋脊把平面分成两半——**屋脊左侧（NOx 少）= NOx-limited**：加 NOx 增产 O₃；
-  **右侧（NOx 多）= NOx-saturated/VOC-limited**：再加 NOx 反而抑制 O₃。
+- 屋脊把平面分成两半——**屋脊下方（NOx 少）= NOx-limited**：加 NOx 增产 O₃；
+  **上方（NOx 多）= NOx-saturated/VOC-limited**：再加 NOx 反而抑制 O₃。
 - 沿纵轴向上越过屋脊后 O₃ 下降 = 经典"NOx 滴定"。
-- 屋脊随 NMVOC 增加而右移（VOC 越多能容纳越多 NOx）——这正是 EKMA 的典型形态。
+- 屋脊随 NMVOC 增加而**上移**（VOC 越多能容纳越多 NOx）——这正是 EKMA 的典型形态。
 
----
+### 3.1 与 EKMA-FNR（S2）的 O₃max 为什么差 2.4 倍——开放箱 vs 封闭瓶
 
-## 4. 与实验 B / 旧 S1 的区别
+> 数字取自两边**各自默认网格的完整运行**（S1 = 0–625%/25%、4 天/3 spinup；
+> S2 = 0–1000%/100%、1 天，均 2026-10-29）。换基线或换汇项后请回读各自的
+> `output/run_meta.txt` 与 `ekma_*_grid.csv`，**不要照抄数值，照抄口径**。
 
-| | 旧 `experiments/run/run_B_surface.py`（实验 B） | 本目录（EKMA-emission） |
+**最干净的证据是零扰动点本身**：S1 的 (0%,0%) = **77.12 ppb**，S2 的 (0%,0%) = **34.14 ppb**
+（2.3×）；全网格峰值 S1 **281.41** vs S2 **119.21 ppb**（2.4×）。同一机制、同一晴天气象序列，
+差异全部来自**实验定义（体系开放度）**，不来自扰动幅度。
+
+| 边界条件 | EKMA-emission（S1，峰 281.4 ppb） | EKMA-FNR（S2，峰 119.2 ppb） |
 |---|---|---|
-| 网格 | 9×9 等比（0.3×1.5^k，0.3–7.7 倍） | **26×26 线性**（1.00–7.25 倍 = 0–625%，默认） |
-| 语义 | "排放因子"扫描 | **扰动百分比**扫描（0% = 无扰动） |
-| 产物位置 | `output/run_B/` | 本目录 `output/` |
-| 用途 | 哨兵/回归（金值 139.04/144.58/5.239/3.832 绑定此网格） | EKMA 教学/分析专用 |
+| 排放 | **开**：NOx 基线 1.003 ppb/h（24h 均值，BOX 日型午后峰 ≈3×）、NMVOC 3.716 ppb/h | **关**：`emissions.config` 清空 + Fortran `esc=0` |
+| 背景张弛 | **开**：`TAU_MIX = 86400 s`、`O3 = 6.2e11` = **25.2 ppb** 背景，一天换一箱 | **关**：IC 模式强制 `tau_mix = 1e30`（`facsimile_impl/fac_batch_omp.f90:566`） |
+| 水平通风 | `dilution.config` 生效（参考配置 1.16e-5 s⁻¹ ≈ 24 h 一箱） | **`DIL = 0`**——本目录默认已改为密闭箱 |
+| 混合层 | 晴天日循环：夜间 180 m → 午后 ~1.8 km | **同序列 ×2**：夜间 ~346 m → 午后 ~3.77 km |
+| 时长与统计窗 | 模拟 4 天 / spinup 3 天 → 窗 = 第 4 天末 24 步 | 1 天 / spinup 0 → 窗 = 唯一那天的 24 步 |
+| 体系性质 | **开放流动反应器**：前体物持续注入 + 背景 O₃ 渗入 → 第 4 天已达准周期稳态 | **封闭瓶**：只有 t=0 那一团空气（NOx 4 ppb、HCHO 6 ppb、O₃ 12 ppb，另有事件情景的 CO 500 / CH₃CHO 20 / ISOP 20 ppb），当天只出不进 |
+| 轴的物理量 | 排放**速率**倍数（×7.25） | 初始**浓度**倍数（×11） |
 
-两者互不干扰：旧网格与哨兵保持不变（不传 `LIN` 即旧行为）。
+**为什么封闭瓶仍然更低（三条，按量级排序）**
+
+1. **NOx 一次性消耗**：S1 每个响应日注入约 24 ppb 的 NOx（1 ppb/h × 24 h），S2 全天总库存只有
+   4 ppb，且不断被 OH 终清除成 HNO₃/PAN——**没有补充**。O₃ 是 NOx 的催化产物，NOx 的
+   "周转次数"被自由基寿命限死。
+2. **背景 O₃ 的渗入**：S1 有 25.2 ppb 的外部背景以 τ = 1 天持续拉入，S2 完全切断。
+3. **起点与时间常数**：S2 从"晨间"起步（O₃ 12 ppb、NOx 4 ppb），一天的时间常数短于自由基与
+   NOx 的清除时间，来不及爬到高位；S1 已经跑完 3 天建立期。
+
+**两个数字各自在回答什么（对外引用时的口径）**
+
+- **281.4 ppb** = "把这座城市的 NOx 与 NMVOC 排放同时放大 7.25 倍，第 4 天午后 1 小时 O₃ 能冲到
+  多少"——**排放政策空间**（准稳态、有源有汇）。
+- **119.2 ppb** = "一团**事件级**晨间空气（NOx 4 ppb／HCHO 6 ppb，CO 500、CH₃CHO 与 ISOP 各
+  20 ppb，静稳无通风、混合层深 3.8 km）在完全封闭、无排放、无外部输入下，自身一天最多把
+  O₃ 抬到多少"——**观测状态空间的敏感性**（瞬态、封闭）。
+
+**两者不可比大小，只可比形态**（屋脊位置、体制分界、梯度方向）。要跨图比较，只能比无量纲量：
+FNR / VNr 等值线位置、屋脊在各自轴百分比上的形状、峰值率 PR。同一坐标点也不能跨图读——
+S1 的 (0,0) 是"参考清单"，S2 的 (0,0) 是"那团空气的初值"，两者毫无共同之处。
+
+> S2 侧的对应分析（含"上限由物理汇而非化学决定"的收支实测与三条无效直觉）见
+> `EKMA-FNR/README.md` §6.1。
+
+## 4. 网格与轴语义
+
+| 项 | 本目录（EKMA-emission） |
+|---|---|
+| 网格 | **26×26 线性**（因子 1.00–7.25，默认 `--pmax 625 --step 25`） |
+| 语义 | **扰动百分比**扫描（0% = 无扰动 = 基线） |
+| 轴 | x = E_VOC 组乘子，y = E_NOx 组乘子（`build_groups` 的分组定义，含 SO₂/DMS/MSA 在 VOC 组） |
+| 产物 | 本目录 `output/`（一张图一轮，CSV 全由 `run.py` 写出） |
+
+执行器 `fac_batch_omp` 的缺省（不传 `LIN`）是 **0.3×1.5^i 等比网格**；本程序显式传
+`fmin/fmax + LIN`，两种几何不要混用。
 
 ---
 
@@ -132,18 +179,17 @@ python plot.py
 
 | 调整项 | 做法 | 影响 |
 |---|---|---|
-| **基线数据** | 直接编辑本目录已有的 `config_override/` 配置及 `constraints/` 数据 | 只改本实验输入，不动根 `configs/` 或其它实验 |
+| **基线数据** | 直接编辑本目录已有的 `config_override/` 配置及 `constraints/` 数据 | 只改本程序输入，不影响其它程序 |
 | **网格** | `python run.py --pmax ... --step ...` | 只改采样网格；默认 625/25 |
 
 `config_override/` 是已建立、长期保留的**持久输入目录**，不需每轮新建。
-它按**文件及相对路径整体使用**（含 `constraints/`），不是按配置行合并，也**不再回落根
-`configs/` 模板**——根配置从此与本实验无关。当前已有全套 11 个顶层文件和 17 个 constraints 文件。
+它按**文件及相对路径整体使用**（含 `constraints/`），不是按配置行合并，也没有任何根配置模板
+可回落。当前已有全套 11 个顶层文件和 17 个 constraints 文件。
 `run.py` 把它装配到系统临时目录后，只在那份副本上把 `model.parameters` 的天数/SPINUP 改为 4/3，
 再交给 `cfgbuild`；装配副本编译完即清理，`config_override/` 本身一个字节都不动。
 日志打印 `[配置] 输入目录: …`；**本轮实际生效的输入**查 `output/runtime_emission.dat`（见 §6）。
 
-**不要把修改根 `configs/` 当作日常路线**：那会改变共享模板，影响其它实验后续配置编译；
-本实验换基线只改 `config_override/`，无需修改根配置或重编内核。
+**换基线只改本目录 `config_override/`**：三个程序各持一套输入，互不共享配置，也不需重编内核。
 
 ### 5.1 九类真实数据 → 配置文件的逐类菜谱
 
@@ -263,13 +309,13 @@ python plot.py
 #       config_override/meteo.config + config_override/constraints/ 中的序列（②）
 #       config_override/initialConcentrations.config（③）
 #       config_override/ 中的 bc/drydep/wetdep/dilution/photolysis 等（④–⑧，按需）
-# 目录已完整建立；不要改根 configs/，也不要把 output/ 当作编辑入口
+# 目录已完整建立；本程序的输入只有 config_override/，output/ 不是编辑入口
 
 # ── 步 2：小网格冒烟（5×5，~1 min）——换数据后建议先验证──
 python run.py --pmax 40 --step 10
 #   验证点:
 #   a) 日志出现 "[配置] 输入目录: …/EKMA-emission/config_override"（本实验唯一输入源）
-#   b) "FAC-BATCH-OMP ok (25 案例, 失败 0)"
+#   b) "FAC-BATCH-OMP ok (N 案例, 失败 0, 降级 0, 氮守恒违例 0, …)"
 #   c) O3max 量级合理（城市环境几十~200 ppb；若 O₃≈0 查 IC/排放；若爆表查单位）
 
 # ── 步 3：核对本轮"实际生效"的输入 ──
@@ -286,7 +332,8 @@ grep -n "file:constraints" config_override/meteo.config   # 气象引用指向�
 
 # ── 步 5：全网格正式跑（默认 676 案例 / 4 天，~8–12 min / 4 核）──
 python run.py
-#   验证: output/run_meta.txt 的 网格/输入目录/失败数 三行；失败>0 看 stdout 警告定位案例
+#   验证: output/run_meta.txt 的 网格/输入目录/失败·降级·氮守恒 三行；任一非 0 时 run.py 已拒出表，
+#        按 stdout 的 [FATAL] 与 [氮守恒 FAIL] 原始行定位案例
 #   本步重新装配配置，生成 runtime 和 CSV，覆盖冒烟结果
 
 # ── 步 6：出图 ──
@@ -321,7 +368,7 @@ python plot.py
 | O₃max ≈ 0 | 可能是排放/IC 未按预期落位，或输入目录里的文件名拼写错 | 看 `[配置] 输入目录` 日志；用 `grep -A2 "^EMIS" output/runtime_emission.dat` 核对生效的排放基线，再检查数据本身 |
 | O₃max 爆表（>500 ppb） | 排放单位错（ppb/h 值写进了 molec/cm³/s 通道） | 检查 `# unit:` 指令与换算 6.8333e6 |
 | 响应面平坦无屋脊 | 基线 NOx 太低（背景级）或太高 | 按 §5.1③/①把基线调到城市量级 |
-| 其它实验/哨兵基线意外变化 | 误改根 `configs/` 共享模板（非日常操作） | 核对并恢复共享模板；本实验数据改在 `config_override/`，不要为局部实验重标全局哨兵 |
+| 其它程序的输出意外变化 | 三个程序共用机制/执行器但各持 `config_override/`——多半是共用的 `.fac` 或 `modules/*.f90` 被动过 | 核对本目录 `output/run_meta.txt` 的机制 md5；本程序数据改在 `config_override/` |
 | `字段超限` 类 csv 报错 | 宽表行 >128 KB | 已在 csvio 防御（16 MB）；自定义脚本需同样设置 |
 
 ### 5.4 不能替换 / 不能随便动的（动了等于换实验）
@@ -331,8 +378,8 @@ python plot.py
 | **机制文件** `mechanism/mechanism_3_full_chain.fac` | **V2.5+ 已封版**。换机制 = 换化学 = 另一个实验体系（走 V2.6 流程） |
 | **`run.py` 的缩放逻辑**（`f = 1 + pct/100`） | "百分比扰动"的定义本身；改了它 x/y 轴语义即失效 |
 | **`build_groups` 分组映射**（Fortran 硬编码） | E_NOx = NO,NO₂；E_VOC = 24 物种（§1）。改分组（如把 SO₂/DMS 踢出 E_VOC）要改 `runtime_dat_mod.f90` 并重编译 |
-| **实验 B 的 9×9 等比网格** | 4 金值哨兵（139.04/144.58/5.239/3.832）绑定它；别把那套网格改成 LIN |
-| **默认幅度 625% / 步长 25%** | 本轮默认；`400%/10%` 是历史归档锚。改网格走 `--pmax/--step` 并记录，别默认认为与历史可比 |
+| **执行器的缺省等比网格** | 不传 `LIN` 时 `fac_batch_omp` 走 `0.3×1.5^i`；本程序显式传 `fmin/fmax + LIN`，别把两种几何混在一轮里 |
+| **默认幅度 625% / 步长 25%** | 本轮默认。改网格走 `--pmax/--step` 并在 `run_meta.txt` 留记录，跨网格不可直接比 |
 
 ## 6. 输入装配与"有效输入记录"（为什么 output 里没有配置快照）
 
@@ -341,7 +388,7 @@ python plot.py
 每次**完整运行**（非 `--from`）的配置链为：
 
 ```
-本目录 config_override/（唯一输入源，不读取根 configs/）
+本目录 config_override/（唯一输入源）
     → 临时装配目录（副本上把天数/SPINUP 改为 4/3）→ cfgbuild → output/runtime_emission.dat → fac_batch_omp
 ```
 
@@ -353,18 +400,18 @@ python plot.py
 |---|---|
 | `output/runtime_emission.dat` | cfgbuild 解析结果：`IC` 向量、`EMIS` 各行 E0/日型/振幅、`MODEL 4 3600 …3`、`MET/SERIES/PHOT/DRY/WET/DIL/BC` 的数值本体——**唯一完整的"有效输入"事实源**；`VNr_group/VNr_nmv` 的 N0/V0 也是从它反算 |
 | `config_override/` | 你编辑的输入原文（除天数/SPINUP 由实验强制，其余逐字生效） |
-| `output/run_meta.txt` | 本轮网格、耗时、机制 md5、`输入目录`、`基线总量 runtime`、`有效输入记录`、失败/降级数 |
+| `output/run_meta.txt` | 本轮网格、时长、耗时、机制 md5、`输入目录`、`基线总量 runtime`、`有效输入记录`、失败/降级数、**氮守恒违例数**、**侧车单位口径** |
 
-> **与根 `runtime_v3.dat` 的关系**：现存归档的 1681 案例当年是用根 runtime 跑的——已验证
-> 本目录编译的 `runtime_emission.dat` 与其**数据行逐行一致**（426/426，仅注释头不同），
-> 归档结果有效；此后每轮都由本目录装配重新编译，根 runtime 与本实验无关。
+> **有效输入记录**：每轮都由本目录装配 → `cfgbuild` → `output/runtime_emission.dat`，
+> 该文件就是本轮真正喂进执行器的内容（IC/EMIS/MODEL/MET 的解析值）。
+> 仓库里不存在全局 runtime，也没有需要回退的共享配置。
 
 ### 操作与输出独立，不等于脱离仓库
 
-1. 不 import `experiments/run/` 任何代码（配置准备、cfgbuild、batch 调用在本目录 `run.py` 内实现）；
-2. 产物只落本目录 `output/`，不读不写仓库通用 `output/`；
+1. 不 import 任何编排层代码（配置准备、cfgbuild 调用、batch 调用都在本目录 `run.py` 内实现）；
+2. 产物只落本目录 `output/`，不读不写其它程序的 `output/`；
 3. 日常在本目录编辑 `config_override/`，执行 `python run.py` → `python plot.py`，
-   不改根 `configs/`，也不重新 `make` 共享内核。
+   不重新 `make` 共享内核。
 
 **共享依赖 = "模型本体"四件套**（必要耦合，非杂物）：
 
@@ -376,7 +423,7 @@ python plot.py
 | `analysis_lib/csvio.py` | CSV 读写（Fortran 指数兜底单源） | 数据契约读写 |
 
 外加 Python 与依赖包、执行器所需动态库（CVODE/OpenMP/gfortran 运行时）与兼容环境。
-**根 `configs/` 与根 `runtime_v3.dat` 都不再被本实验读取**（配置链已完全本地化）。
+**配置链已完全本地化**：本程序只读 `config_override/`，只写 `output/runtime_emission.dat`。
 
 **归档与复现边界**：
 - **一轮实验的完整留档 = `config_override/`（输入原文）+ `output/`（runtime 有效输入记录 + 数据 + 图 + run_meta）**；
@@ -414,7 +461,7 @@ python plot.py
 | `FNR_pm` 等 6 个 `_pm` 列 | 判据(午后) | 上列对应量的 **12–18 h 午后口径**（Sillman 原文窗口） |
 | `nst` | 诊断 | CVODE 内步数（跨韧性重启累计；异常小 = 该案例收敛失败已降级，见 stdout 警告） |
 
-### 7.2 `ekma_emission_grid_raw.csv_ipr.csv` —— 过程账侧车（4 网格列 + 111 物种 × 6 账 = 670 列）
+### 7.2 `ekma_emission_grid_raw.csv_ipr.csv` —— 过程账侧车（4 网格列 + 111 物种 × 6 账 = 670 列；单位 = 末 24 步**平均倾向** [molec/cm³/s]，**不是** CASE 那套窗口积分）
 
 | 列模式 | 含义（窗口均值，molec/cm³/s） |
 |---|---|
@@ -470,7 +517,12 @@ python plot.py
 ### 7.7 `run_meta.txt`
 
 模式（完整运行/复用）/ 网格（由数据推断）/ 时长（days/spinup 取自 runtime）/ 耗时 / 机制路径+md5 / 基线总量 runtime /
-输入目录 / 有效输入记录（`output/runtime_emission.dat`）/ 失败与降级计数。
+输入目录 / 有效输入记录（`output/runtime_emission.dat`）/ 失败与降级计数 /
+**氮守恒违例数**（逐案例首快照检，违例即 `stop 1`；原始 `[氮守恒 FAIL]` 行由 `run.py` 捕获入库）/ **侧车单位口径**。
+
+> `nfail>0`（零统计求解失败）**或** `氮守恒违例>0` 时执行器末尾 `stop 1`，`run.py` **一律拒绝出表**；
+> 不变量是逐案例的首快照检查（每案例一次，确定性的），当前归档实测违例 0。
+> `nwarn`（降级）不致命，但必须看 `run_meta.txt` 判断是否可用。
 
 ### 7.8 `ekma_emission_derived.csv` —— 派生表：PR 峰值率与 VNr 临界比（表头注释 + 26 行）
 
@@ -524,10 +576,10 @@ python plot.py
 
 | | AtChem2 | ozone_lab |
 |---|---|---|
-| 机制 | MCM Fortran 源码（先编译） | `.fac` → mechc.py → gen_v3（`make v3` 先编译） |
-| 初始浓度 | `initialConcentrations.config` | `configs/initialConcentrations.config`（未列=0；本实验取 `config_override/` 同名文件） |
-| 气象/光解 | `environmentVariables.config`（常数或时序）+ 光解内置于发行包 | `meteo.config` + `photolysis.config` + `photolysis-rates_MCM`（**光解是显式必需输入**） |
-| 运行控制 | `model.parameters` | `configs/model.parameters`（天数/步长/RTOL/ATOL/SPINUP；本实验取 `config_override/` 并强制 4 天/3 天） |
+| 机制 | MCM Fortran 源码（先编译） | `.fac` → mechc.py → gen_v3（`make all` 先编译） |
+| 初始浓度 | `initialConcentrations.config` | `config_override/initialConcentrations.config`（未列=0） |
+| 气象/光解 | `environmentVariables.config`（常数或时序）+ 光解内置于发行包 | `config_override/meteo.config` + `photolysis.config` + `photolysis-rates_MCM`（**光解是显式必需输入**） |
+| 运行控制 | `model.parameters` | `config_override/model.parameters`（天数/步长/RTOL/ATOL/SPINUP；本程序强制 4 天/3 天） |
 
 **判定**：概念三要素一致（机制 + 初始场 + 气象/光解环境）。文件层面差异：ozone_lab 把光解拆为
 **显式必需输入**（语义最小集 = 5 类）；且 `cfgbuild` 无条件打开 10 份配置——**文件层面 10 份必须
@@ -706,153 +758,96 @@ pert_VOC[%] = (E_NMVOC,站点 / 3.716 − 1) × 100
 | 改落到 S2 | 观测 HCHO/NO₂ 直接落 FNR 平面（`EKMA-FNR/README` §11） | 回答的是"观测状态"而非"排放政策"问题 |
 | 用文献清单 | 借用同类型城市清单（如 MIX/MEIC 截面） | 需说明来源与代表年 |
 
-### 9.4 额外定位法：仅用 **O₃ + NO₂ 观测** 反查排放坐标（无需 VOC 清单）
+### 9.4 额外定位法（✅ 已实现）：仅用 **O₃ + NO₂ 观测** 反查排放坐标（无需 VOC 清单）
 
 > **动机**：§9.3 的方法需要 NOx **与** NMVOC 两份清单。但 O₃ 与 NO₂ 是**常规监测**（站点小时值、
 > 卫星柱），若手上没有 VOC 清单，仍可用"观测反查"在 S1 上定位——利用本实验 `_state.csv`
-> 侧车已记录的每个案例的 **(NO₂ 均值, O₃max)** 做查表反演。
-> **本节为额外方法，不替代 §9.3 的清单定位**（后者更准，前者更易得数据）。
+> 侧车已记录的每个案例的 **(NO₂ 窗均, O₃max)** 做查表反演。
+> **本节为额外方法，不替代 §9.3 的清单定位**（后者无歧义；前者数据更易得）。
 
-#### 9.4.1 原理
+#### 9.4.0 与 EKMA-FNR §11.7/§11.8 的关系
 
-S1 的 676 个案例（当前归档；旧 41×41 轮次为 1681），每个都有两组坐标：
-
-| 组 | 内容 | 文件 |
+| | EKMA-FNR §11.7/§11.8 | 本节（EKMA-emission） |
 |---|---|---|
-| **控制坐标**（图的轴） | (pert_voc_pct, pert_nox_pct) | `ekma_emission_grid.csv` |
-| **状态坐标**（模型算出的） | (NO2mean_ppb, O3max_ppb) | `ekma_emission_grid_raw.csv_state.csv` |
+| 反查语义 | 初值状态 → "这团空气会怎样" | **排放情景 → 政策空间坐标**（与 §9.3 清单法同轴可比） |
+| 匹配空间 | NO₂/HCHO 均值 + O₃max（1 天封闭瓶） | NO₂ 均值 + O₃max **(+HCHO 均值可选)**（4 天开放箱稳态） |
+| 工具 | `plot.py --obs-single/--obs-more` | `plot.py --obs-single/--obs-more [--with-hcho]`（**同名同构**：同一套三档图面标记 + 同一套终端候选表，`draw_station`） |
 
-状态坐标的两个量**都是可观测的**（NO₂ 站点/卫星、O₃ 站点）。于是反演：
-**给定观测 (NO₂_obs, O₃_obs) → 在状态空间找最近案例 → 读出该案例的控制坐标 (VOC%, NOx%)**。
+#### 9.4.1 用法
 
-#### 9.4.2 可直接运行的查表脚本
+```bash
+python EKMA-emission/plot.py --obs-single "O3=142,NO2=6.5"                    # 两观测反查
+python EKMA-emission/plot.py --obs-single "O3=142,NO2=6.5,HCHO=8.0" --with-hcho   # 三观测（VOC 轴更准）
+python EKMA-emission/plot.py --obs-more stations.csv --with-hcho              # 多站点
+#   stations.csv 列: station,O3,NO2[,HCHO]（一行一站, ppb）
+```
+
+观测口径（**必须与模拟统计窗一致**）：`O₃` = 日最大；`NO₂` = 窗口均值（日均）；`HCHO` = 窗口均值。
+
+**图面标记三档**（`draw_station`，与 EKMA-FNR §11.8 同规则）：
+
+| 站点数 | 红星 | 8 近邻候选（终端表始终给全明细） | 文字标注 |
+|---|---|---|---|
+| **1 站** | ✅ s=280 + 图例 `station (matched)` / `8-NN candidates` | ✅ **包络框**（候选 VOC%/NOx% 的红点矩形）+ 叉点 | 坐标 + 屋脊侧短标签（`ridge-left: NOx-limited` / `ridge-right: NOx-saturated`）+ `match σ`；两观测时附 `2-obs: VOC axis ambiguous ±40–50%` |
+| **2–5 站** | ✅ | ✅ 仅**叉点**（多框会互相遮挡） | `编号: 站名 (VOC% / NOx%)` |
+| **>5 站** | ✅ | ❌ 不画（避免糊图） | 只标**编号**，明细在终端表 |
+
+```text
+终端: 多站汇总表 + 每站 8 近邻候选表（rank/距离σ/VOC%/NOx%）
+      plot.py 只写 PNG，候选明细不落 CSV（全仓 CSV 由 run.py 独占）
+```
+
+⚠ **标记会画进 `ekma_emission_S1.png` 本身**（覆盖同名文件）。存档需无标记响应面时，
+重跑 `python plot.py`（不带 `--obs-*`）即可恢复。
+前置条件：`output/ekma_emission_grid.csv` 与 `ekma_emission_grid_raw.csv_state.csv` 存在（先跑 `run.py`）。
+**站名请用 ASCII**：图件不配 CJK 字体，中文站名会渲染成缺字方块（脚本会告警；中文明细仍在终端）；
+标注位置自动避让（右半区向左标、贴底抬高），不会压住右下角图例。
+
+#### 9.4.2 反查原理与脚本（--obs-single 实测输出对照）
+
+原理：S1 的 676 案例，每个都有两组坐标——**控制坐标** (pert_voc_pct, pert_nox_pct)（图的轴）与
+**状态坐标** (NO2mean_ppb, O3max_ppb)（`_state.csv`，皆可观测）。给定观测 (NO₂, O₃) → 标准化
+(可加 HCHO 第三维) → 找最近案例 → 读其控制坐标。**NO₂ 随 NOx 单调 → NOx 轴定位准；VOC 轴
+靠 O₃ 形状分辨 → 有歧义（±40–50%）**，加 HCHO 第三维可压缩。
 
 ```python
 import sys; sys.path.insert(0, "analysis_lib")
 import numpy as np
 from csvio import read_table, fcol
 
-# 1) 读控制坐标与状态坐标（两文件行序一一对应）
 hg, G = read_table("EKMA-emission/output/ekma_emission_grid.csv")
 hs, S = read_table("EKMA-emission/output/ekma_emission_grid_raw.csv_state.csv")
 pv, pn = fcol(hg, G, "pert_voc_pct"), fcol(hg, G, "pert_nox_pct")
 no2, o3 = fcol(hs, S, "NO2mean_ppb"), fcol(hs, S, "O3max_ppb")
 
-# 2) 标准化（防 O₃ 的 ppb 尺度压过 NO₂）
-M, SD = np.c_[no2, o3].mean(0), np.c_[no2, o3].std(0)
-P = (np.c_[no2, o3] - M) / SD
-
-# 3) 你的观测（同一窗口口径：O₃ 用日最大、NO₂ 用午后/日均）
-NO2_obs, O3_obs = 6.5, 142.0
+NO2_obs, O3_obs = 6.5, 142.0                       # 你的观测（同窗口口径）
+cols = np.c_[no2, o3]
+M, SD = cols.mean(0), cols.std(0)
 q = (np.array([NO2_obs, O3_obs]) - M) / SD
-
-# 4) 最近 10 个候选 → 报告坐标散布（这就是定位不确定度）
-d = np.hypot(P[:, 0]-q[0], P[:, 1]-q[1])
+P = (cols - M) / SD
+d = np.linalg.norm(P - q, axis=1)
 idx = np.argsort(d)[:10]
-print(f"最近案例距离 {d[idx[0]]:.3f}σ")
+print(f"最近距离 {d[idx[0]]:.3f}σ")
 print(f"VOC 轴候选: {pv[idx].min():.0f}–{pv[idx].max():.0f}%  (中位 {np.median(pv[idx]):.0f}%)")
 print(f"NOx 轴候选: {pn[idx].min():.0f}–{pn[idx].max():.0f}%  (中位 {np.median(pn[idx]):.0f}%)")
 ```
 
-**实测输出**（本仓库现数据，`NO₂=6.5 ppb / O₃=142 ppb`）：
-
-```text
-最近案例距离 0.041σ
-VOC 轴候选: 60–80%  (中位 70%)
-NOx 轴候选: 220–250%  (中位 235%)
-```
-
-即该观测对应"VOC +70%、NOx +235%"附近——NOx 轴收得很紧（±15 个百分点），VOC 轴有 20 个百分点
-带宽（符合 §9.4.3 的精度结论）。
-
-#### 9.4.3 实测精度（留一验证 + 噪声检验）
-
-| 检验 | 结果 |
-|---|---|
-| 留一验证（用每个格点自身当观测，找次近点） | **NOx 轴偏差中位 0%、VOC 轴 10%**（80 分位均 10%） |
-| 加入 10% 观测噪声（200 次抽样） | **候选数中位 9 个，轴散布中位：VOC 40% / NOx 10%** |
-
-**结论**：
-- **NOx 轴定位很可靠**（±10%）——因为 NO₂ 随 NOx 单调增，NO₂ 观测直接锁住 NOx；
-- **VOC 轴只能粗定（±40%）**——O₃–NOx 曲线在不同 VOC 水平下形状相似，靠 O₃ 单独难以分辨
-  VOC 高低（这正是 EKMA 固有歧义）；
-- **加一个观测量就能显著改善**：把 `HCHOmean_ppb` 也纳入（卫星 HCHO 可测），留一验证的
-  VOC 轴偏差从 10% 降到 0–10% 量级。
-
-> 实测对照（S2 平面，同样的反演）：仅 O₃+NO₂ 时轴散布 20%/10%，加入 HCHO 后恢复接近精确
-> ——印证"HCHO 是破 VOC 轴歧义的关键第三方观测"（见 `EKMA-FNR/README` §11.7）。
-
-#### 9.4.4 四个硬约束（不满足则结果无意义）
+#### 9.4.3 四条硬约束（自动检查/警告已内置）
 
 | 约束 | 说明 |
 |---|---|
-| **统计口径必须一致** | 模型端是"末 24 步窗口"：`O3max_ppb` = 窗口最大、`NO2mean_ppb` = 窗口均值。观测端要用**对应口径**（O₃ 日最大 8h/1h；NO₂ 日均或午后均值），**不可用峰值 NO₂ 比窗口均值** |
-| **模型依赖性** | 反演用的是"本机制 + 参考源谱"算出的 NO₂–O₃ 关系；你的城市源谱不同 → 状态关系偏移 → 坐标有系统误差（与 §9.3 的近似同源，量级可能更大） |
-| **多解性 = EKMA 歧义** | 同一 (NO₂, O₃) 可能对应"低 VOC 高 NOx"与"高 VOC 低 NOx"两类解——报告时**必须给候选范围**，不要只报单点 |
-| **只在数据覆盖范围内有效** | 观测超出状态范围（NO₂ >19.95 或 O₃ >229.5 ppb / <37.2）→ 最近点仍是边界值，**外推无意义** |
+| **统计口径** | 模型端 `O3max_ppb` = 末 24 输出步窗口最大、`NO2mean_ppb` = 窗口均值；观测端用对应口径（O₃ 日最大、NO₂ 日均），不可用峰值 NO₂ 比均值 |
+| **模型依赖性** | 反查基于"本机制 + 参考源谱"算出的 NO₂–O₃ 关系；你城市源谱不同 → 状态关系偏移 → 坐标有系统误差（与 §9.3 清单法的近似同源，量级可能更大） |
+| **多解性（EKMA 歧义）** | 同一 (NO₂, O₃) 可能对应"低 VOC 高 NOx"与"高 VOC 低 NOx"——**必须报告候选范围**，不报单点。加 HCHO 第三维可压缩（见 §9.4.1 `--with-hcho`） |
+| **覆盖范围** | 观测超出模拟状态包络（NO₂mean / O3max 的 min–max，脚本会逐维检查并警告）→ 最近点仍是边界值，**外推无意义** |
 
-#### 9.4.5 三种定位法对比（本实验并存，按数据可得性选）
+#### 9.4.4 三种定位法对比（本实验并存，按数据可得性选）
 
 | 方法 | 需要的数据 | 精度 | 章节 |
 |---|---|---|---|
 | **A. 清单比值（首选）** | NOx + NMVOC 清单 | 高（轴即清单，无歧义） | §9.3 |
-| **B. O₃+NO₂ 反查（本节的额外法）** | O₃ + NO₂ 观测（常规可得） | NOx 轴 ±10%、VOC 轴 ±40% | §9.4 |
-| **C. O₃+NO₂+HCHO 反查** | 再加卫星 HCHO | 接近 A（轴偏差 ~0–10%） | §9.4.3 末 |
+| **B. O₃+NO₂ 反查（本节）** | O₃ + NO₂ 观测（常规可得） | NOx 轴 ±10%、VOC 轴 ±40–50% | §9.4 |
+| **C. O₃+NO₂+HCHO 反查** | 再加 HCHO（卫星/站点） | 接近 A（VOC 轴歧义被压缩） | §9.4（`--with-hcho`） |
 
 > **推荐**：有清单走 A；无清单但有 HCHO 走 C；只有 O₃/NO₂ 走 B 并**如实报告 VOC 轴的不确定带**。
-
----
-
-## 11. 2026-10-29 决议与修复记录
-
-### 11.1 默认网格与时长（用户决议）
-
-| 项 | 旧 | 新（默认） |
-|---|---|---|
-| 扰动范围 / 步长 | 0–400% / 10%（41 点/轴） | **0–625% / 25%（26 点/轴）** |
-| 案例数 | 1681 | **676** |
-| 模拟时长 | 5 天 / spinup 2 天 | **4 天 / spinup 3 天** |
-| 响应统计窗 | 末 24 步（= 第 5 天） | 末 24 步（= 第 4 天） |
-
-`--pmax 400 --step 10` 可回旧口径（与历史归档可比）。
-
-**为什么 4 天够用（A/B 实测，`fac_batch_omp` 同一网格 3×3、同一配置）**：
-5 天 vs 4 天的 O3max 差 **−0.8% ~ −1.9%**，FNR 差约 −1%（如 0.93→0.90），体制判定不变；
-单批耗时 23.93 s → 19.53 s（**−18.4%**）。4 天/3 天因此作为默认。
-
-> ⚠ 语义澄清：`fac_batch_omp` 的 **SPINUP 只用于「post-spinup ≥24 步」闸门**，
-> 聚合窗固定为末 24 步。所以「spinup 3 天」= 「只报告第 4 天」；真正的成本变化来自 5→4 天。
-
-### 11.2 `--from` 复用与失败判定（修复）
-
-- `--from PATH` 现在**真正读取指定 raw**（绝对/相对仓库根），不装配配置、不编译、不跑模拟；
-- 基线总量（V₀、N₀）改为**取自产出该 raw 的 `runtime_emission.dat`**（源目录优先），
-  杜绝「旧 raw 配新配置」的混基线；找不到 runtime 时 VNr 列留空并明示；
-- 网格范围/步长改为**由 raw 数据推断**，meta 记录模式、来源、时长（从 runtime MODEL 行读）、失败/降级计数；
-- 批量进程 **非零退出即失败**（不再「有 raw 就继续」）；`失败 N / 降级 K` 从 stdout 解析写入 meta。
-
-### 11.3 口径与文档纠偏
-
-| 项 | 处理 |
-|---|---|
-| `O3max` 语义 | 明确为**末 24 个输出步窗口最大**（不是 8h 日最大）；写进图色标、FYI 与 CSV 注释 |
-| `VNr` | 拆为 **`VNr_group`**（E_VOC 组，含 SO₂/DMS/MSA）与 **`VNr_nmv`**（剔除硫）；注明**摩尔比**，不可当质量比 |
-| PR 列名 | `PR_nox0` → **`PR_vs_baseNOx`**、`O3_at_nox0_ppb` → **`O3_at_baseNOx_ppb`**（0% 扰动 = 基线，不是零排放；旧名会误导） |
-| 屋脊越界 | 派生表新增 `ridge_at_edge`；图标题统计越界列数并显式警告 |
-| 列数 | 「grid 保留 18 列」更正为 **17 列** |
-| 图标题 | 删除写死的 “5-day clear-sky”，改为指向 `config_override/` 与 `runtime_emission.dat`（有效输入记录）；姊妹实验 EKMA-FNR 同口径 |
-| 耗时 | 历史 1681 案例（5 天）实测 **2140 s ≈ 36 min**；**当前归档 676 案例 / 4 天实测 360.1 s ≈ 6 min**（`run_meta.txt` 墙钟；batch 自报的是多线程累计 **CPU 秒**，字段已改 `F10.2` 并标注 `CPU s`，不再溢出为 `******`） |
-
-### 11.4 共享执行器修复（影响所有 batch 实验）
-
-`facsimile_impl/fac_batch_omp.f90`：
-
-1. **IRR 侧车坐标错位**：IPR 写出循环复用了网格索引 `i`，导致随后 IRR 行写入错坐标
-   （归档中 1681 行 `fnox` 全为同一值）。已改用独立循环变量；**旧归档的 `_irr.csv` 不可用于逐案例归因**，需重跑
-   （2026-10-29 两轮重跑后，两目录的 `_irr.csv` 已是坐标正确的版本）；
-2. `nst_acc` 加入 OpenMP private，消除重启累计步数的竞态；
-3. 午后口径不再二次调用诊断（同一状态复用 `dg`），减少约 7/24 窗口步的重复速率计算；
-4. IPR/IRR 行改为线程私有缓冲、**临界区外格式化**，临界区只做整行写；
-5. 新增**降级案例计数**（窗口不完整）并打印，调用方写入 meta。
-
-**数值中性验证**：用常数气象 runtime 复跑 13×13 网格，与归档逐格对比 **O3max 最大绝对差 0.000**（153 个共同格点）。
+> 与 EKMA-FNR 的分工见 §9.3.2 末与 `EKMA-FNR/README` §11.6。

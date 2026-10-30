@@ -17,14 +17,20 @@ EKMA-emission/run.py —— S1 排放正交扰动响应面（EKMA-emission）
   y 轴 = E_NOx / E_NOx,BAU   （NOx 排放组扰动 %）
   色标 = O3max [ppb]（末 24 步窗口最大值）
 
-输出（本目录 output/）:
-  ekma_emission_grid_raw.csv   fac_batch_omp 原始 24 列输出（1681 行）
-  ekma_emission_grid.csv       规整后：pert_voc_pct, pert_nox_pct, 关键列
-  run_meta.txt                  运行元数据（网格/耗时/失败数/机制哈希）
+输出（本目录 output/，全部由本文件写出）:
+  runtime_emission.dat            本轮有效输入记录（cfgbuild 产物）
+  ekma_emission_grid_raw.csv      fac_batch_omp 原始 24 列（默认 26×26 = 676 行）
+  ekma_emission_grid_raw.csv_{ipr,irr,state}.csv   执行器侧车（**平均倾向** [molec/cm3/s]，
+                                 与 fac_v3 的窗口积分口径差 dtout 倍）
+  ekma_emission_grid.csv          规整表（pert_nox_pct, pert_voc_pct, 指标列, VNr_group/VNr_nmv）
+  ekma_emission_ridge.csv         每 VOC 列的屋脊点
+  ekma_emission_derived.csv       PR_bau / PR_vs_baseNOx / VNr_ridge_* / ridge_at_edge
+  run_meta.txt                    运行元数据（网格/时长/耗时/失败/降级/氮守恒/侧车单位）
 
 用法:
-  python EKMA-emission/run.py                # 默认 0–400% / 10%
+  python EKMA-emission/run.py                # 默认 0–625% / 25%（26×26 = 676 案例）
   python EKMA-emission/run.py --pmax 200 --step 5
+  python EKMA-emission/run.py --from path/to/ekma_emission_grid_raw.csv   # 只重导出
 """
 import argparse
 import hashlib
@@ -142,6 +148,7 @@ def main(argv):
     os.makedirs(OUT, exist_ok=True)
     dt = None
     nfail_txt = "沿用原 raw（--from 复用模式）"
+    guard_txt = "沿用原 raw（未跑模拟，无从判断）"
     rt_i = None
 
     if a.from_raw:
@@ -166,7 +173,8 @@ def main(argv):
             print("✗ --pmax/--step 非法", file=sys.stderr)
             return 2
         if not os.path.isdir(OVERRIDE_DIR):
-            print(f"缺少完整输入目录: {OVERRIDE_DIR}（不会回退到根 configs）", file=sys.stderr)
+            print(f"缺少完整输入目录: {OVERRIDE_DIR}（本程序唯一输入源，无全局配置层）",
+                  file=sys.stderr)
             return 1
         miss = [f for f in REQUIRED_INPUT if not os.path.isfile(os.path.join(OVERRIDE_DIR, f))]
         if miss:
@@ -200,17 +208,20 @@ def main(argv):
         r = subprocess.run(cmd, cwd=os.path.join(ROOT, "facsimile_impl"),
                            capture_output=True, text=True)
         dt = time.time() - t0
-        tail = [l for l in r.stdout.splitlines() if "FAC-BATCH" in l or "FATAL" in l]
+        tail = [l for l in r.stdout.splitlines()
+                if "FAC-BATCH" in l or "FATAL" in l or "警告" in l or "氮守恒" in l]
         print("  " + (" | ".join(tail) if tail else "batch done"))
-        if r.returncode != 0:
-            print(r.stdout[-800:], r.stderr[-800:], file=sys.stderr)
-            print("  ✗ 批量模拟非零退出（失败或 fatal）—— 结果不完整，拒绝出表",
-                  file=sys.stderr)
-            return 1
+        _mg = [l.strip() for l in r.stdout.splitlines() if "[氮守恒 FAIL]" in l]
+        guard_txt = (f"违例 {len(_mg)} 例: " + " ; ".join(_mg[:3])) if _mg else "0 违例"
         _mf = re.search(r"失败 (\d+)", r.stdout)
         _md = re.search(r"降级 (\d+)", r.stdout)
         nfail_txt = (f"失败 {_mf.group(1) if _mf else '?'} / "
                      f"降级 {_md.group(1) if _md else '?'}")
+        if r.returncode != 0:
+            print(r.stdout[-800:], r.stderr[-800:], file=sys.stderr)
+            print(f"  ✗ 批量模拟非零退出（{nfail_txt}；{guard_txt}）"
+                  f"—— 网格不完整，拒绝出表", file=sys.stderr)
+            return 1
         if _md and int(_md.group(1)) > 0:
             print(f"  ⚠ 有 {_md.group(1)} 个降级案例（窗口不完整）—— 已记入 run_meta")
 
@@ -333,7 +344,10 @@ def main(argv):
                 f" 输入目录: {OVERRIDE_DIR}\n"
                 f" 有效输入记录: output/runtime_emission.dat"
                 f"（IC/EMIS/MODEL/MET 解析值；不在 output 留配置快照目录）\n"
-                f" 失败/降级: {nfail_txt}\n")
+                f" 失败/降级: {nfail_txt}\n"
+                f" 氮守恒不变量: {guard_txt}\n"
+                f" 侧车单位: {os.path.basename(raw)}_ipr.csv/_irr.csv = 末 24 步**平均倾向** "
+                f"[molec/cm3/s]；fac_v3 的三件套是窗口**积分** [molec/cm3]，差 dtout 倍\n")
 
     o3 = fcol(hdr, D, "O3max") if "O3max" in hdr else []
     print(f"  产物: {os.path.relpath(grid_csv, ROOT)}, {os.path.relpath(p_ridge, ROOT)}")

@@ -2,10 +2,11 @@
 # -*- coding: utf-8 -*-
 """
 cfgbuild.py —— ozone_lab 配置编译器
-  configs/ (12 类人类可读配置) → runtime.dat (Fortran 顺序表控平面文件)
+  <程序>/config_override/ (12 类人类可读配置) → runtime.dat (Fortran 顺序表控平面文件)
   编译期完成: 物种存在性校验 / 单位换算(ppb→molec) / 序列单调性校验 /
   情景表达式静态解析 / 光解 l/m/n 表映射 / 排放日型展开
-用法: python cfgbuild.py [input_dir] [out_runtime.dat]
+用法: python cfgbuild.py <配置目录> <runtime 输出文件> [--mech F] [--days N] [--dtout S]
+      三个程序的 run.py 每轮自动调用，一般不需要手动运行。
 """
 import os, re, sys
 from pathlib import Path
@@ -76,8 +77,8 @@ def read_series(path, allow_unit=True):
         if t[i] <= t[i-1]:
             raise ValueError(f"{path}: 时间非单调 @ t={t[i]}")
     if len(t) > 128:
-        raise ValueError(f"{path}: 序列 {len(t)} 点 > Fortran 端上限 128 "
-                         f"(runtime_dat_mod NSER_MAX=8, 每序列 128 点)")
+        raise ValueError(f"{path}: 序列 {len(t)} 点 > Fortran 端每序列上限 128 点 "
+                         f"(runtime_dat_mod ser_t/ser_v 第二维；序列池另见 NSER_MAX=40)")
     return t, v
 
 def read_ic(path):
@@ -188,9 +189,9 @@ def compile_cfg(input_dir="configs", out_path="runtime_v3.dat", mech_override=No
 
     def register_series(name, t, v):
         if name in sidx: return sidx[name]
-        if len(sidx) >= 8:
+        if len(sidx) >= 40:
             raise ValueError(
-                f"序列总数 {len(sidx)+1} > Fortran 端上限 8 (runtime_dat_mod NSER_MAX=8; "
+                f"序列总数 {len(sidx)+1} > Fortran 端上限 40 (runtime_dat_mod NSER_MAX=40; "
                 f"气象+BC 共享同一序列池) — 请合并或降采样: '{name}' 注册被拒绝")
         sidx[name] = len(sidx) + 1
         series[sidx[name]] = (name, t, v)
@@ -209,6 +210,9 @@ def compile_cfg(input_dir="configs", out_path="runtime_v3.dat", mech_override=No
             met_s[k] = sidx[k]; met_c[k] = 0.0
         else:
             met_c[k] = float(val); met_s[k] = 0
+            if k == "BLH" and met_c[k] <= 0:
+                raise ValueError(f"meteo.config: BLH = {val} 非正 — 物理账②④ 的 "
+                                 f"vd/BLH、dB/BLH 将除零（常数分支与 file: 序列同口径校验）")
 
     # ============ ⑥ BC ============
     bcc = read_kv(inp / "bc.config")

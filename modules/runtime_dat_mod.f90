@@ -9,7 +9,7 @@ module runtime_dat_mod
     use oz_mech, only: ns, nj
     implicit none
     integer, parameter :: NMET = 7        ! TEMP PRES RH RADIAT BLH RAIN JFAC
-    integer, parameter :: NSCEN_MAX = 16, NSER_MAX = 8, NTOK = 260
+    integer, parameter :: NSCEN_MAX = 16, NSER_MAX = 40, NTOK = 260   ! 40: 气象 6 条 + BC 观测约束 26+ 物种（CASE 同化），余量 8
     real(8), parameter :: PI = 3.14159265358979d0
 
     character(len=16) :: sp_name(ns)
@@ -189,8 +189,8 @@ contains
                 ! 行1: name n; 行2: t...; 行3: v...
                 iser = iser + 1
                 if (iser > NSER_MAX) then
-                    print '(A,I0,A)', "[read_runtime FATAL] 序列数 ", iser, &
-                        " > NSER_MAX=8 (cfgbuild 应已拦截; runtime.dat 被手改?)"
+                    print '(A,I0,A,I0,A)', "[read_runtime FATAL] 序列数 ", iser, &
+                        " > NSER_MAX=", NSER_MAX, " (cfgbuild 应已拦截; runtime.dat 被手改?)"
                     error stop
                 end if
                 nser = iser

@@ -2,7 +2,7 @@
 # 【气象站序列样例】met_BLH_demo.txt —— 边界层高度逐时观测 → meteo.config 的 BLH
 # =====================================================================
 # 用法: meteo.config 写  BLH = file:constraints/met_BLH_demo.txt
-#       然后重建 runtime_v3.dat (cfgbuild 校验后在 SERIES 段登记)
+#       然后重跑本程序 run.py (cfgbuild 每轮自动重编译 runtime 并校验)
 #
 # 物理作用: 箱子体积 ∝ BLH, 四条账都除以 BLH ——
 #           ① 稀释/夹卷 ② 干湿沉降 ③ 排放浓度化 ④ 膨胀项 dB/BLH。

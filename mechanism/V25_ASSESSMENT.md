@@ -52,7 +52,7 @@
 （集总物种经代表分子映射后判定）。J15/J16/J22/J24 等空出槽位不再引用。
 
 > 本节结论已于 2026-10-27 由人工核对固化为可执行断言
-> `mechanism/audit/jslot_audit.py`（四条不变量 + 负向验证），接入 `make test` / `make jcheck`。
+> `mechanism/audit/jslot_audit.py`（四条不变量 + 负向验证），由 `make jcheck` 运行。
 
 ### 2.3 GLY（乙二醛）光解三分支——与 MCM 逐条对应
 
@@ -166,7 +166,7 @@ V2.5+ 有 20 个单产物反应对应 MCM 多分支，**全部为已声明的集
 | 来源 | 覆盖 | 说明 |
 |---|---|---|
 | MCM v3.3.1 官方速率 | 34 条热反应逐字 + 2 条光解形状族 | 核心无机 + CH₄/醛/酮链 |
-| MCM v3.3.1 光解表 | 18 个在用槽的 l/m/n | `configs/photolysis-rates_MCM` |
+| MCM v3.3.1 光解表 | 18 个在用槽的 l/m/n | `<程序>/config_override/photolysis-rates_MCM` |
 | V2.5 新增 MCM 专属速率 | KO3HO2 / KO3OH / KIOLENO3（+ ETH-NO₃ 内联） | 补缺口，逐字一致 |
 | JPL/IUPAC（与 MCM 同源） | KMT03/04/07/08/11 Troe 逐字 | 夜化学 |
 | JMAP 文献正午值 | 7 个自定义槽（N₂O₅/卤素） | MCM 无基准，声明为文献量级 |
@@ -182,11 +182,11 @@ V2.5+ 有 20 个单产物反应对应 MCM 多分支，**全部为已声明的集
 | `python mechanism/audit/element_audit.py` | 203/203 每反应 C/H/N/O/S/Cl/Br 配平 | ✅ |
 | `python mechanism/audit/mcm_compare.py` | 48 条速率比对（32 无机 + 16 映射）+ 文档漂移检查 | ✅ 8.9% |
 | `python mechanism/audit/jslot_audit.py` | 光解槽位语义：18 个 MCM 官方槽逐槽 ⊆ 判定 + 7 个自定义槽白名单封闭 + JMAP 死参数 + README 52 行一致 | ✅ 0 错位 |
-| `make test` | 71 项功能测试（FT-FREEZE/CFG/DAYS/MECHK/PHOT/SYNC/UNIT 等 14 族）+ 上述三个审计 | ✅ |
-| `run_A..run_M` | 逐入口端到端（无中央 run_all） | ✅ |
+| `bash check_env.sh` | 13 项环境/依赖/二进制自检 | ✅ 13 OK / 0 MISS |
+| `python <程序>/run.py` | 三个自完备程序端到端（六账/IRR/RIR + 两张响应面） | ✅ |
 
 > `mcm_compare.py` 是热反应专用，**不覆盖**光解槽位语义（`J` 值不参与速率求值，
-> 借错槽它无感）。该维度已由 `jslot_audit.py` 固化并接入 `make test` / `make jcheck`，
+> 借错槽它无感）。该维度已由 `jslot_audit.py` 固化（`make jcheck` 运行），
 > 换槽操作不再需要人工按 §2.2 语义表复核。固化过程实测抓出 `mechanism/README.md`
 > 2 处 V2.5 迁槽遗留（§5 反应表 J22→J34、J13→J14），已修正。
 

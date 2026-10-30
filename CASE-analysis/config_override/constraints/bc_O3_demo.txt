@@ -16,15 +16,15 @@
 #
 # ---- 硬约束（违反则 cfgbuild 编译期拒绝）----
 #   • 点数 ≤ 128（本文件 24 点，正好一个日循环）
-#   • 与气象等共享序列池，总序列数 ≤ 8
+#   • 与气象等共享序列池，总序列数 ≤ 40（NSER_MAX）
 #   • 时间严格递增；缺测直接省行（自动线性插值 + 端点钳制）
 #
 # ---- 使用步骤 ----
 #   1. 复制本文件为你自己的名字: cp bc_O3_demo.txt o3_station_MYSITE.txt
 #   2. 替换为你的观测值（保持 t[s] 递增、单位一致）
 #   3. bc.config 加一行:  O3 = file:constraints/o3_station_MYSITE.txt
-#   4. make runtime_v3.dat   （cfgbuild 会校验）
-#   5. cd facsimile_impl && ./fac_v3 SCEN_BAU ../output/assim ../runtime_v3.dat
+#   4. 重跑本程序 run.py（cfgbuild 每轮自动编译 runtime 并校验）
+#   5. 积分由 run.py spawn facsimile_impl/fac_v3（前缀 ../CASE-analysis/output/case）
 #   6. 验证同化生效: 检查 <pref>_ipr.csv 中 O3_B 列显著非零
 #
 # ---- 建议 TAU_MIX（张弛强度）----

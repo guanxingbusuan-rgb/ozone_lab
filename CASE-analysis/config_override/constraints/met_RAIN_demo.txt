@@ -2,7 +2,7 @@
 # 【气象站序列样例】met_RAIN_demo.txt —— 降水强度逐时观测 → meteo.config 的 RAIN
 # =====================================================================
 # 用法: meteo.config 写  RAIN = file:constraints/met_RAIN_demo.txt
-#       然后重建 runtime_v3.dat (cfgbuild 校验后在 SERIES 段登记)
+#       然后重跑本程序 run.py (cfgbuild 每轮自动重编译 runtime 并校验)
 #
 # 物理作用: 进入湿沉降 k_wet = a·RAIN^b, 是 HNO3/H2O2/可溶物种的主要汇。
 #           仅对 wetdep.config 中系数非零的物种生效。

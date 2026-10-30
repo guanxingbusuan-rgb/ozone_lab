@@ -3,8 +3,7 @@
 """
 sat2surf.py —— 卫星柱浓度 → 地表等效 ppb 约束序列 (0-D 箱模型的离线转换器)
 
-背景: ozone_lab 是 0-D 箱体, 无气柱概念 —— 引擎不直读卫星柱浓度
-      (docs/templates/satellite_column.template 明确此边界)。
+背景: ozone_lab 是 0-D 箱体, 无气柱概念 —— 引擎不直读卫星柱浓度。
       卫星数据的正确用法 = 离线转换为表面等效体积混合比, 再走 bc.config 张弛约束。
 
 转换公式 (直观法为主准则, 混合比法仅作参考核对):
@@ -21,7 +20,7 @@ sat2surf.py —— 卫星柱浓度 → 地表等效 ppb 约束序列 (0-D 箱模
   ⚠ 历史 bug: 旧模板写 柱/(空气柱×混合层分数) 且标 [ppb] —— 那是无量纲
     摩尔混合比, 漏 ×1e9, 差 9 个量级。本工具以量级自检 + 参考核对防复发。
 
-输入格式 (照 docs/templates/satellite_column.template):
+输入格式 (注释头 + 三列数据; --selftest 为三条已知值的换算核对):
   # satellite: TROPOMI/S5P  product: OFFL  L2  v: 2.4.0
   # species: NO2_tropo
   # qa_filter: qa_value > 0.75

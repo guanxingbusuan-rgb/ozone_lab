@@ -15,11 +15,12 @@
 !   预算表: batch_budget_init 启动期解析索引 (自检硬失败); 氮守恒在线不变量
 !   物理层: chem_phys_mod 唯一实现 (A1, 与 fac_v3 共享; F3 序列 BC 在此接线)
 !   线程模型: C API 直连, 每线程独立 mem/N_Vector/user_data
-! CLI: fac_batch_omp [ng≤32] [out.csv] [runtime.dat] [jfac列表] [dt列表] [fmin] [fmax]
-!      缺省网格 fmin=0.3, 步长比 1.5 (与历史/哨兵一致);
-!      传 fmin/fmax 可在同范围内加密 (例: 13 点 0.3–7.7 → 步长比 1.31)
-!      例: fac_batch_omp 9 ../output/b.csv ../runtime_v3.dat 0.6,1.0 0,5
-!          fac_batch_omp 13 ../output/run_J/batch.csv ../runtime_v3.dat 1.0 0.0 0.3 7.69
+! CLI: fac_batch_omp [ng≤64] [out.csv] [runtime.dat] [jfac列表] [dt列表] [fmin] [fmax]
+!      [模式 EMIS|IC] [第9参] [LIN]
+!      缺省网格 fmin=0.3、步长比 1.5 (等比)；传 fmin/fmax 指定范围，第 10 参 LIN 走线性网格
+!      正式入口 = EKMA-FNR / EKMA-emission 的 run.py（传绝对路径）；手工等价例:
+!        fac_batch_omp 11 raw.csv runtime_fnr.dat 1.0 0.0 1 11 IC NOX:HCHO LIN
+!        fac_batch_omp 26 raw.csv runtime_emission.dat 1.0 0.0 1 7.25 EMIS 1 LIN
 ! =====================================================================
 module batch_mod
     use iso_c_binding, only: c_double, c_int
@@ -45,6 +46,7 @@ module batch_mod
     logical :: ic_mode = .false.                  ! IC 扰动模式开关
     logical :: ndbg_once = .true.
     !$omp threadprivate(ndbg_once)
+    integer :: nNviol = 0                     ! 氮守恒不变量违例案例数（共享，critical 内累加）
     real(8) :: peff_last(nr)               ! diag_indicators 最近一次 peff (IRR 累积源)
     !$omp threadprivate(peff_last)
     character(len=1), parameter :: iprl(6) = ["P", "L", "E", "D", "B", "X"]
@@ -377,7 +379,7 @@ contains
         end if
         call batch_rates(t, y, rp, peff)
         peff_last = peff
-        ! 氮守恒在线不变量 (每线程首快照)
+        ! 氮守恒在线不变量 (每案例首快照; ndbg_once 在案例开头重置, threadprivate ⇒ 无竞态)
         if (ndbg_once) then
             ndbg_once = .false.
             ych = 0.0d0
@@ -393,6 +395,7 @@ contains
             l1 = sum(wn*abs(ych))
             if (abs(nsum) > 1.0d-4*max(l1, 1.0d0)) then
                 !$omp critical (nwarn)
+                nNviol = nNviol + 1
                 print '(A,ES10.3)', "  [氮守恒 FAIL] |Σ w_N·dy/dt| = ", abs(nsum)
                 !$omp end critical (nwarn)
             end if
@@ -647,6 +650,8 @@ program fac_batch_omp
         ipracc = 0.0d0
         irracc = 0.0d0
         cnt = 0; cntpm = 0
+        ndbg_once = .true.    ! 每案例都检一次首快照（threadprivate ⇒ 线程内私有，无竞态；
+                              ! 若只在每线程检一次，fatal 化会变成"看哪个线程先碰哪个案例"）
         do k = 1, nsteps
             ier = c_cvode(mem, dble(k)*dtout, ny, TRET, CV_NORMAL)
             if (ier /= 0) then
@@ -751,12 +756,13 @@ program fac_batch_omp
     !$omp end parallel do
     close (u); close (uipr); close (u3); close (ust)
     call cpu_time(tend)
-    print '(A,I0,A,I0,A,I0,A,F10.2,A,I0,A)', "FAC-BATCH-OMP ok (", ng*ng*njf*ndt, &
-        " 案例, 失败 ", nfail, ", 降级 ", nwarn, ", ", tend - tstart, &
-        " CPU s, 线程 ", omp_get_max_threads(), ")"
-    ! R11-P2: 部分格点求解失败必须让调用方 (make/CI/脚本) 看见
-    if (nfail > 0) then
-        print '(A,I0,A)', "[FATAL] ", nfail, " 个案例求解失败 (非全流程错误, 但结果不完整)"
+    print '(A,I0,A,I0,A,I0,A,I0,A,F10.2,A,I0,A)', "FAC-BATCH-OMP ok (", ng*ng*njf*ndt, &
+        " 案例, 失败 ", nfail, ", 降级 ", nwarn, ", 氮守恒违例 ", nNviol, ", ", &
+        tend - tstart, " CPU s, 线程 ", omp_get_max_threads(), ")"
+    ! 求解失败或化学不自洽都必须让调用方看见：截断网格 / NOy 不守恒的响应面都不能出
+    if (nfail > 0 .or. nNviol > 0) then
+        print '(A,I0,A,I0,A)', "[FATAL] 求解失败 ", nfail, " 例 / 氮守恒违例 ", nNviol, &
+            " 例 —— 结果不完整或化学不自洽，调用方应拒绝出表"
         stop 1
     end if
 contains

@@ -6,17 +6,10 @@ csvio.py —— CSV 契约读写的**唯一实现**（analysis_lib 层；纯 I/O
 职责边界:
   · 本模块只做"CSV 文本 ↔ 数值"的两件事: 读（含 gfortran 三位指数省略 E 的兜底解析）
     与写（可带 # 注释头）。
-  · 不 import 任何仿真/编排模块（experiments/run/_runner.py 等）——依赖方向恒为单向。
-
-与旧实现的关系（2026-10-27 单源化）:
-  · 原 experiments/run/_lib.py 的 _fnum/read_table/col/last24_mean/write_csv → 本模块
-  · 原 analysis_lib/csvfloat.py 的 fix_fortran_exp/fnum/load_csv_rows → 本模块
-    （csvfloat.py 降为兼容转发层）
-  · 原 analysis_lib/diagnostics.py 的本地 _fix_fortran_exp → 本模块
-    （diagnostics.py 改为 import，函数名保留为别名）
+  · 不 import 任何仿真/编排模块（各程序 run.py 等）——依赖方向恒为单向。
 
 用法（analysis_lib 已在 sys.path 时）:
-    from csvio import read_table, col, last24_mean, series_mean, series_max, write_csv, PPB
+    from csvio import PPB, read_table, read_rows, fcol, write_csv
 """
 import csv
 import os
@@ -62,19 +55,6 @@ def fnum(tok):
         return np.nan
 
 
-def load_csv_rows(path):
-    """读 CSV, 返回 (header, rows_of_float) —— 全部数值列已修复格式"""
-    with open(path) as f:
-        rd = list(csv.reader(f))
-    if not rd:
-        return [], []
-    hdr = [h.strip() for h in rd[0]]
-    out = []
-    for r in rd[1:]:
-        if not r or not any(x.strip() for x in r):
-            continue
-        out.append([fnum(x) for x in r])
-    return hdr, out
 
 
 def read_table(path):
@@ -101,12 +81,6 @@ def read_rows(path):
     return [h.strip() for h in rows[0]], rows[1:]
 
 
-def scol(hdr, rows, name):
-    """read_rows 的按列取字符串"""
-    if name not in hdr:
-        raise KeyError(f"列 '{name}' 不存在; 可用列: {hdr[:8]}...")
-    i = hdr.index(name)
-    return [r[i] if i < len(r) else "" for r in rows]
 
 
 def fcol(hdr, rows, name):
@@ -117,43 +91,12 @@ def fcol(hdr, rows, name):
     return np.array([fnum(r[i]) for r in rows], dtype=float)
 
 
-def col(hdr, data, name):
-    """按列名取 numpy 数组"""
-    if name not in hdr:
-        raise KeyError(f"列 '{name}' 不存在; 可用列: {hdr[:8]}...")
-    i = hdr.index(name)
-    return np.array([r[i] for r in data], dtype=float)
 
 
-def last24_mean(path, species, ppb=True):
-    """conc CSV 末 24 行(小时) 的物种均值；sp 缺列返回 nan。
-
-    仅用于响应面/情景矩阵等明确按“末 24h”聚合的指标；
-    需要 post-spinup 全时间序列统计时用 series_mean。
-    """
-    hdr, data = read_table(path)
-    if species not in hdr or not data:
-        return np.nan
-    v = col(hdr, data, species)[-24:]
-    return float(np.nanmean(v) / (PPB if ppb else 1.0))
 
 
-def series_mean(path, species, ppb=True):
-    """conc CSV 全部 post-spinup 输出行的物种均值；sp 缺列返回 nan。"""
-    hdr, data = read_table(path)
-    if species not in hdr or not data:
-        return np.nan
-    v = col(hdr, data, species)
-    return float(np.nanmean(v) / (PPB if ppb else 1.0))
 
 
-def series_max(path, species, ppb=True):
-    """conc CSV 全部 post-spinup 输出行的物种最大值；sp 缺列返回 nan。"""
-    hdr, data = read_table(path)
-    if species not in hdr or not data:
-        return np.nan
-    v = col(hdr, data, species)
-    return float(np.nanmax(v) / (PPB if ppb else 1.0))
 
 
 def write_csv(path, header, rows, note=None):
